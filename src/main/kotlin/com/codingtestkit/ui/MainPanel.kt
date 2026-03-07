@@ -2,6 +2,7 @@ package com.codingtestkit.ui
 
 import com.codingtestkit.service.ProblemFileManager
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -13,7 +14,7 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
-class MainPanel(project: Project) : JPanel(BorderLayout()), Disposable {
+class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
     private val problemPanel = ProblemPanel(project)
     private val testPanel = TestPanel(project)
@@ -75,6 +76,15 @@ class MainPanel(project: Project) : JPanel(BorderLayout()), Disposable {
         testPanel.setProblemSource(problem.source)
         testPanel.setParameterNames(problem.parameterNames)
         testPanel.setTestCases(problem.testCases)
+
+        // 현재 문제 폴더만 소스 루트로 전환 (중복 클래스 방지)
+        ApplicationManager.getApplication().invokeLater {
+            val vfs = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+            val folderVf = vfs.findFileByIoFile(folder)
+            if (folderVf != null) {
+                ProblemFileManager.markAsSourceRoot(project, folderVf)
+            }
+        }
     }
 
     override fun dispose() {}

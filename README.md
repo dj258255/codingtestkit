@@ -181,12 +181,36 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
   <img src="docs/screenshots/countdown-end.png" width="500" alt="타이머 종료"/>
 </p>
 
-### 설정
+### 설정 & 시험 모드
 
-자동완성과 코드 검사를 끄고 켜는 **시험 모드**를 제공합니다. 실제 코딩테스트 환경과 동일한 조건에서 연습할 수 있습니다. 감지된 도구 경로도 확인 가능합니다.
+자동완성과 코드 검사를 끄고 켜는 **시험 모드**를 제공합니다. 실제 코딩테스트 환경과 동일한 조건에서 연습할 수 있습니다.
 
 <p align="center">
   <img src="docs/screenshots/settings.png" width="600" alt="설정"/>
+</p>
+
+#### 시험 모드 (자동완성 OFF)
+
+시험 모드에서는 코드 자동완성과 검사가 비활성화됩니다. `Integer.`을 입력해도 자동완성 팝업이 표시되지 않아, 실제 시험과 동일한 환경에서 연습할 수 있습니다.
+
+<p align="center">
+  <img src="docs/screenshots/exam-mode-editor.png" width="700" alt="시험 모드 - 에디터"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/exam-mode-no-autocomplete.png" width="400" alt="시험 모드 - 자동완성 없음"/>
+</p>
+
+#### 일반 모드 (자동완성 ON)
+
+일반 모드에서는 `Integer.`을 입력하면 `parseInt`, `bitCount` 등 메서드 목록이 자동으로 표시됩니다.
+
+<p align="center">
+  <img src="docs/screenshots/normal-mode-editor.png" width="700" alt="일반 모드 - 에디터"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/normal-mode-autocomplete.png" width="600" alt="일반 모드 - 자동완성"/>
 </p>
 
 ---

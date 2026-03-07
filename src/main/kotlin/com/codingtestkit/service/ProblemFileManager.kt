@@ -8,7 +8,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.module.ModuleTypeId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -76,28 +78,34 @@ object ProblemFileManager {
         return CreatedFiles(problemDir, codeFile, markdownFile)
     }
 
-    private fun markAsSourceRoot(project: Project, folder: VirtualFile) {
-        val module = ModuleManager.getInstance(project).modules.firstOrNull() ?: return
+    private const val CTK_MODULE_NAME = "CodingTestKit-Problem"
 
-        // 이미 소스 루트로 등록되어 있는지 확인
-        val existingSourceRoots = com.intellij.openapi.roots.ModuleRootManager.getInstance(module).sourceRoots
-        if (existingSourceRoots.any { it.path == folder.path }) return
+    /**
+     * 전용 모듈에 현재 문제 폴더를 소스 루트로 등록
+     * 별도 모듈이므로 기존 src/Main.java와 중복 클래스 충돌 없음
+     */
+    fun markAsSourceRoot(project: Project, folder: VirtualFile) {
+        val moduleManager = ModuleManager.getInstance(project)
 
-        ModuleRootModificationUtil.updateModel(module) { modifiableModel ->
-            // problems 폴더를 포함하는 content entry 찾기
-            val targetEntry = modifiableModel.contentEntries.firstOrNull { entry ->
-                val entryPath = entry.file?.path ?: return@firstOrNull false
-                folder.path.startsWith(entryPath)
+        // 전용 모듈이 없으면 생성
+        var module = moduleManager.findModuleByName(CTK_MODULE_NAME)
+        if (module == null) {
+            WriteAction.runAndWait<Throwable> {
+                val imlPath = "${project.basePath}/.idea/$CTK_MODULE_NAME.iml"
+                module = moduleManager.newModule(imlPath, ModuleTypeId.JAVA_MODULE)
             }
+        }
 
-            if (targetEntry != null) {
-                // 기존 content entry 안에 소스 폴더 추가
-                targetEntry.addSourceFolder(folder, false)
-            } else {
-                // content entry가 없으면 새 content entry + 소스 폴더로 추가
-                val newEntry = modifiableModel.addContentEntry(folder)
-                newEntry.addSourceFolder(folder, false)
+        val mod = module ?: return
+
+        // 소스 루트를 현재 문제 폴더로 교체
+        ModuleRootModificationUtil.updateModel(mod) { model ->
+            for (entry in model.contentEntries.toList()) {
+                model.removeContentEntry(entry)
             }
+            val entry = model.addContentEntry(folder)
+            entry.addSourceFolder(folder, false)
+            model.inheritSdk()
         }
     }
 

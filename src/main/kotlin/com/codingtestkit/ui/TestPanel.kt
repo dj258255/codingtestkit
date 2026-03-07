@@ -473,6 +473,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     scrollPane.preferredSize = Dimension(scrollPane.width, fieldHeight)
                     fieldPanel.revalidate()
                     contentPanel.revalidate()
+                    maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
                     this@TestCaseCard.revalidate()
                     cardListPanel.revalidate()
                     cardListPanel.repaint()
@@ -505,7 +506,11 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         fun updateMaxSize() {
             if (isExpanded) {
-                maximumSize = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
+                // preferredSize 기반으로 제한하여 빈 공간 방지
+                SwingUtilities.invokeLater {
+                    maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+                    cardListPanel.revalidate()
+                }
             } else {
                 val headerHeight = headerPanel.preferredSize.height + insets.top + insets.bottom
                 maximumSize = Dimension(Int.MAX_VALUE, headerHeight)

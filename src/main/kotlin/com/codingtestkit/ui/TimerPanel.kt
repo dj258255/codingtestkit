@@ -189,7 +189,7 @@ class TimerPanel : JPanel(BorderLayout()) {
         private val progressBar = JProgressBar(0, 1000).apply {
             isStringPainted = false
             border = JBUI.Borders.empty(0, JBUI.scale(16), 0, JBUI.scale(16))
-            preferredSize = Dimension(0, JBUI.scale(14))
+            preferredSize = Dimension(0, JBUI.scale(22))
         }
 
         private val hourField = createTimeField("0")
