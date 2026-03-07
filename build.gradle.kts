@@ -31,7 +31,7 @@ intellijPlatform {
         version = "1.0.0"
         ideaVersion {
             sinceBuild = "241"
-            untilBuild = "253.*"
+            untilBuild = "263.*"
         }
     }
 

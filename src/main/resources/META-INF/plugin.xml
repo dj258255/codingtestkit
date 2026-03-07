@@ -20,8 +20,10 @@
             <li>문제 가져오기 - 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
             <li>로컬 테스트 - Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 및 결과 비교</li>
             <li>코드 제출 - JCEF 브라우저로 각 플랫폼에 직접 제출</li>
+            <li>자동 문제 인식 - 코드 파일 열면 해당 문제 자동 로드</li>
+            <li>시험 환경 모드 - 코드 자동완성/검사 끄기로 실제 시험과 동일한 환경 구현</li>
             <li>코드 템플릿 - 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
-            <li>타이머 - 스톱워치 / 카운트다운 타이머</li>
+            <li>타이머 - 스톱워치 / 카운트다운으로 시험 시간 관리</li>
             <li>디버그 출력 분리 - System.out.println 디버그 출력을 자동 구분</li>
         </ul>
 
@@ -50,7 +52,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow id="CodingTestKit"
                     secondary="true"
-                    icon="AllIcons.Toolwindows.ToolWindowRun"
+                    icon="/icons/ctk-toolwindow.svg"
                     anchor="right"
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>

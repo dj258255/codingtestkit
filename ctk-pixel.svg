@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" shape-rendering="crispEdges">
+  <!-- Background - dark IntelliJ style -->
+  <rect width="128" height="128" fill="#1e1f22"/>
+  
+  <!-- Pixel border frame -->
+  <rect x="4" y="4" width="120" height="120" fill="none" stroke="#ff6b35" stroke-width="4"/>
+  <rect x="8" y="8" width="112" height="112" fill="none" stroke="#ff8c42" stroke-width="2"/>
+
+  <!-- Inner dark panel -->
+  <rect x="12" y="12" width="104" height="104" fill="#2b2d30"/>
+
+  <!-- CRT scanlines across entire inner panel -->
+  <rect x="12" y="14" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="18" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="22" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="26" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="30" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="34" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="38" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="42" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="46" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="50" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="54" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="58" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="62" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="66" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="70" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="74" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="78" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="82" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="86" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="90" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="94" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="98" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="102" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="106" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+  <rect x="12" y="110" width="104" height="2" fill="#ffffff" opacity="0.03"/>
+
+  <!-- Corner pixels - orange accent -->
+  <rect x="4" y="4" width="8" height="8" fill="#ff6b35"/>
+  <rect x="116" y="4" width="8" height="8" fill="#ff6b35"/>
+  <rect x="4" y="116" width="8" height="8" fill="#ff6b35"/>
+  <rect x="116" y="116" width="8" height="8" fill="#ff6b35"/>
+
+  <!-- Pixel art: code bracket < -->
+  <rect x="18" y="44" width="4" height="4" fill="#ff8c42"/>
+  <rect x="22" y="48" width="4" height="4" fill="#ff8c42"/>
+  <rect x="26" y="52" width="4" height="4" fill="#ff8c42"/>
+  <rect x="22" y="56" width="4" height="4" fill="#ff8c42"/>
+  <rect x="18" y="60" width="4" height="4" fill="#ff8c42"/>
+
+  <!-- Pixel art: code bracket / (more vertical, closer to >) -->
+  <rect x="32" y="60" width="4" height="4" fill="#ffd700"/>
+  <rect x="34" y="56" width="4" height="4" fill="#ffd700"/>
+  <rect x="36" y="52" width="4" height="4" fill="#ffd700"/>
+  <rect x="38" y="48" width="4" height="4" fill="#ffd700"/>
+  <rect x="40" y="44" width="4" height="4" fill="#ffd700"/>
+
+  <!-- Pixel art: code bracket > (shifted left to be closer to /) -->
+  <rect x="56" y="44" width="4" height="4" fill="#ff8c42"/>
+  <rect x="52" y="48" width="4" height="4" fill="#ff8c42"/>
+  <rect x="48" y="52" width="4" height="4" fill="#ff8c42"/>
+  <rect x="52" y="56" width="4" height="4" fill="#ff8c42"/>
+  <rect x="56" y="60" width="4" height="4" fill="#ff8c42"/>
+
+  <!-- Pixel art: exam paper — x=72~112 (40px), y=22~54 -->
+  <rect x="72" y="22" width="40" height="32" fill="#2e3250"/>
+  <rect x="72" y="22" width="40" height="32" fill="none" stroke="#9da5c9" stroke-width="2"/>
+  <!-- Dog-ear fold top-right -->
+  <polygon points="102,22 112,22 112,32" fill="#2b2d30"/>
+  <polygon points="102,22 112,32 102,32" fill="#6b7299"/>
+  <!-- Paper lines -->
+  <rect x="76" y="28" width="6" height="2" fill="#ffd700" opacity="0.9"/>
+  <rect x="84" y="28" width="20" height="2" fill="#9da5c9" opacity="0.6"/>
+  <rect x="76" y="34" width="6" height="2" fill="#ffd700" opacity="0.9"/>
+  <rect x="84" y="34" width="20" height="2" fill="#9da5c9" opacity="0.6"/>
+  <rect x="76" y="40" width="6" height="2" fill="#ffd700" opacity="0.9"/>
+  <rect x="84" y="40" width="13" height="2" fill="#9da5c9" opacity="0.6"/>
+  <rect x="76" y="46" width="24" height="2" fill="#ff8c42" opacity="0.8"/>
+  <!-- Mini checkmark on paper -->
+  <rect x="99" y="44" width="2" height="2" fill="#4CAF50"/>
+  <rect x="101" y="46" width="2" height="2" fill="#4CAF50"/>
+  <rect x="103" y="42" width="2" height="2" fill="#4CAF50"/>
+  <rect x="105" y="40" width="2" height="2" fill="#4CAF50"/>
+
+  <!-- Pixel circle — x=72~112 (40px), y=60~92 (6px gap after paper) -->
+  <!-- Circle fill -->
+  <rect x="76" y="60" width="32" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="64" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="68" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="72" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="76" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="80" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="72" y="84" width="40" height="4" fill="#1a3d1f"/>
+  <rect x="76" y="88" width="32" height="4" fill="#1a3d1f"/>
+  <!-- Circle border -->
+  <rect x="76" y="60" width="32" height="4" fill="#4CAF50"/>
+  <rect x="72" y="64" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="64" width="4" height="4" fill="#4CAF50"/>
+  <rect x="72" y="68" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="68" width="4" height="4" fill="#4CAF50"/>
+  <rect x="72" y="72" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="72" width="4" height="4" fill="#4CAF50"/>
+  <rect x="72" y="76" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="76" width="4" height="4" fill="#4CAF50"/>
+  <rect x="72" y="80" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="80" width="4" height="4" fill="#4CAF50"/>
+  <rect x="72" y="84" width="4" height="4" fill="#4CAF50"/>
+  <rect x="108" y="84" width="4" height="4" fill="#4CAF50"/>
+  <rect x="76" y="88" width="32" height="4" fill="#4CAF50"/>
+  <!-- Checkmark inside circle -->
+  <rect x="78" y="76" width="4" height="4" fill="#66BB6A"/>
+  <rect x="82" y="80" width="4" height="4" fill="#66BB6A"/>
+  <rect x="86" y="84" width="4" height="4" fill="#66BB6A"/>
+  <rect x="90" y="80" width="4" height="4" fill="#66BB6A"/>
+  <rect x="94" y="76" width="4" height="4" fill="#66BB6A"/>
+  <rect x="98" y="72" width="4" height="4" fill="#66BB6A"/>
+  <rect x="102" y="68" width="4" height="4" fill="#66BB6A"/>
+  <!-- Highlight -->
+  <rect x="78" y="76" width="2" height="2" fill="#a5d6a7"/>
+  <rect x="102" y="68" width="2" height="2" fill="#a5d6a7"/>
+
+  <!-- Bottom pixel text: CTK — 5×7 dot matrix, 3px dots, y=85~109 -->
+
+  <!-- C (x=15)
+       . █ █ █ .
+       █ . . . .
+       █ . . . .
+       █ . . . .
+       █ . . . .
+       █ . . . .
+       . █ █ █ .
+  -->
+  <rect x="18" y="85" width="9" height="3" fill="#ff6b35"/>
+  <rect x="15" y="88" width="3" height="3" fill="#ff6b35"/>
+  <rect x="15" y="91" width="3" height="3" fill="#ff6b35"/>
+  <rect x="15" y="94" width="3" height="3" fill="#ff6b35"/>
+  <rect x="15" y="97" width="3" height="3" fill="#ff6b35"/>
+  <rect x="15" y="100" width="3" height="3" fill="#ff6b35"/>
+  <rect x="18" y="103" width="9" height="3" fill="#ff6b35"/>
+
+  <!-- T (x=31)
+       █ █ █ █ █
+       . . █ . .
+       . . █ . .
+       . . █ . .
+       . . █ . .
+       . . █ . .
+       . . █ . .
+  -->
+  <rect x="31" y="85" width="15" height="3" fill="#ff6b35"/>
+  <rect x="37" y="88" width="3" height="3" fill="#ff6b35"/>
+  <rect x="37" y="91" width="3" height="3" fill="#ff6b35"/>
+  <rect x="37" y="94" width="3" height="3" fill="#ff6b35"/>
+  <rect x="37" y="97" width="3" height="3" fill="#ff6b35"/>
+  <rect x="37" y="100" width="3" height="3" fill="#ff6b35"/>
+  <rect x="37" y="103" width="3" height="3" fill="#ff6b35"/>
+
+  <!-- K (x=51)
+       █ . . . █
+       █ . . █ .
+       █ . █ . .
+       █ █ . . .
+       █ . █ . .
+       █ . . █ .
+       █ . . . █
+  -->
+  <rect x="51" y="85" width="3" height="3" fill="#ff6b35"/>
+  <rect x="63" y="85" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="88" width="3" height="3" fill="#ff6b35"/>
+  <rect x="60" y="88" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="91" width="3" height="3" fill="#ff6b35"/>
+  <rect x="57" y="91" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="94" width="3" height="3" fill="#ff6b35"/>
+  <rect x="54" y="94" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="97" width="3" height="3" fill="#ff6b35"/>
+  <rect x="57" y="97" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="100" width="3" height="3" fill="#ff6b35"/>
+  <rect x="60" y="100" width="3" height="3" fill="#ff6b35"/>
+  <rect x="51" y="103" width="3" height="3" fill="#ff6b35"/>
+  <rect x="63" y="103" width="3" height="3" fill="#ff6b35"/>
+
+  <!-- Pixel noise / grain overlay -->
+  <rect x="20" y="20" width="2" height="2" fill="#ff6b35" opacity="0.15"/>
+  <rect x="100" y="24" width="2" height="2" fill="#ff8c42" opacity="0.1"/>
+  <rect x="110" y="40" width="2" height="2" fill="#ffd700" opacity="0.12"/>
+  <rect x="16" y="80" width="2" height="2" fill="#ff6b35" opacity="0.1"/>
+</svg>
