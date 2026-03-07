@@ -23,9 +23,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private val sourceCombo = ComboBox(ProblemSource.entries.map { it.displayName }.toTypedArray()).apply {
         preferredSize = Dimension(JBUI.scale(100), preferredSize.height)
+        renderer = createComboRenderer()
     }
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray()).apply {
         preferredSize = Dimension(JBUI.scale(90), preferredSize.height)
+        renderer = createComboRenderer()
     }
     private val problemIdField = JTextField().apply {
         toolTipText = "문제 번호 또는 URL을 입력하세요"
@@ -127,6 +129,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
         problemIdField.putClientProperty("JTextField.placeholderText", placeholder)
         problemIdField.toolTipText = tooltip
+    }
+
+    private fun createComboRenderer(): ListCellRenderer<Any?> {
+        return ListCellRenderer { list, value, index, isSelected, cellHasFocus ->
+            JLabel(value?.toString() ?: "").apply {
+                isOpaque = true
+                border = JBUI.Borders.empty(2, 8)
+                background = if (isSelected) list.selectionBackground else list.background
+                foreground = if (isSelected) list.selectionForeground else list.foreground
+                font = list.font
+            }
+        }
     }
 
     private fun createLabel(text: String): JLabel {
@@ -333,14 +347,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         fetchButton.isEnabled = true
         fetchButton.text = "가져오기"
 
-        Messages.showInfoMessage(
-            project,
-            "문제를 가져왔습니다!\n" +
-                    "폴더: ${files.folder.name}\n" +
-                    "코드: ${files.codeFile.name}\n" +
-                    "설명: ${files.markdownFile.name}",
-            "CodingTestKit"
-        )
+        com.intellij.notification.NotificationGroupManager.getInstance()
+            .getNotificationGroup("CodingTestKit")
+            .createNotification(
+                "문제를 가져왔습니다!",
+                "폴더: ${files.folder.name} | 코드: ${files.codeFile.name}",
+                com.intellij.notification.NotificationType.INFORMATION
+            )
+            .notify(project)
     }
 
     /**
@@ -453,36 +467,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             append(desc)
 
-            // 예제 입출력 표시
-            if (problem.testCases.isNotEmpty()) {
-                if (problem.source == ProblemSource.PROGRAMMERS && problem.parameterNames.isNotEmpty()) {
-                    // 프로그래머스: 표 형태로 표시
-                    val cellStyle = "padding:8px 12px; border:1px solid #555;"
-                    val headerStyle = "$cellStyle background:#3c3f41; color:#bbb; font-weight:bold;"
-                    append("<h3>입출력 예</h3>")
-                    append("<table cellspacing='0' cellpadding='0' style='border-collapse:collapse; width:100%;'>")
-                    append("<tr>")
-                    for (param in problem.parameterNames) {
-                        append("<th style='$headerStyle'>$param</th>")
-                    }
-                    append("<th style='$headerStyle'>return</th>")
-                    append("</tr>")
-                    for (tc in problem.testCases) {
-                        append("<tr>")
-                        val inputs = tc.input.split("\n")
-                        for ((j, _) in problem.parameterNames.withIndex()) {
-                            val value = inputs.getOrElse(j) { "" }
-                                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                            append("<td style='$cellStyle font-family:monospace;'>$value</td>")
-                        }
-                        val output = tc.expectedOutput
-                            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                        append("<td style='$cellStyle font-family:monospace;'>$output</td>")
-                        append("</tr>")
-                    }
-                    append("</table>")
-                } else {
-                    // 백준/SWEA: 입력/출력 블록
+            // 예제 입출력 표시 (프로그래머스는 설명 HTML에 이미 테이블 포함)
+            if (problem.testCases.isNotEmpty() && problem.source != ProblemSource.PROGRAMMERS) {
                     for ((i, tc) in problem.testCases.withIndex()) {
                         val preStyle = "background:#2b2b2b; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace;"
                         if (problem.source == ProblemSource.SWEA) {
@@ -506,7 +492,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                             append("<div style='$preStyle'>$outputHtml</div>")
                         }
                     }
-                }
             }
 
             append("</body></html>")

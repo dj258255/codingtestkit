@@ -57,5 +57,6 @@
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
+        <notificationGroup id="CodingTestKit" displayType="BALLOON"/>
     </extensions>
 </idea-plugin>

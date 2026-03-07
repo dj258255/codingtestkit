@@ -146,10 +146,20 @@ object CodeRunner {
         return """
 $solutionClass
 ///MAIN_SEPARATOR///
-${importBlock}class Main {
+${importBlock}import java.util.Arrays;
+class Main {
     public static void main(String[] args) {
         Solution sol = new Solution();
-        System.out.println(sol.solution($args));
+        printResult(sol.solution($args));
+    }
+    static void printResult(Object o) {
+        if (o instanceof String) System.out.println("\"" + o + "\"");
+        else if (o instanceof int[]) System.out.println(Arrays.toString((int[])o));
+        else if (o instanceof long[]) System.out.println(Arrays.toString((long[])o));
+        else if (o instanceof double[]) System.out.println(Arrays.toString((double[])o));
+        else if (o instanceof boolean[]) System.out.println(Arrays.toString((boolean[])o));
+        else if (o instanceof Object[]) System.out.println(Arrays.deepToString((Object[])o));
+        else System.out.println(o);
     }
 }
 """.trimIndent()
@@ -160,7 +170,11 @@ ${importBlock}class Main {
         return """
 $code
 
-print(solution($args))
+_result = solution($args)
+if isinstance(_result, str):
+    print(f'"{_result}"')
+else:
+    print(_result)
 """.trimIndent()
     }
 
@@ -178,9 +192,11 @@ using namespace std;
 $includes
 $code
 
+template<typename T> void printResult(T r) { cout << r << endl; }
+void printResult(string r) { cout << "\"" << r << "\"" << endl; }
+
 int main() {
-    auto result = solution($args);
-    cout << result << endl;
+    printResult(solution($args));
     return 0;
 }
 """.trimIndent()
@@ -192,7 +208,9 @@ int main() {
 $code
 
 fun main() {
-    println(solution($args))
+    val result = solution($args)
+    if (result is String) println("\"${'$'}result\"")
+    else println(result)
 }
 """.trimIndent()
     }

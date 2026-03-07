@@ -2,20 +2,22 @@ package com.codingtestkit.ui
 
 import com.codingtestkit.service.ProblemFileManager
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
-class MainPanel(project: Project) : JPanel(BorderLayout()) {
+class MainPanel(project: Project) : JPanel(BorderLayout()), Disposable {
 
     private val problemPanel = ProblemPanel(project)
     private val testPanel = TestPanel(project)
-    private val templatePanel = TemplatePanel(project)
+    private val templatePanel = TemplatePanel(project).also { Disposer.register(this, it) }
     private val timerPanel = TimerPanel()
     private val settingsPanel = SettingsPanel(project)
     private var lastLoadedFolder: String? = null
@@ -74,4 +76,6 @@ class MainPanel(project: Project) : JPanel(BorderLayout()) {
         testPanel.setParameterNames(problem.parameterNames)
         testPanel.setTestCases(problem.testCases)
     }
+
+    override fun dispose() {}
 }

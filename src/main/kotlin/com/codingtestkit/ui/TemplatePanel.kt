@@ -4,11 +4,17 @@ import com.codingtestkit.model.CodeTemplate
 import com.codingtestkit.model.Language
 import com.codingtestkit.service.TemplateService
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
@@ -16,7 +22,7 @@ import com.intellij.util.ui.JBUI
 import java.awt.*
 import javax.swing.*
 
-class TemplatePanel(private val project: Project) : JPanel(BorderLayout()) {
+class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
     private val templateList = JBList<String>()
     private val templateListModel = DefaultListModel<String>()
@@ -34,13 +40,8 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()) {
         toolTipText = "선택한 템플릿 삭제"
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
     }
-    private val previewArea = JTextArea().apply {
-        isEditable = false
-        font = Font("JetBrains Mono", Font.PLAIN, JBUI.scale(12))
-        background = JBColor(Color(245, 245, 245), Color(43, 43, 43))
-        border = JBUI.Borders.empty(8)
-        lineWrap = false
-    }
+    private var previewEditor: EditorEx? = null
+    private val previewPanel = JPanel(BorderLayout())
 
     init {
         border = JBUI.Borders.empty()
@@ -107,12 +108,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()) {
         }
         centerPanel.topComponent = listScrollPane
 
-        val previewScrollPane = JBScrollPane(previewArea).apply {
-            minimumSize = Dimension(0, JBUI.scale(100))
-        }
-
         // 미리보기 헤더
-        val previewPanel = JPanel(BorderLayout())
         val previewHeader = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), JBUI.scale(2))).apply {
             background = JBColor(Color(240, 240, 240), Color(50, 50, 50))
             border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
@@ -123,7 +119,8 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()) {
             icon = AllIcons.Actions.Preview
         })
         previewPanel.add(previewHeader, BorderLayout.NORTH)
-        previewPanel.add(previewScrollPane, BorderLayout.CENTER)
+        previewPanel.minimumSize = Dimension(0, JBUI.scale(100))
+        updatePreviewEditor("", "Java")
         centerPanel.bottomComponent = previewPanel
 
         add(centerPanel, BorderLayout.CENTER)
@@ -210,13 +207,59 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()) {
 
         TemplateService.getInstance(project).deleteTemplate(name)
         refreshTemplateList()
-        previewArea.text = ""
+        updatePreviewEditor("", "Java")
     }
 
     private fun previewSelectedTemplate() {
         val template = getSelectedTemplate()
-        previewArea.text = template?.code ?: ""
-        previewArea.caretPosition = 0
+        updatePreviewEditor(template?.code ?: "", template?.language ?: "Java")
+    }
+
+    private fun updatePreviewEditor(code: String, language: String) {
+        // 기존 에디터 제거
+        previewEditor?.let { editor ->
+            previewPanel.remove(editor.component)
+            EditorFactory.getInstance().releaseEditor(editor)
+        }
+
+        // 새 에디터 생성
+        val document = EditorFactory.getInstance().createDocument(code)
+        val editor = EditorFactory.getInstance().createViewer(document, project) as EditorEx
+
+        // 언어별 구문 강조 설정
+        val extension = when (language) {
+            "Java" -> "java"
+            "Python" -> "py"
+            "C++" -> "cpp"
+            "Kotlin" -> "kt"
+            "JavaScript" -> "js"
+            else -> "txt"
+        }
+        val fileType = FileTypeManager.getInstance().getFileTypeByExtension(extension)
+        val highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, fileType)
+        editor.highlighter = highlighter
+
+        // 에디터 설정
+        editor.settings.apply {
+            isLineNumbersShown = true
+            isFoldingOutlineShown = false
+            isAdditionalPageAtBottom = false
+            isLineMarkerAreaShown = false
+            isIndentGuidesShown = true
+            isRightMarginShown = false
+        }
+
+        previewEditor = editor
+        previewPanel.add(editor.component, BorderLayout.CENTER)
+        previewPanel.revalidate()
+        previewPanel.repaint()
+    }
+
+    override fun dispose() {
+        previewEditor?.let { editor ->
+            EditorFactory.getInstance().releaseEditor(editor)
+            previewEditor = null
+        }
     }
 
     private fun getSelectedTemplate(): CodeTemplate? {

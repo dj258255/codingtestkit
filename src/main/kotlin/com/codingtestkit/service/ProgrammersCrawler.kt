@@ -34,6 +34,13 @@ object ProgrammersCrawler {
         val initialCode = extractInitialCode(doc)
         val difficulty = extractDifficulty(doc)
 
+        // 초기 코드가 없으면 파라미터/테스트 케이스에서 추론하여 생성
+        val finalCode = if (initialCode.isNotBlank()) {
+            initialCode
+        } else if (paramNames.isNotEmpty() && testCases.isNotEmpty()) {
+            buildInitialCodeFromParams(paramNames, testCases)
+        } else ""
+
         return Problem(
             source = ProblemSource.PROGRAMMERS,
             id = lessonId,
@@ -41,7 +48,7 @@ object ProgrammersCrawler {
             description = description,
             testCases = testCases,
             parameterNames = paramNames,
-            initialCode = initialCode,
+            initialCode = finalCode,
             difficulty = difficulty
         )
     }
@@ -210,6 +217,12 @@ object ProgrammersCrawler {
         return Pair(paramNames, testCases)
     }
 
+    private fun stripSurroundingQuotes(value: String): String {
+        return if (value.startsWith("\"") && value.endsWith("\"") && value.length >= 2) {
+            value.substring(1, value.length - 1)
+        } else value
+    }
+
     /**
      * 초기 코드 (solution 함수 시그니처) 추출
      */
@@ -224,14 +237,35 @@ object ProgrammersCrawler {
         }
 
         // script 태그의 JSON에서 초기 코드 추출
+        val codeKeys = listOf("code", "solution_code", "default_code", "initial_code", "initialCode")
         for (script in doc.select("script")) {
             val data = script.data()
-            if (data.contains("\"code\"") || data.contains("\"solution_code\"")) {
+            for (key in codeKeys) {
+                if (data.contains("\"$key\"")) {
+                    try {
+                        val codeMatch = Regex("\"$key\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                            .find(data)
+                        if (codeMatch != null) {
+                            val extracted = codeMatch.groupValues[1]
+                                .replace("\\n", "\n")
+                                .replace("\\t", "\t")
+                                .replace("\\\"", "\"")
+                            // Java 코드인 경우만 반환
+                            if (extracted.contains("class Solution") || extracted.contains("public")) {
+                                return extracted
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
+            // JSON 배열 형태의 코드 목록에서 Java 찾기
+            if (data.contains("class Solution") && data.contains("public")) {
                 try {
-                    val codeMatch = Regex("\"(?:code|solution_code|default_code)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                    val javaCodeMatch = Regex("\"(class Solution\\s*\\{(?:[^\"\\\\]|\\\\.)*)\"")
                         .find(data)
-                    if (codeMatch != null) {
-                        return codeMatch.groupValues[1]
+                    if (javaCodeMatch != null) {
+                        return javaCodeMatch.groupValues[1]
                             .replace("\\n", "\n")
                             .replace("\\t", "\t")
                             .replace("\\\"", "\"")
@@ -284,6 +318,77 @@ object ProgrammersCrawler {
         if (bodyMatch != null) return "Level${bodyMatch.groupValues[1]}"
 
         return "Unrated"
+    }
+
+    /**
+     * 테스트 케이스 값에서 Java 타입 추론
+     */
+    private fun inferJavaType(value: String): String {
+        val v = value.trim()
+        if (v.startsWith("\"") && v.endsWith("\"")) return "String"
+        if (v == "true" || v == "false") return "boolean"
+        if (v.startsWith("[[")) {
+            if (v.contains("\"")) return "String[][]"
+            return "int[][]"
+        }
+        if (v.startsWith("[")) {
+            if (v.contains("\"")) return "String[]"
+            if (v.contains(".")) return "double[]"
+            if (v.contains("true") || v.contains("false")) return "boolean[]"
+            return "int[]"
+        }
+        if (v.contains(".") && v.toDoubleOrNull() != null) return "double"
+        if (v.toLongOrNull() != null) {
+            val num = v.toLong()
+            return if (num > Int.MAX_VALUE || num < Int.MIN_VALUE) "long" else "int"
+        }
+        return "String"
+    }
+
+    private fun defaultValue(type: String): String = when (type) {
+        "String" -> "\"\"" ; "int" -> "0" ; "long" -> "0L"
+        "double" -> "0.0" ; "boolean" -> "false"
+        else -> if (type.endsWith("[]")) "{}" else "null"
+    }
+
+    /**
+     * 파라미터명 + 테스트 케이스에서 Java 초기 코드 생성
+     */
+    private fun buildInitialCodeFromParams(paramNames: List<String>, testCases: List<TestCase>): String {
+        val firstTC = testCases.first()
+        val inputValues = firstTC.input.split("\n").map { it.trim() }
+
+        // 파라미터 타입 추론
+        val paramTypes = inputValues.mapIndexed { i, v ->
+            if (i < paramNames.size) inferJavaType(v) else "int"
+        }
+
+        // 반환 타입 추론 (expectedOutput에서 따옴표가 이미 제거된 상태)
+        val expectedRaw = firstTC.expectedOutput.trim()
+        // 원본 테이블에서 따옴표가 있었는지 확인 (stripSurroundingQuotes로 제거됨)
+        // 따옴표가 제거된 결과가 숫자/배열/불린이 아니면 String
+        val returnType = if (expectedRaw.startsWith("[")) {
+            inferJavaType(expectedRaw)
+        } else if (expectedRaw == "true" || expectedRaw == "false") {
+            "boolean"
+        } else if (expectedRaw.toLongOrNull() != null) {
+            val num = expectedRaw.toLong()
+            if (num > Int.MAX_VALUE || num < Int.MIN_VALUE) "long" else "int"
+        } else if (expectedRaw.toDoubleOrNull() != null) {
+            "double"
+        } else {
+            "String" // 따옴표가 있었으므로 String
+        }
+
+        val params = paramNames.zip(paramTypes).joinToString(", ") { (name, type) -> "$type $name" }
+        val defVal = defaultValue(returnType)
+
+        return """class Solution {
+    public $returnType solution($params) {
+        $returnType answer = $defVal;
+        return answer;
+    }
+}"""
     }
 
     /**

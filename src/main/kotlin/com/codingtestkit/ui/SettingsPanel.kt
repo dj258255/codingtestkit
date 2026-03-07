@@ -16,18 +16,18 @@ class SettingsPanel(private val project: Project) : JPanel() {
 
     init {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        border = JBUI.Borders.empty(12)
+        border = JBUI.Borders.empty(8)
 
         // 제목
         val titlePanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(30))
+            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(24))
         }
         titlePanel.add(JLabel("알고리즘 풀이 설정").apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(15f).toFloat())
         })
         add(titlePanel)
-        add(Box.createVerticalStrut(JBUI.scale(12)))
+        add(Box.createVerticalStrut(JBUI.scale(6)))
 
         // 토글 섹션
         val toggleSection = createSection("코딩 환경")
@@ -35,13 +35,13 @@ class SettingsPanel(private val project: Project) : JPanel() {
         autoCompleteToggle.isSelected = CodeInsightSettings.getInstance().AUTO_POPUP_COMPLETION_LOOKUP
         autoCompleteToggle.addActionListener { toggleAutoComplete() }
         toggleSection.add(autoCompleteToggle)
-        toggleSection.add(Box.createVerticalStrut(JBUI.scale(4)))
+        toggleSection.add(Box.createVerticalStrut(JBUI.scale(2)))
 
         inspectionToggle.alignmentX = LEFT_ALIGNMENT
         inspectionToggle.isSelected = !PowerSaveMode.isEnabled()
         inspectionToggle.addActionListener { toggleInspections() }
         toggleSection.add(inspectionToggle)
-        toggleSection.add(Box.createVerticalStrut(JBUI.scale(8)))
+        toggleSection.add(Box.createVerticalStrut(JBUI.scale(4)))
 
         // 프리셋 버튼
         val presetPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0)).apply {
@@ -69,20 +69,20 @@ class SettingsPanel(private val project: Project) : JPanel() {
         presetPanel.add(normalModeBtn)
         toggleSection.add(presetPanel)
         add(toggleSection)
-        add(Box.createVerticalStrut(JBUI.scale(12)))
+        add(Box.createVerticalStrut(JBUI.scale(6)))
 
         // 도움말
         val helpSection = createSection("도움말")
         helpSection.add(createHelpLine(AllIcons.General.Information,
             "자동완성 끄기: 타이핑 시 자동완성 팝업이 나타나지 않습니다"))
-        helpSection.add(Box.createVerticalStrut(JBUI.scale(4)))
+        helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
             "코드 검사 끄기: 절전 모드를 활성화하여 백그라운드 분석을 중지합니다"))
-        helpSection.add(Box.createVerticalStrut(JBUI.scale(4)))
-        helpSection.add(createHelpLine(AllIcons.General.Tip,
+        helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+        helpSection.add(createHelpLine(AllIcons.General.Information,
             "두 기능을 모두 끄면 코딩 테스트 환경과 유사하게 연습할 수 있습니다"))
         add(helpSection)
-        add(Box.createVerticalStrut(JBUI.scale(12)))
+        add(Box.createVerticalStrut(JBUI.scale(6)))
 
         // 감지된 도구 경로
         val pathSection = createSection("감지된 도구 경로")
@@ -90,7 +90,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
         for ((name, path) in paths) {
             val found = path.isNotBlank() && (name == "JAVA_HOME" || java.io.File(path).exists())
             pathSection.add(createPathLine(name, path, found))
-            pathSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+            pathSection.add(Box.createVerticalStrut(JBUI.scale(1)))
         }
         add(pathSection)
 
@@ -98,7 +98,11 @@ class SettingsPanel(private val project: Project) : JPanel() {
     }
 
     private fun createSection(title: String): JPanel {
-        return JPanel().apply {
+        return object : JPanel() {
+            override fun getMaximumSize(): Dimension {
+                return Dimension(super.getMaximumSize().width, preferredSize.height)
+            }
+        }.apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             alignmentX = LEFT_ALIGNMENT
             border = BorderFactory.createCompoundBorder(
@@ -108,28 +112,33 @@ class SettingsPanel(private val project: Project) : JPanel() {
                     javax.swing.border.TitledBorder.LEFT,
                     javax.swing.border.TitledBorder.TOP
                 ),
-                JBUI.Borders.empty(6, 8, 8, 8)
+                JBUI.Borders.empty(4, 8, 6, 8)
             )
         }
     }
 
     private fun createHelpLine(icon: Icon, text: String): JPanel {
-        return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+        return JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(22))
-            add(JLabel(icon))
+            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(20))
+            val iconLabel = JLabel(icon).apply {
+                preferredSize = Dimension(JBUI.scale(16), JBUI.scale(16))
+            }
+            add(iconLabel, BorderLayout.WEST)
             add(JLabel(text).apply {
                 font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
                 foreground = JBColor.GRAY
-            })
+            }, BorderLayout.CENTER)
         }
     }
 
     private fun createPathLine(name: String, path: String, found: Boolean): JPanel {
         return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(22))
-            add(JLabel(if (found) AllIcons.General.InspectionsOK else AllIcons.General.Error))
+            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(20))
+            add(JLabel(if (found) AllIcons.General.InspectionsOK else AllIcons.General.Error).apply {
+                preferredSize = Dimension(JBUI.scale(16), JBUI.scale(16))
+            })
             add(JLabel(name).apply {
                 font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             })

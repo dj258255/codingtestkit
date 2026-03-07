@@ -7,8 +7,11 @@ import com.codingtestkit.model.TestCase
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.File
@@ -54,10 +57,17 @@ object ProblemFileManager {
         // problem.json 저장 (메타데이터 + 테스트 케이스)
         saveProblemJson(problemDir, problem)
 
-        // VFS 새로고침 + 파일 열기
+        // VFS 새로고침 + 소스 루트 등록 + 파일 열기
         ApplicationManager.getApplication().invokeLater {
             val vfs = LocalFileSystem.getInstance()
             vfs.refreshAndFindFileByIoFile(problemDir)
+
+            // problems 폴더를 소스 루트로 등록 (자동완성/컴파일 활성화)
+            val problemsDir = File(basePath, "problems")
+            val problemsVf = vfs.refreshAndFindFileByIoFile(problemsDir)
+            if (problemsVf != null) {
+                markAsSourceRoot(project, problemsVf)
+            }
 
             val virtualFile = vfs.refreshAndFindFileByIoFile(codeFile)
             if (virtualFile != null) {
@@ -66,6 +76,32 @@ object ProblemFileManager {
         }
 
         return CreatedFiles(problemDir, codeFile, markdownFile)
+    }
+
+    private fun markAsSourceRoot(project: Project, folder: VirtualFile) {
+        val module = ModuleManager.getInstance(project).modules.firstOrNull() ?: return
+        val rootModel = ModuleRootManager.getInstance(module)
+
+        // 이미 소스 루트로 등록되어 있는지 확인
+        if (rootModel.sourceRoots.any { it.path == folder.path }) return
+
+        WriteCommandAction.runWriteCommandAction(project) {
+            val modifiableModel = rootModel.modifiableModel
+
+            // problems 폴더를 포함하는 content entry 찾기
+            var targetEntry = modifiableModel.contentEntries.firstOrNull { entry ->
+                val entryPath = entry.file?.path ?: return@firstOrNull false
+                folder.path.startsWith(entryPath)
+            }
+
+            // 포함하는 content entry가 없으면 새로 추가
+            if (targetEntry == null) {
+                targetEntry = modifiableModel.addContentEntry(folder)
+            }
+
+            targetEntry.addSourceFolder(folder, false)
+            modifiableModel.commit()
+        }
     }
 
     /**
@@ -89,8 +125,8 @@ object ProblemFileManager {
         // HTML → Markdown 변환
         sb.appendLine(HtmlToMarkdown.convert(problem.description))
 
-        // 테스트 케이스
-        if (problem.testCases.isNotEmpty()) {
+        // 테스트 케이스 (프로그래머스는 description에 이미 입출력 예 테이블 포함)
+        if (problem.testCases.isNotEmpty() && problem.source != ProblemSource.PROGRAMMERS) {
             sb.appendLine()
             sb.appendLine("---")
             sb.appendLine()

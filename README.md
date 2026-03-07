@@ -2,9 +2,26 @@
   <img src="ctk-pixel.svg" width="128" alt="CodingTestKit Icon"/>
 </p>
 
-# CodingTestKit - 알고리즘 문제 풀이 올인원 플러그인
+<h1 align="center">CodingTestKit</h1>
+<p align="center">
+  IntelliJ IDE에서 알고리즘 문제를 <b>가져오고</b>, <b>테스트하고</b>, <b>제출</b>까지 한번에 할 수 있는 올인원 플러그인
+</p>
 
-IntelliJ IDE에서 알고리즘 문제를 **가져오고**, **테스트하고**, **제출**까지 한번에 할 수 있는 플러그인입니다.
+---
+
+## 왜 만들었나?
+
+코딩테스트를 준비하면서 항상 불편했습니다. 문제를 풀려면 브라우저에서 문제를 읽고, IDE에서 코드를 작성하고, 다시 브라우저로 돌아가 제출하고... 이 과정을 반복해야 했습니다.
+
+기존에도 문제를 가져오거나 제출을 도와주는 도구들은 있었지만, **실제 코딩테스트 환경을 그대로 재현**해주는 것은 없었습니다. 코딩테스트에서는 자동완성도 없고, 코드 검사도 없고, 시간 제한 안에서 풀어야 합니다.
+
+CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현**하기 위해 만들었습니다:
+
+- **시험 모드**: 자동완성과 코드 검사를 끄고 실전과 동일한 환경에서 연습
+- **타이머**: 스톱워치와 카운트다운으로 실제 시험 시간을 관리
+- **올인원**: 문제 읽기, 코드 작성, 테스트, 제출까지 IDE를 벗어나지 않고 전부 해결
+
+브라우저와 IDE를 왔다갔다 하지 않고, **IntelliJ 하나로 코딩테스트의 모든 과정을 끝내는 것**이 이 플러그인의 목표입니다.
 
 ## 지원 플랫폼
 
@@ -14,44 +31,137 @@ IntelliJ IDE에서 알고리즘 문제를 **가져오고**, **테스트하고**,
 | **프로그래머스** | O | O | O |
 | **SWEA** | O | O | O |
 
+## 지원 언어
+
+| 언어 | 백준 | 프로그래머스 | SWEA |
+|------|:----:|:----------:|:----:|
+| Java | O | O | O |
+| Python | O | O | O |
+| C++ | O | O | O |
+| Kotlin | O | O | X |
+
+---
+
 ## 주요 기능
 
 ### 문제 가져오기
-- 문제 번호만 입력하면 문제 설명, 테스트 케이스 자동 추출
-- 프로젝트 내 폴더 자동 생성 (`problems/플랫폼/난이도/문제명/`)
-- README.md + 코드 파일 자동 생성 및 에디터에서 열기
-- SWEA: input.txt/output.txt 자동 다운로드, 이미지 로컬 저장
 
-### 자동 문제 인식
-- 코드 파일이나 README를 열면 해당 문제를 자동으로 인식
-- 문제 정보, 테스트 케이스가 자동으로 로드
+플랫폼과 언어를 선택하고 문제 번호만 입력하면 문제 설명, 테스트 케이스가 자동으로 추출됩니다.
+
+<p align="center">
+  <img src="docs/screenshots/main-panel.png" width="500" alt="메인 패널"/>
+</p>
+
+문제를 가져오면 프로젝트 내에 폴더가 자동 생성되고, 코드 파일과 README.md가 만들어집니다.
+
+<p align="center">
+  <img src="docs/screenshots/fetch-notification.png" width="700" alt="문제 가져오기 완료"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/folder-structure.png" width="250" alt="폴더 구조"/>
+</p>
+
+- 백준: `problems/백준/Gold III/16236. 아기 상어/`
+- 프로그래머스: `problems/프로그래머스/Level1/12937. 짝수와 홀수/`
+- SWEA: `problems/SWEA/D3/1204. 최빈수 구하기/`
+
+### 문제 보기
+
+플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다. README.md 프리뷰도 함께 생성됩니다.
+
+<p align="center">
+  <img src="docs/screenshots/problem-view-1.png" width="420" alt="문제 보기 - 상단"/>
+  <img src="docs/screenshots/problem-view-2.png" width="420" alt="문제 보기 - 예제"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/readme-preview.png" width="500" alt="README 프리뷰"/>
+</p>
+
+프로그래머스 문제도 입출력 예 테이블과 함께 표시됩니다.
+
+<p align="center">
+  <img src="docs/screenshots/programmers-problem.png" width="700" alt="프로그래머스 문제"/>
+</p>
+
+### 로그인 & 제출
+
+내장 JCEF 브라우저를 통해 각 플랫폼에 로그인하고, 코드를 직접 제출할 수 있습니다.
+
+<p align="center">
+  <img src="docs/screenshots/boj-login.png" width="600" alt="백준 로그인"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-success.png" width="300" alt="백준 제출 성공"/>
+</p>
 
 ### 로컬 테스트 실행
-- Java, Python, C++, Kotlin 지원
-- 백준/SWEA: stdin 입력 방식
-- 프로그래머스: solution 함수 자동 래핑 실행
-- 디버그 출력 자동 분리 (`System.out.println` 등)
-- 아코디언 스타일 테스트 케이스 UI (접기/펼치기)
 
-### 코드 제출
-- JCEF 내장 브라우저로 각 플랫폼에 직접 제출
-- 코드와 언어 자동 입력
-- 수동 입력 버튼 제공 (네트워크 환경에 따른 대비)
-- 제출 결과를 브라우저에서 바로 확인 가능
+코드를 작성하고 **전체 실행**을 누르면 모든 테스트 케이스가 실행되어 PASS/FAIL 결과를 바로 확인할 수 있습니다.
+
+<p align="center">
+  <img src="docs/screenshots/test-cases-list.png" width="700" alt="테스트 케이스 목록"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/test-all-pass.png" width="700" alt="전체 통과"/>
+</p>
+
+각 테스트 케이스를 펼치면 입력, 예상 출력, 실제 출력을 비교할 수 있습니다. FAIL인 케이스는 자동으로 펼쳐집니다.
+
+<p align="center">
+  <img src="docs/screenshots/test-detail.png" width="600" alt="테스트 상세"/>
+</p>
+
+프로그래머스의 solution 함수도 자동으로 래핑하여 테스트합니다.
+
+<p align="center">
+  <img src="docs/screenshots/programmers-test.png" width="700" alt="프로그래머스 테스트"/>
+</p>
+
+### 코드 에디터
+
+문제를 가져오면 기본 코드가 자동 생성되어 에디터에서 바로 작성할 수 있습니다. 소스 루트가 자동 등록되어 자동완성과 컴파일이 정상 동작합니다.
+
+<p align="center">
+  <img src="docs/screenshots/code-editor.png" width="500" alt="코드 에디터"/>
+</p>
 
 ### 코드 템플릿
-- 자주 쓰는 코드 템플릿 저장 및 불러오기
-- 언어별 기본 템플릿 제공
 
-### 시험 환경 모드
-- 코드 자동완성 끄기/켜기
-- 코드 검사(Inspections) 끄기/켜기
-- 실제 코딩테스트 시험 환경과 동일한 조건에서 연습 가능
+자주 쓰는 코드를 템플릿으로 저장하고 불러올 수 있습니다. 구문 강조가 적용된 미리보기를 제공합니다.
+
+<p align="center">
+  <img src="docs/screenshots/template-panel.png" width="700" alt="템플릿 패널"/>
+</p>
 
 ### 타이머
-- 스톱워치 (랩 기능 포함)
-- 카운트다운 타이머
-- 시험 시간 관리에 활용
+
+**스톱워치**와 **카운트다운 타이머**를 제공합니다. 스톱워치에는 랩 기록과 메모 기능이 있고, 카운트다운 타이머는 시간이 종료되면 알림을 표시합니다.
+
+<p align="center">
+  <img src="docs/screenshots/stopwatch.png" width="700" alt="스톱워치"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/countdown-running.png" width="500" alt="카운트다운 실행 중"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/countdown-end.png" width="500" alt="타이머 종료"/>
+</p>
+
+### 설정
+
+자동완성과 코드 검사를 끄고 켜는 **시험 모드**를 제공합니다. 실제 코딩테스트 환경과 동일한 조건에서 연습할 수 있습니다. 감지된 도구 경로도 확인 가능합니다.
+
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="600" alt="설정"/>
+</p>
+
+---
 
 ## 설치 방법
 
@@ -62,6 +172,8 @@ IntelliJ IDE에서 알고리즘 문제를 **가져오고**, **테스트하고**,
 ### 수동 설치
 1. [Releases](https://github.com/dj258255/codingtestkit/releases)에서 `.zip` 파일 다운로드
 2. IntelliJ IDEA > Settings > Plugins > 톱니바퀴 > Install Plugin from Disk
+
+---
 
 ## 사용법
 
@@ -88,14 +200,7 @@ IntelliJ IDE에서 알고리즘 문제를 **가져오고**, **테스트하고**,
 2. 내장 브라우저에서 코드 자동 입력 확인
 3. 제출 버튼 클릭 후 결과 확인
 
-## 지원 언어
-
-| 언어 | 백준 | 프로그래머스 | SWEA |
-|------|:----:|:----------:|:----:|
-| Java | O | O | O |
-| Python | O | O | O |
-| C++ | O | O | O |
-| Kotlin | O | O | X |
+---
 
 ## 요구 사항
 

@@ -25,10 +25,6 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         toolTipText = "테스트 케이스 추가"
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
     }
-    private val removeButton = JButton(AllIcons.General.Remove).apply {
-        toolTipText = "선택한 테스트 케이스 삭제"
-        preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
-    }
     private val statusLabel = JLabel("").apply {
         border = JBUI.Borders.empty(0, 4)
     }
@@ -74,7 +70,6 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val rightControls = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0))
         rightControls.add(addButton)
-        rightControls.add(removeButton)
 
         buttonRow.add(leftControls, BorderLayout.WEST)
         buttonRow.add(rightControls, BorderLayout.EAST)
@@ -101,7 +96,6 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 이벤트
         runButton.addActionListener { runAllTests() }
         addButton.addActionListener { addTestCase() }
-        removeButton.addActionListener { removeSelectedTestCase() }
     }
 
     fun setTestCases(cases: List<TestCase>) {
@@ -147,7 +141,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             cardListPanel.add(card)
             cardListPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
         }
-        cardListPanel.add(Box.createVerticalGlue())
+        // 하단 여백 없이 카드만 표시 (스크롤 영역이 내용 크기에 맞춰짐)
         updateInfoLabel()
         cardListPanel.revalidate()
         cardListPanel.repaint()
@@ -161,12 +155,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         cards.lastOrNull()?.expand()
     }
 
-    private fun removeSelectedTestCase() {
-        // 선택된(펼쳐진) 카드 중 마지막 것 삭제, 또는 마지막 카드 삭제
-        val expandedIndex = cards.indexOfLast { it.isExpanded }
-        val removeIndex = if (expandedIndex >= 0) expandedIndex else testCases.lastIndex
-        if (removeIndex >= 0 && removeIndex < testCases.size) {
-            testCases.removeAt(removeIndex)
+    private fun removeTestCaseAt(index: Int) {
+        if (index < 0 || index >= testCases.size) return
+        val result = javax.swing.JOptionPane.showConfirmDialog(
+            this,
+            "테스트 케이스 #${index + 1}을 삭제하시겠습니까?",
+            "삭제 확인",
+            javax.swing.JOptionPane.YES_NO_OPTION
+        )
+        if (result == javax.swing.JOptionPane.YES_OPTION) {
+            syncCardsToTestCases()
+            testCases.removeAt(index)
             rebuildCards()
         }
     }
@@ -366,6 +365,20 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             headerPanel.add(summaryLabel, BorderLayout.CENTER)
 
+            // 삭제 버튼
+            val deleteBtn = JLabel(AllIcons.Actions.Close).apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = "이 테스트 케이스 삭제"
+                border = JBUI.Borders.empty(0, 4)
+            }
+            deleteBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    val idx = cards.indexOf(this@TestCaseCard)
+                    if (idx >= 0) removeTestCaseAt(idx)
+                }
+            })
+            headerPanel.add(deleteBtn, BorderLayout.EAST)
+
             add(headerPanel, BorderLayout.NORTH)
 
             // 콘텐츠 (펼쳐졌을 때)
@@ -418,17 +431,31 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         private fun createFieldPanel(label: String, textArea: JTextArea): JPanel {
+            var fieldHeight = JBUI.scale(60)
+
             val scrollPane = JBScrollPane(textArea).apply {
-                preferredSize = Dimension(0, JBUI.scale(60))
+                preferredSize = Dimension(0, fieldHeight)
                 minimumSize = Dimension(0, JBUI.scale(30))
             }
 
+            val fieldPanel = object : JPanel(BorderLayout(0, 0)) {
+                override fun getPreferredSize(): Dimension {
+                    val labelH = getComponent(0)?.preferredSize?.height ?: 0 // label (NORTH)
+                    val handleH = getComponent(2)?.preferredSize?.height ?: 0 // handle (SOUTH)
+                    return Dimension(super.getPreferredSize().width, labelH + fieldHeight + handleH)
+                }
+                override fun getMaximumSize(): Dimension {
+                    return Dimension(Int.MAX_VALUE, preferredSize.height)
+                }
+            }
+            fieldPanel.alignmentX = LEFT_ALIGNMENT
+
             // 하단 드래그 핸들로 높이 조절
             val resizeHandle = JPanel().apply {
-                preferredSize = Dimension(0, JBUI.scale(5))
+                preferredSize = Dimension(0, JBUI.scale(8))
+                minimumSize = Dimension(0, JBUI.scale(8))
                 cursor = Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
-                background = JBColor(Color(220, 220, 220), Color(60, 60, 60))
-                border = JBUI.Borders.empty()
+                background = JBColor(Color(210, 210, 210), Color(65, 65, 65))
             }
 
             var dragStartY = 0
@@ -436,32 +463,29 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             resizeHandle.addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mousePressed(e: java.awt.event.MouseEvent) {
                     dragStartY = e.yOnScreen
-                    dragStartHeight = scrollPane.height
+                    dragStartHeight = fieldHeight
                 }
             })
             resizeHandle.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
                 override fun mouseDragged(e: java.awt.event.MouseEvent) {
                     val delta = e.yOnScreen - dragStartY
-                    val newHeight = (dragStartHeight + delta).coerceIn(JBUI.scale(30), JBUI.scale(500))
-                    scrollPane.preferredSize = Dimension(scrollPane.width, newHeight)
-                    scrollPane.revalidate()
-                    // 부모 카드 크기도 갱신
-                    this@TestCaseCard.updateMaxSize()
+                    fieldHeight = (dragStartHeight + delta).coerceIn(JBUI.scale(30), JBUI.scale(500))
+                    scrollPane.preferredSize = Dimension(scrollPane.width, fieldHeight)
+                    fieldPanel.revalidate()
+                    contentPanel.revalidate()
+                    this@TestCaseCard.revalidate()
                     cardListPanel.revalidate()
                     cardListPanel.repaint()
                 }
             })
 
-            return JPanel(BorderLayout(0, 0)).apply {
-                alignmentX = LEFT_ALIGNMENT
-                maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(600))
-                add(JLabel(label).apply {
-                    font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
-                    foreground = JBColor.GRAY
-                }, BorderLayout.NORTH)
-                add(scrollPane, BorderLayout.CENTER)
-                add(resizeHandle, BorderLayout.SOUTH)
-            }
+            fieldPanel.add(JLabel(label).apply {
+                font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
+                foreground = JBColor.GRAY
+            }, BorderLayout.NORTH)
+            fieldPanel.add(scrollPane, BorderLayout.CENTER)
+            fieldPanel.add(resizeHandle, BorderLayout.SOUTH)
+            return fieldPanel
         }
 
         fun toggle() {
@@ -481,7 +505,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         fun updateMaxSize() {
             if (isExpanded) {
-                maximumSize = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
+                maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
             } else {
                 val headerHeight = headerPanel.preferredSize.height + insets.top + insets.bottom
                 maximumSize = Dimension(Int.MAX_VALUE, headerHeight)
