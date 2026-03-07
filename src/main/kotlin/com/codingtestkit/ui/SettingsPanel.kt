@@ -21,13 +21,14 @@ import javax.swing.*
 
 class SettingsPanel(private val project: Project) : JPanel() {
 
-    private val autoCompleteToggle = JCheckBox("자동완성 (Auto Complete)")
-    private val inspectionToggle = JCheckBox("코드 검사 (Inspections)")
-    private val pasteBlockToggle = JCheckBox("외부 붙여넣기 차단")
-    private val focusAlertToggle = JCheckBox("포커스 이탈 감지")
+    private val autoCompleteToggle = JCheckBox("자동완성 끄기 (Auto Complete OFF)")
+    private val inspectionToggle = JCheckBox("코드 검사 끄기 (Inspections OFF)")
+    private val pasteBlockToggle = JCheckBox("외부 붙여넣기 차단 (Paste Block)")
+    private val focusAlertToggle = JCheckBox("포커스 이탈 감지 (Focus Alert)")
 
     private var focusListener: WindowAdapter? = null
     private var focusLostCount = 0
+    private var showingAlert = false
 
     init {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -47,13 +48,13 @@ class SettingsPanel(private val project: Project) : JPanel() {
         // 토글 섹션
         val toggleSection = createSection("코딩 환경")
         autoCompleteToggle.alignmentX = LEFT_ALIGNMENT
-        autoCompleteToggle.isSelected = CodeInsightSettings.getInstance().AUTO_POPUP_COMPLETION_LOOKUP
+        autoCompleteToggle.isSelected = !CodeInsightSettings.getInstance().AUTO_POPUP_COMPLETION_LOOKUP
         autoCompleteToggle.addActionListener { toggleAutoComplete() }
         toggleSection.add(autoCompleteToggle)
         toggleSection.add(Box.createVerticalStrut(JBUI.scale(2)))
 
         inspectionToggle.alignmentX = LEFT_ALIGNMENT
-        inspectionToggle.isSelected = !PowerSaveMode.isEnabled()
+        inspectionToggle.isSelected = PowerSaveMode.isEnabled()
         inspectionToggle.addActionListener { toggleInspections() }
         toggleSection.add(inspectionToggle)
         toggleSection.add(Box.createVerticalStrut(JBUI.scale(2)))
@@ -75,23 +76,23 @@ class SettingsPanel(private val project: Project) : JPanel() {
             alignmentX = LEFT_ALIGNMENT
         }
         val examModeBtn = JButton("시험 모드", AllIcons.General.Warning).apply {
-            toolTipText = "자동완성, 코드 검사 모두 끄기"
+            toolTipText = "4가지 제한을 모두 활성화합니다"
             putClientProperty("JButton.buttonType", "roundRect")
         }
         val normalModeBtn = JButton("일반 모드", AllIcons.General.InspectionsOK).apply {
-            toolTipText = "자동완성, 코드 검사 모두 켜기"
+            toolTipText = "4가지 제한을 모두 해제합니다"
             putClientProperty("JButton.buttonType", "roundRect")
         }
 
         examModeBtn.addActionListener {
-            setAutoComplete(false)
-            setInspections(false)
+            setAutoCompleteOff(true)
+            setInspectionsOff(true)
             setPasteBlock(true)
             setFocusAlert(true)
         }
         normalModeBtn.addActionListener {
-            setAutoComplete(true)
-            setInspections(true)
+            setAutoCompleteOff(false)
+            setInspectionsOff(false)
             setPasteBlock(false)
             setFocusAlert(false)
         }
@@ -108,16 +109,16 @@ class SettingsPanel(private val project: Project) : JPanel() {
             "자동완성 끄기: 타이핑 시 자동완성 팝업이 나타나지 않습니다"))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
-            "코드 검사 끄기: 절전 모드를 활성화하여 백그라운드 분석을 중지합니다"))
+            "코드 검사 끄기: 절전 모드를 활성화하여 백그라운드 코드 분석을 중지합니다"))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
-            "두 기능을 모두 끄면 코딩 테스트 환경과 유사하게 연습할 수 있습니다"))
+            "붙여넣기 차단: IDE 외부에서 복사한 텍스트의 붙여넣기를 차단합니다"))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
-            "붙여넣기 차단: 외부에서 복사한 코드의 붙여넣기를 방지합니다"))
+            "포커스 감지: IDE 창을 벗어나면 경고를 표시합니다"))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
-            "포커스 감지: IDE를 벗어나면 경고를 표시합니다 (실제 시험 환경과 동일)"))
+            "4가지를 모두 켜면 실제 코딩 테스트와 동일한 환경에서 연습할 수 있습니다"))
         add(helpSection)
         add(Box.createVerticalStrut(JBUI.scale(6)))
 
@@ -187,24 +188,26 @@ class SettingsPanel(private val project: Project) : JPanel() {
     }
 
     private fun toggleAutoComplete() {
-        setAutoComplete(autoCompleteToggle.isSelected)
+        setAutoCompleteOff(autoCompleteToggle.isSelected)
     }
 
     private fun toggleInspections() {
-        setInspections(inspectionToggle.isSelected)
+        setInspectionsOff(inspectionToggle.isSelected)
     }
 
-    private fun setAutoComplete(enabled: Boolean) {
+    /** checked = 자동완성 끄기 활성 */
+    private fun setAutoCompleteOff(off: Boolean) {
         val settings = CodeInsightSettings.getInstance()
-        settings.AUTO_POPUP_COMPLETION_LOOKUP = enabled
-        settings.AUTO_POPUP_PARAMETER_INFO = enabled
-        settings.AUTO_POPUP_JAVADOC_INFO = enabled
-        autoCompleteToggle.isSelected = enabled
+        settings.AUTO_POPUP_COMPLETION_LOOKUP = !off
+        settings.AUTO_POPUP_PARAMETER_INFO = !off
+        settings.AUTO_POPUP_JAVADOC_INFO = !off
+        autoCompleteToggle.isSelected = off
     }
 
-    private fun setInspections(enabled: Boolean) {
-        PowerSaveMode.setEnabled(!enabled)
-        inspectionToggle.isSelected = enabled
+    /** checked = 코드 검사 끄기 활성 */
+    private fun setInspectionsOff(off: Boolean) {
+        PowerSaveMode.setEnabled(off)
+        inspectionToggle.isSelected = off
     }
 
     private var originalPasteHandler: EditorActionHandler? = null
@@ -266,8 +269,9 @@ class SettingsPanel(private val project: Project) : JPanel() {
             focusLostCount = 0
             focusListener = object : WindowAdapter() {
                 override fun windowDeactivated(e: WindowEvent) {
-                    if (ExamModeState.focusAlertEnabled) {
+                    if (ExamModeState.focusAlertEnabled && !showingAlert) {
                         focusLostCount++
+                        showingAlert = true
                         SwingUtilities.invokeLater {
                             JOptionPane.showMessageDialog(
                                 frame,
@@ -275,6 +279,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
                                 "포커스 이탈 감지",
                                 JOptionPane.WARNING_MESSAGE
                             )
+                            showingAlert = false
                         }
                     }
                 }
