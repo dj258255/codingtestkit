@@ -4,6 +4,7 @@ import com.codingtestkit.model.Language
 import com.codingtestkit.model.TestCase
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 object CodeRunner {
 
@@ -11,7 +12,9 @@ object CodeRunner {
         val output: String,
         val error: String,
         val exitCode: Int,
-        val timedOut: Boolean = false
+        val timedOut: Boolean = false,
+        val executionTimeMs: Long = 0,
+        val peakMemoryKB: Long = 0
     )
 
     /**
@@ -480,15 +483,117 @@ fun main() {
             process.outputStream.bufferedWriter().use { it.write(input) }
         }
 
+        // 메모리 폴링 스레드 시작
+        val peakMemory = AtomicLong(0)
+        val pid = process.pid()
+        val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+        val memoryPoller = Thread {
+            try {
+                while (process.isAlive) {
+                    val mem = getProcessMemoryKB(pid)
+                    if (mem > 0) {
+                        peakMemory.updateAndGet { prev -> maxOf(prev, mem) }
+                    }
+                    Thread.sleep(50)
+                }
+                // Linux: 프로세스 종료 직전 VmHWM (커널이 기록한 peak RSS) 읽기
+                if (isLinux) {
+                    val hwm = getLinuxVmHWM(pid)
+                    if (hwm > 0) peakMemory.updateAndGet { prev -> maxOf(prev, hwm) }
+                }
+            } catch (_: InterruptedException) {}
+        }.apply {
+            isDaemon = true
+            start()
+        }
+
+        val startTime = System.nanoTime()
         val completed = process.waitFor(timeout, TimeUnit.SECONDS)
+        val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
+
+        // 프로세스 종료 후 OS별 peak 메모리 조회
+        if (isLinux) {
+            val hwm = getLinuxVmHWM(pid)
+            if (hwm > 0) peakMemory.updateAndGet { prev -> maxOf(prev, hwm) }
+        } else if (System.getProperty("os.name").lowercase().contains("win")) {
+            val peak = getWindowsPeakWorkingSetKB(pid)
+            if (peak > 0) peakMemory.updateAndGet { prev -> maxOf(prev, peak) }
+        }
+
+        memoryPoller.interrupt()
+
         if (!completed) {
             process.destroyForcibly()
-            return RunResult(output = "", error = "시간 초과 (${timeout}초)", exitCode = -1, timedOut = true)
+            return RunResult(output = "", error = "시간 초과 (${timeout}초)", exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
         val output = process.inputStream.bufferedReader().readText().trimEnd()
         val error = process.errorStream.bufferedReader().readText().trimEnd()
 
-        return RunResult(output = output, error = error, exitCode = process.exitValue())
+        return RunResult(output = output, error = error, exitCode = process.exitValue(), executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
+    }
+
+    private fun getLinuxVmHWM(pid: Long): Long {
+        return try {
+            val statusFile = File("/proc/$pid/status")
+            if (statusFile.exists()) {
+                val line = statusFile.readLines().find { it.startsWith("VmHWM:") }
+                line?.replace("VmHWM:", "")?.replace("kB", "")?.trim()?.toLongOrNull() ?: 0
+            } else 0
+        } catch (_: Exception) { 0 }
+    }
+
+    private fun getWindowsPeakWorkingSetKB(pid: Long): Long {
+        return try {
+            // PowerShell로 OS가 기록한 PeakWorkingSet64 (bytes) 조회
+            val proc = ProcessBuilder(
+                "powershell", "-NoProfile", "-Command",
+                "(Get-Process -Id $pid -ErrorAction SilentlyContinue).PeakWorkingSet64"
+            ).start()
+            val result = proc.inputStream.bufferedReader().readText().trim()
+            proc.waitFor(2, TimeUnit.SECONDS)
+            val bytes = result.toLongOrNull() ?: 0
+            bytes / 1024 // bytes → KB
+        } catch (_: Exception) { 0 }
+    }
+
+    private fun getProcessMemoryKB(pid: Long): Long {
+        val os = System.getProperty("os.name").lowercase()
+        return try {
+            when {
+                os.contains("mac") || os.contains("darwin") -> {
+                    // macOS: ps -o rss= -p <pid>
+                    val proc = ProcessBuilder("ps", "-o", "rss=", "-p", pid.toString()).start()
+                    val result = proc.inputStream.bufferedReader().readText().trim()
+                    proc.waitFor(1, TimeUnit.SECONDS)
+                    result.toLongOrNull() ?: 0
+                }
+                os.contains("linux") -> {
+                    // Linux: /proc/<pid>/status → VmRSS
+                    val statusFile = File("/proc/$pid/status")
+                    if (statusFile.exists()) {
+                        val line = statusFile.readLines().find { it.startsWith("VmRSS:") }
+                        line?.replace("VmRSS:", "")?.replace("kB", "")?.trim()?.toLongOrNull() ?: 0
+                    } else {
+                        // fallback: ps
+                        val proc = ProcessBuilder("ps", "-o", "rss=", "-p", pid.toString()).start()
+                        val result = proc.inputStream.bufferedReader().readText().trim()
+                        proc.waitFor(1, TimeUnit.SECONDS)
+                        result.toLongOrNull() ?: 0
+                    }
+                }
+                os.contains("win") -> {
+                    // Windows: PowerShell로 PeakWorkingSet64 조회 (OS가 기록한 peak, bytes)
+                    val proc = ProcessBuilder(
+                        "powershell", "-NoProfile", "-Command",
+                        "(Get-Process -Id $pid -ErrorAction SilentlyContinue).PeakWorkingSet64"
+                    ).start()
+                    val result = proc.inputStream.bufferedReader().readText().trim()
+                    proc.waitFor(1, TimeUnit.SECONDS)
+                    (result.toLongOrNull() ?: 0) / 1024 // bytes → KB
+                }
+                else -> 0
+            }
+        } catch (_: Exception) { 0 }
     }
 }

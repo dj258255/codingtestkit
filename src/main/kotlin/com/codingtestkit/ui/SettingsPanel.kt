@@ -3,16 +3,31 @@ package com.codingtestkit.ui
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.icons.AllIcons
 import com.intellij.ide.PowerSaveMode
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.editor.Caret
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.actionSystem.EditorActionHandler
+import com.intellij.openapi.editor.actionSystem.EditorActionManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import java.awt.*
+import java.awt.datatransfer.DataFlavor
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 import javax.swing.*
 
 class SettingsPanel(private val project: Project) : JPanel() {
 
     private val autoCompleteToggle = JCheckBox("자동완성 (Auto Complete)")
     private val inspectionToggle = JCheckBox("코드 검사 (Inspections)")
+    private val pasteBlockToggle = JCheckBox("외부 붙여넣기 차단")
+    private val focusAlertToggle = JCheckBox("포커스 이탈 감지")
+
+    private var focusListener: WindowAdapter? = null
+    private var focusLostCount = 0
 
     init {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -41,6 +56,18 @@ class SettingsPanel(private val project: Project) : JPanel() {
         inspectionToggle.isSelected = !PowerSaveMode.isEnabled()
         inspectionToggle.addActionListener { toggleInspections() }
         toggleSection.add(inspectionToggle)
+        toggleSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+
+        pasteBlockToggle.alignmentX = LEFT_ALIGNMENT
+        pasteBlockToggle.toolTipText = "외부 프로그램에서 복사한 텍스트 붙여넣기를 차단합니다"
+        pasteBlockToggle.addActionListener { togglePasteBlock() }
+        toggleSection.add(pasteBlockToggle)
+        toggleSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+
+        focusAlertToggle.alignmentX = LEFT_ALIGNMENT
+        focusAlertToggle.toolTipText = "IDE 창에서 포커스가 벗어나면 경고를 표시합니다"
+        focusAlertToggle.addActionListener { toggleFocusAlert() }
+        toggleSection.add(focusAlertToggle)
         toggleSection.add(Box.createVerticalStrut(JBUI.scale(4)))
 
         // 프리셋 버튼
@@ -59,10 +86,14 @@ class SettingsPanel(private val project: Project) : JPanel() {
         examModeBtn.addActionListener {
             setAutoComplete(false)
             setInspections(false)
+            setPasteBlock(true)
+            setFocusAlert(true)
         }
         normalModeBtn.addActionListener {
             setAutoComplete(true)
             setInspections(true)
+            setPasteBlock(false)
+            setFocusAlert(false)
         }
 
         presetPanel.add(examModeBtn)
@@ -81,6 +112,12 @@ class SettingsPanel(private val project: Project) : JPanel() {
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
             "두 기능을 모두 끄면 코딩 테스트 환경과 유사하게 연습할 수 있습니다"))
+        helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+        helpSection.add(createHelpLine(AllIcons.General.Information,
+            "붙여넣기 차단: 외부에서 복사한 코드의 붙여넣기를 방지합니다"))
+        helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+        helpSection.add(createHelpLine(AllIcons.General.Information,
+            "포커스 감지: IDE를 벗어나면 경고를 표시합니다 (실제 시험 환경과 동일)"))
         add(helpSection)
         add(Box.createVerticalStrut(JBUI.scale(6)))
 
@@ -168,5 +205,89 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun setInspections(enabled: Boolean) {
         PowerSaveMode.setEnabled(!enabled)
         inspectionToggle.isSelected = enabled
+    }
+
+    private var originalPasteHandler: EditorActionHandler? = null
+
+    private fun togglePasteBlock() {
+        setPasteBlock(pasteBlockToggle.isSelected)
+    }
+
+    private fun setPasteBlock(enabled: Boolean) {
+        pasteBlockToggle.isSelected = enabled
+        ExamModeState.pasteBlockEnabled = enabled
+
+        // 최초 활성화 시 paste handler 설치 (이후에는 flag로만 제어)
+        if (enabled && originalPasteHandler == null) {
+            val manager = EditorActionManager.getInstance()
+            originalPasteHandler = manager.getActionHandler(IdeActions.ACTION_EDITOR_PASTE)
+            val original = originalPasteHandler!!
+            manager.setActionHandler(IdeActions.ACTION_EDITOR_PASTE, object : EditorActionHandler() {
+                override fun doExecute(editor: Editor, caret: Caret?, dataContext: DataContext) {
+                    if (ExamModeState.pasteBlockEnabled) {
+                        // IntelliJ 내부 클립보드와 시스템 클립보드 비교
+                        val internalText = try {
+                            CopyPasteManager.getInstance().contents
+                                ?.getTransferData(DataFlavor.stringFlavor) as? String
+                        } catch (_: Exception) { null }
+
+                        val systemText = try {
+                            Toolkit.getDefaultToolkit().systemClipboard
+                                .getData(DataFlavor.stringFlavor) as? String
+                        } catch (_: Exception) { null }
+
+                        if (internalText != systemText) {
+                            // 외부에서 복사된 내용 → 차단
+                            Toolkit.getDefaultToolkit().beep()
+                            return
+                        }
+                    }
+                    original.execute(editor, caret, dataContext)
+                }
+
+                override fun isEnabledForCaret(editor: Editor, caret: Caret, dataContext: DataContext): Boolean {
+                    return original.isEnabled(editor, caret, dataContext)
+                }
+            })
+        }
+    }
+
+    private fun toggleFocusAlert() {
+        setFocusAlert(focusAlertToggle.isSelected)
+    }
+
+    private fun setFocusAlert(enabled: Boolean) {
+        focusAlertToggle.isSelected = enabled
+        ExamModeState.focusAlertEnabled = enabled
+
+        val frame = SwingUtilities.getWindowAncestor(this) as? java.awt.Window ?: return
+
+        if (enabled) {
+            focusLostCount = 0
+            focusListener = object : WindowAdapter() {
+                override fun windowDeactivated(e: WindowEvent) {
+                    if (ExamModeState.focusAlertEnabled) {
+                        focusLostCount++
+                        SwingUtilities.invokeLater {
+                            JOptionPane.showMessageDialog(
+                                frame,
+                                "IDE 창을 벗어났습니다! (${focusLostCount}회)\n실제 시험에서는 부정행위로 간주될 수 있습니다.",
+                                "포커스 이탈 감지",
+                                JOptionPane.WARNING_MESSAGE
+                            )
+                        }
+                    }
+                }
+            }
+            frame.addWindowListener(focusListener)
+        } else {
+            focusListener?.let { frame.removeWindowListener(it) }
+            focusListener = null
+        }
+    }
+
+    object ExamModeState {
+        var pasteBlockEnabled = false
+        var focusAlertEnabled = false
     }
 }

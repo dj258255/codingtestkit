@@ -259,8 +259,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 if (tc.passed == true) passCount++
 
                 val idx = i
+                val timeMs = result.executionTimeMs
+                val memKB = result.peakMemoryKB
                 SwingUtilities.invokeLater {
-                    if (idx < cards.size) cards[idx].setResult(tc)
+                    if (idx < cards.size) cards[idx].setResult(tc, timeMs, memKB)
                 }
             }
 
@@ -532,18 +534,30 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             debugArea.text = ""
         }
 
-        fun setResult(tc: TestCase) {
+        fun setResult(tc: TestCase, timeMs: Long = 0, memKB: Long = 0) {
             actualArea.text = tc.actualOutput
+            val timeStr = buildString {
+                if (timeMs > 0 || memKB > 0) {
+                    append(" (")
+                    if (timeMs > 0) append("${timeMs}ms")
+                    if (timeMs > 0 && memKB > 0) append(" / ")
+                    if (memKB > 0) {
+                        if (memKB >= 1024) append("%.1fMB".format(memKB / 1024.0))
+                        else append("${memKB}KB")
+                    }
+                    append(")")
+                }
+            }
             when (tc.passed) {
                 true -> {
                     statusIcon.icon = AllIcons.General.InspectionsOK
-                    titleLabel.text = "#$number PASS"
+                    titleLabel.text = "#$number PASS$timeStr"
                     titleLabel.foreground = JBColor(Color(46, 160, 67), Color(80, 200, 80))
                     headerPanel.background = JBColor(Color(235, 250, 235), Color(40, 55, 40))
                 }
                 false -> {
                     statusIcon.icon = AllIcons.General.Error
-                    titleLabel.text = "#$number FAIL"
+                    titleLabel.text = "#$number FAIL$timeStr"
                     titleLabel.foreground = JBColor(Color(218, 54, 51), Color(230, 80, 80))
                     headerPanel.background = JBColor(Color(255, 240, 240), Color(60, 40, 40))
                 }
@@ -579,4 +593,5 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
         }
     }
+
 }
