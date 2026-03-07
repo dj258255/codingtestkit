@@ -68,6 +68,12 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
 
 ### 문제 보기
 
+백준 #16236 "아기 상어" 문제를 예시로 살펴보겠습니다.
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="문제 가져오기 예시"/>
+</p>
+
 플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다. README.md 프리뷰도 함께 생성됩니다.
 
 <p align="center">
@@ -93,9 +99,19 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/boj-login.png" width="600" alt="백준 로그인"/>
 </p>
 
+**제출** 버튼을 누르면 제출 확인 다이얼로그가 표시됩니다. 문제 정보, 언어, 파일 경로를 한눈에 확인하고 **예(Y)** 를 누르면 내장 브라우저가 열립니다.
+
 <p align="center">
-  <img src="docs/screenshots/boj-submit-success.png" width="300" alt="백준 제출 성공"/>
+  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="제출 확인 다이얼로그"/>
 </p>
+
+코드와 언어가 자동으로 입력됩니다. 만약 자동 입력이 되지 않는 경우 하단의 **코드 붙여넣기** 버튼을 누르면 코드가 자동으로 채워집니다. 사용자는 스크롤만 내려서 **제출** 버튼을 누르면 끝입니다.
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="코드 자동 입력"/>
+</p>
+
+백준뿐만 아니라 **프로그래머스**, **SWEA**도 동일한 방식으로 로그인과 제출이 가능합니다.
 
 ### 로컬 테스트 실행
 

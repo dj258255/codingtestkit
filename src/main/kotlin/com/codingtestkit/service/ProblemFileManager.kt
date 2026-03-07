@@ -61,11 +61,10 @@ object ProblemFileManager {
             val vfs = LocalFileSystem.getInstance()
             vfs.refreshAndFindFileByIoFile(problemDir)
 
-            // problems 폴더를 소스 루트로 등록 (자동완성/컴파일 활성화)
-            val problemsDir = File(basePath, "problems")
-            val problemsVf = vfs.refreshAndFindFileByIoFile(problemsDir)
-            if (problemsVf != null) {
-                markAsSourceRoot(project, problemsVf)
+            // 각 문제 폴더를 개별 소스 루트로 등록 (자동완성 활성화)
+            val problemVf = vfs.refreshAndFindFileByIoFile(problemDir)
+            if (problemVf != null) {
+                markAsSourceRoot(project, problemVf)
             }
 
             val virtualFile = vfs.refreshAndFindFileByIoFile(codeFile)
