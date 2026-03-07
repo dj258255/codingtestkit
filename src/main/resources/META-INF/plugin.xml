@@ -1,0 +1,59 @@
+<idea-plugin>
+    <id>com.codingtestkit</id>
+    <name>CodingTestKit - Algorithm Problem Solver</name>
+    <version>1.0.0</version>
+    <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">beomsu</vendor>
+
+    <description><![CDATA[
+        <h2>CodingTestKit - 알고리즘 문제 풀이 올인원 플러그인</h2>
+        <p>IntelliJ IDE에서 알고리즘 문제를 가져오고, 테스트하고, 제출까지 한번에!</p>
+
+        <h3>지원 플랫폼</h3>
+        <ul>
+            <li><b>백준 (BOJ)</b> - 문제 크롤링, 테스트 케이스 자동 추출, 코드 제출</li>
+            <li><b>프로그래머스</b> - 문제 크롤링, 입출력 예 파싱, 코드 제출</li>
+            <li><b>SWEA</b> - 문제 크롤링, 코드 제출</li>
+        </ul>
+
+        <h3>주요 기능</h3>
+        <ul>
+            <li>문제 가져오기 - 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
+            <li>로컬 테스트 - Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 및 결과 비교</li>
+            <li>코드 제출 - JCEF 브라우저로 각 플랫폼에 직접 제출</li>
+            <li>코드 템플릿 - 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
+            <li>타이머 - 스톱워치 / 카운트다운 타이머</li>
+            <li>디버그 출력 분리 - System.out.println 디버그 출력을 자동 구분</li>
+        </ul>
+
+        <h3>지원 언어</h3>
+        <p>Java, Python, C++, Kotlin</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>v1.0.0 (2026-03-07)</h3>
+        <ul>
+            <li>첫 정식 릴리스</li>
+            <li>백준, 프로그래머스, SWEA 문제 크롤링 지원</li>
+            <li>Java, Python, C++, Kotlin 로컬 테스트 실행</li>
+            <li>JCEF 브라우저 기반 로그인 및 코드 제출</li>
+            <li>아코디언 스타일 테스트 케이스 UI</li>
+            <li>코드 템플릿 저장/불러오기</li>
+            <li>스톱워치 및 카운트다운 타이머</li>
+            <li>디버그 출력 자동 분리 (System.out.println)</li>
+            <li>프로그래머스 입출력 예 테이블 표시</li>
+            <li>프로그래머스 solution 함수 자동 래핑 실행</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="CodingTestKit"
+                    secondary="true"
+                    icon="AllIcons.Toolwindows.ToolWindowRun"
+                    anchor="right"
+                    factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
+        <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
+        <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
+    </extensions>
+</idea-plugin>
