@@ -505,7 +505,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         fun updateMaxSize() {
             if (isExpanded) {
-                maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+                maximumSize = Dimension(Int.MAX_VALUE, Int.MAX_VALUE)
             } else {
                 val headerHeight = headerPanel.preferredSize.height + insets.top + insets.bottom
                 maximumSize = Dimension(Int.MAX_VALUE, headerHeight)
@@ -541,8 +541,6 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     titleLabel.text = "#$number FAIL"
                     titleLabel.foreground = JBColor(Color(218, 54, 51), Color(230, 80, 80))
                     headerPanel.background = JBColor(Color(255, 240, 240), Color(60, 40, 40))
-                    // FAIL이면 자동 펼치기
-                    if (!isExpanded) expand()
                 }
                 null -> {
                     statusIcon.icon = null

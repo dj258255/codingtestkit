@@ -7,11 +7,10 @@ import com.codingtestkit.model.TestCase
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.File
@@ -80,27 +79,26 @@ object ProblemFileManager {
 
     private fun markAsSourceRoot(project: Project, folder: VirtualFile) {
         val module = ModuleManager.getInstance(project).modules.firstOrNull() ?: return
-        val rootModel = ModuleRootManager.getInstance(module)
 
         // 이미 소스 루트로 등록되어 있는지 확인
-        if (rootModel.sourceRoots.any { it.path == folder.path }) return
+        val existingSourceRoots = com.intellij.openapi.roots.ModuleRootManager.getInstance(module).sourceRoots
+        if (existingSourceRoots.any { it.path == folder.path }) return
 
-        WriteCommandAction.runWriteCommandAction(project) {
-            val modifiableModel = rootModel.modifiableModel
-
+        ModuleRootModificationUtil.updateModel(module) { modifiableModel ->
             // problems 폴더를 포함하는 content entry 찾기
-            var targetEntry = modifiableModel.contentEntries.firstOrNull { entry ->
+            val targetEntry = modifiableModel.contentEntries.firstOrNull { entry ->
                 val entryPath = entry.file?.path ?: return@firstOrNull false
                 folder.path.startsWith(entryPath)
             }
 
-            // 포함하는 content entry가 없으면 새로 추가
-            if (targetEntry == null) {
-                targetEntry = modifiableModel.addContentEntry(folder)
+            if (targetEntry != null) {
+                // 기존 content entry 안에 소스 폴더 추가
+                targetEntry.addSourceFolder(folder, false)
+            } else {
+                // content entry가 없으면 새 content entry + 소스 폴더로 추가
+                val newEntry = modifiableModel.addContentEntry(folder)
+                newEntry.addSourceFolder(folder, false)
             }
-
-            targetEntry.addSourceFolder(folder, false)
-            modifiableModel.commit()
         }
     }
 

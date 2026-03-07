@@ -52,7 +52,7 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/main-panel.png" width="500" alt="메인 패널"/>
 </p>
 
-문제를 가져오면 프로젝트 내에 폴더가 자동 생성되고, 코드 파일과 README.md가 만들어집니다.
+문제를 가져오면 프로젝트 내에 폴더가 자동 생성되고, 코드 파일과 README.md(문제 설명)가 만들어집니다.
 
 <p align="center">
   <img src="docs/screenshots/fetch-notification.png" width="700" alt="문제 가져오기 완료"/>
@@ -109,7 +109,13 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/test-all-pass.png" width="700" alt="전체 통과"/>
 </p>
 
-각 테스트 케이스를 펼치면 입력, 예상 출력, 실제 출력을 비교할 수 있습니다. FAIL인 케이스는 자동으로 펼쳐집니다.
+FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습니다.
+
+<p align="center">
+  <img src="docs/screenshots/test-all-fail.png" width="700" alt="테스트 실패"/>
+</p>
+
+각 테스트 케이스를 펼치면 입력, 예상 출력, 실제 출력을 비교할 수 있습니다.
 
 <p align="center">
   <img src="docs/screenshots/test-detail.png" width="600" alt="테스트 상세"/>
@@ -126,12 +132,18 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
 문제를 가져오면 기본 코드가 자동 생성되어 에디터에서 바로 작성할 수 있습니다. 소스 루트가 자동 등록되어 자동완성과 컴파일이 정상 동작합니다.
 
 <p align="center">
+  <img src="docs/screenshots/fetch-notification.png" width="700" alt="기본 코드 자동 생성"/>
+</p>
+
+정답 코드를 작성하고 로컬에서 바로 테스트할 수 있습니다.
+
+<p align="center">
   <img src="docs/screenshots/code-editor.png" width="500" alt="코드 에디터"/>
 </p>
 
 ### 코드 템플릿
 
-자주 쓰는 코드를 템플릿으로 저장하고 불러올 수 있습니다. 구문 강조가 적용된 미리보기를 제공합니다.
+코딩테스트에서 매번 반복되는 도입부(입출력 설정 등)를 템플릿으로 저장해두면 빠르게 넘길 수 있습니다. 구문 강조가 적용된 미리보기를 제공합니다.
 
 <p align="center">
   <img src="docs/screenshots/template-panel.png" width="700" alt="템플릿 패널"/>
