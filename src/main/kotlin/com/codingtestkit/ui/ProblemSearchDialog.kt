@@ -1,0 +1,235 @@
+package com.codingtestkit.ui
+
+import com.codingtestkit.service.I18n
+import com.codingtestkit.service.SolvedAcApi
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.JBColor
+import com.intellij.ui.table.JBTable
+import com.intellij.util.ui.JBUI
+import java.awt.*
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import javax.swing.*
+import javax.swing.table.DefaultTableModel
+
+class ProblemSearchDialog(private val project: Project) : DialogWrapper(project) {
+
+    private val searchField = JTextField().apply {
+        putClientProperty("JTextField.placeholderText", I18n.t("문제 제목, 번호, 또는 solved.ac 쿼리 입력", "Enter title, number, or solved.ac query"))
+    }
+    private val sortCombo = ComboBox(arrayOf(
+        I18n.t("번호순", "By Number"),
+        I18n.t("난이도순", "By Difficulty"),
+        I18n.t("제목순", "By Title"),
+        I18n.t("푼 사람순", "By Solved")
+    )).apply {
+        renderer = object : DefaultListCellRenderer() {
+            override fun getListCellRendererComponent(
+                list: JList<*>?, value: Any?, index: Int,
+                isSelected: Boolean, cellHasFocus: Boolean
+            ): Component {
+                val c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                border = JBUI.Borders.empty(4, 8)
+                font = font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
+                return c
+            }
+        }
+    }
+    private val searchButton = JButton(I18n.t("검색", "Search"))
+
+    // 자동완성
+    private val suggestionPopup = JPopupMenu()
+    private val debounceTimer = Timer(300, null).apply { isRepeats = false }
+
+    // 결과 테이블
+    private val tableModel = object : DefaultTableModel(
+        arrayOf(I18n.t("번호", "No."), I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"), I18n.t("태그", "Tags"), I18n.t("맞은 사람", "Solved")), 0
+    ) {
+        override fun isCellEditable(row: Int, column: Int) = false
+    }
+    private val resultTable = JBTable(tableModel)
+    private val statusLabel = JLabel(I18n.t("문제 제목이나 번호를 입력하세요", "Enter a problem title or number"))
+
+    private var results: List<SolvedAcApi.ProblemInfo> = emptyList()
+    var selectedProblemId: Int? = null
+        private set
+
+    init {
+        title = I18n.t("문제 검색 (solved.ac)", "Problem Search (solved.ac)")
+        setOKButtonText(I18n.t("가져오기", "Fetch"))
+        setCancelButtonText(I18n.t("닫기", "Close"))
+        init()
+        isOKActionEnabled = false
+    }
+
+    override fun createCenterPanel(): JComponent {
+        val panel = JPanel(BorderLayout(0, JBUI.scale(8)))
+        panel.preferredSize = Dimension(JBUI.scale(700), JBUI.scale(450))
+
+        // 검색 바
+        val searchPanel = JPanel(BorderLayout(JBUI.scale(4), 0))
+        searchPanel.border = JBUI.Borders.empty(4)
+        searchPanel.add(searchField, BorderLayout.CENTER)
+
+        val rightPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
+        rightPanel.add(sortCombo)
+        rightPanel.add(searchButton)
+        searchPanel.add(rightPanel, BorderLayout.EAST)
+
+        panel.add(searchPanel, BorderLayout.NORTH)
+
+        // 결과 테이블
+        resultTable.selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        resultTable.rowHeight = JBUI.scale(24)
+        resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(60)
+        resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(250)
+        resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(90)
+        resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(180)
+        resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(70)
+
+        panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
+
+        // 상태
+        statusLabel.foreground = JBColor.GRAY
+        statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
+        panel.add(statusLabel, BorderLayout.SOUTH)
+
+        // 이벤트
+        setupAutocomplete()
+        searchButton.addActionListener { doSearch() }
+        searchField.addActionListener { doSearch() }
+
+        resultTable.selectionModel.addListSelectionListener {
+            if (!it.valueIsAdjusting) {
+                val row = resultTable.selectedRow
+                isOKActionEnabled = row in results.indices
+                if (isOKActionEnabled) {
+                    selectedProblemId = results[row].problemId
+                }
+            }
+        }
+        resultTable.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2 && resultTable.selectedRow >= 0) {
+                    selectedProblemId = results[resultTable.selectedRow].problemId
+                    doOKAction()
+                }
+            }
+        })
+
+        return panel
+    }
+
+    private fun setupAutocomplete() {
+        searchField.addKeyListener(object : KeyAdapter() {
+            override fun keyReleased(e: KeyEvent) {
+                // Enter, ESC, 방향키는 무시
+                if (e.keyCode in listOf(
+                    KeyEvent.VK_ENTER, KeyEvent.VK_ESCAPE,
+                    KeyEvent.VK_UP, KeyEvent.VK_DOWN
+                )) return
+
+                debounceTimer.stop()
+                debounceTimer.actionListeners.forEach { debounceTimer.removeActionListener(it) }
+                debounceTimer.addActionListener { fetchSuggestions() }
+                debounceTimer.start()
+            }
+        })
+    }
+
+    private fun fetchSuggestions() {
+        val query = searchField.text.trim()
+        if (query.length < 2) {
+            suggestionPopup.isVisible = false
+            return
+        }
+
+        Thread {
+            try {
+                val suggestions = SolvedAcApi.searchSuggestions(query)
+                SwingUtilities.invokeLater {
+                    showSuggestions(suggestions)
+                }
+            } catch (_: Exception) {
+                // 자동완성 실패는 무시
+            }
+        }.start()
+    }
+
+    private fun showSuggestions(suggestions: List<SolvedAcApi.ProblemInfo>) {
+        suggestionPopup.removeAll()
+        if (suggestions.isEmpty()) {
+            suggestionPopup.isVisible = false
+            return
+        }
+
+        for (p in suggestions.take(10)) {
+            val level = SolvedAcApi.levelToString(p.level)
+            val text = "${p.problemId}. ${p.title}  [$level]"
+            val item = JMenuItem(text).apply {
+                font = font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
+            }
+            item.addActionListener {
+                searchField.text = p.problemId.toString()
+                suggestionPopup.isVisible = false
+                doSearch()
+            }
+            suggestionPopup.add(item)
+        }
+
+        suggestionPopup.show(searchField, 0, searchField.height)
+        searchField.requestFocusInWindow()
+    }
+
+    private fun doSearch() {
+        val query = searchField.text.trim()
+        if (query.isBlank()) return
+
+        suggestionPopup.isVisible = false
+        searchButton.isEnabled = false
+        statusLabel.text = I18n.t("검색 중...", "Searching...")
+        tableModel.rowCount = 0
+        isOKActionEnabled = false
+
+        val sortKeys = arrayOf("id", "level", "title", "solved")
+        val sort = sortKeys[sortCombo.selectedIndex]
+
+        Thread {
+            try {
+                val result = SolvedAcApi.searchProblems(query, sort)
+                results = result.problems
+                SwingUtilities.invokeLater {
+                    for (p in results) {
+                        tableModel.addRow(arrayOf(
+                            p.problemId,
+                            p.title,
+                            SolvedAcApi.levelToString(p.level),
+                            p.tags.take(3).joinToString(", "),
+                            p.acceptedUserCount
+                        ))
+                    }
+                    statusLabel.text = when {
+                        results.isEmpty() -> I18n.t("검색 결과가 없습니다", "No results found")
+                        result.totalCount > results.size ->
+                            I18n.t("총 ${result.totalCount}개 중 ${results.size}개 표시 (더블클릭으로 가져오기)",
+                                "Showing ${results.size} of ${result.totalCount} (double-click to fetch)")
+                        else -> I18n.t("${results.size}개 문제를 찾았습니다 (더블클릭으로 가져오기)",
+                            "Found ${results.size} problems (double-click to fetch)")
+                    }
+                    searchButton.isEnabled = true
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    statusLabel.text = "${I18n.t("오류", "Error")}: ${e.message}"
+                    searchButton.isEnabled = true
+                }
+            }
+        }.start()
+    }
+
+    override fun getPreferredFocusedComponent(): JComponent = searchField
+}

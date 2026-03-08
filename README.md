@@ -4,50 +4,364 @@
 
 <h1 align="center">CodingTestKit</h1>
 <p align="center">
-  IntelliJ IDE에서 알고리즘 문제를 <b>가져오고</b>, <b>테스트하고</b>, <b>제출</b>까지 한번에 할 수 있는 올인원 플러그인
+  An all-in-one IntelliJ plugin to <b>fetch</b>, <b>test</b>, and <b>submit</b> algorithm problems — all without leaving your IDE.<br/>
+  <b>BOJ</b> · <b>Programmers</b> · <b>SWEA</b> · <b>LeetCode</b>
+</p>
+
+<p align="center">
+  <a href="#english"><b>English</b></a> &nbsp;|&nbsp; <a href="#한국어"><b>한국어</b></a>
 </p>
 
 ---
+
+<p align="center">
+  <img src="docs/screenshots/main-panel.png" width="420" alt="Main Panel"/>
+  &nbsp;
+  <img src="docs/screenshots/test-all-pass.png" width="420" alt="Test Pass"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-code.png" width="420" alt="Code Submit"/>
+  &nbsp;
+  <img src="docs/screenshots/settings.png" width="420" alt="Settings"/>
+</p>
+
+---
+
+# English
+
+## Why?
+
+Preparing for coding tests has always been cumbersome — read the problem in a browser, write code in the IDE, switch back to the browser to submit, and repeat.
+
+CodingTestKit was built to **replicate the real exam environment inside your IDE**:
+
+- **Exam Mode**: Disable autocomplete & inspections, block external paste, detect focus loss — practice under real test conditions
+- **Performance Metrics**: Show execution time (ms) and memory usage per test case
+- **Timer**: Stopwatch, circular dial countdown timer, progress bar, digital clock
+- **All-in-One**: Fetch, code, test, and submit without leaving the IDE
+- **Problem Translation**: One-click Korean ↔ English translation with caching and rate limit protection
+- **GitHub Push**: Auto-push accepted solutions to GitHub (BaekjoonHub-style)
+
+## Supported Platforms
+
+| Platform | Fetch | Test | Submit | Search | Random |
+|----------|:-----:|:----:|:------:|:------:|:------:|
+| **BOJ (Baekjoon)** | O | O | O | O | O |
+| **Programmers** | O | O | O | - | - |
+| **SWEA** | O | O | O | - | - |
+| **LeetCode** | O | O | O | O | O |
+
+## Supported Languages
+
+| Language | BOJ | Programmers | SWEA | LeetCode |
+|----------|:---:|:-----------:|:----:|:--------:|
+| Java | O | O | O | O |
+| Python | O | O | O | O |
+| C++ | O | O | O | O |
+| Kotlin | O | O | X | O |
+
+---
+
+## Features
+
+### Internationalization (i18n)
+
+Switch between **Korean / English** in settings. All UI text is displayed in the selected language.
+
+### Fetch Problems
+
+Select the platform and language, enter a problem number, and the problem description and test cases are automatically extracted.
+
+- **BOJ**: Enter the problem number (e.g., `1000`)
+- **Programmers**: Number after `/lessons/` in URL (e.g., `12947`)
+- **SWEA**: Enter problem number or paste URL
+- **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
+
+<p align="center">
+  <img src="docs/screenshots/main-panel.png" width="500" alt="Main Panel"/>
+</p>
+
+When a problem is fetched, a folder is automatically created with a code file and README.md (problem description).
+
+<p align="center">
+  <img src="docs/screenshots/fetch-notification.png" width="700" alt="Fetch Complete"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/folder-structure.png" width="250" alt="Folder Structure"/>
+</p>
+
+### Problem View & Translation
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="Fetch Example"/>
+</p>
+
+View the problem description, I/O format, and examples directly in the plugin panel.
+
+#### Problem Translation (KR ↔ EN)
+
+Translate problem descriptions between Korean and English with one click.
+
+- **Toggle Translation**: Click the Translate button to switch between original and translated text
+- **Auto Language Detection**: Automatically detects Korean/English and translates to the other language
+- **Translation Caching**: Translated results are cached — no repeated API calls for the same problem
+- **Rate Limit Protection**: Built-in request throttling and exponential backoff retry to prevent IP blocking
+- Uses the same Google Translate unofficial API used by popular IntelliJ translation plugins (e.g., YiiGuxing Translation Plugin)
+
+<p align="center">
+  <img src="docs/screenshots/problem-view-1.png" width="420" alt="Problem View - Top"/>
+  <img src="docs/screenshots/problem-view-2.png" width="420" alt="Problem View - Examples"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/readme-preview.png" width="500" alt="README Preview"/>
+</p>
+
+Programmers problems are also displayed with I/O example tables.
+
+<p align="center">
+  <img src="docs/screenshots/programmers-problem.png" width="700" alt="Programmers Problem"/>
+</p>
+
+### Problem Search
+
+#### BOJ (solved.ac)
+
+- **Autocomplete**: Real-time results as you type problem numbers or titles
+- **Sort Options**: By difficulty, number, title, or solved count
+- **Quick Fetch**: Double-click to fetch immediately
+
+#### LeetCode
+
+- **Keyword Search**: Search by title or keyword
+- **Difficulty Filter**: Filter by Easy, Medium, Hard
+- **Tag Filter**: Filter by algorithm tags (Array, DP, Graph, etc.)
+- **Auto Search**: Debounced auto-search while typing
+
+### Random Problem Picker
+
+#### BOJ (solved.ac)
+
+- **Tier Range**: Set desired difficulty range from Bronze V to Ruby I
+- **Class Filter**: Filter problems by Class 1–10
+- **Algorithm Tag Chips**: Selected tags shown as chips/badges, individually removable with ×
+- **Solved Filter**: All / Exclude my solved / Only my solved (auto-detects handle from login)
+- **Exclude Obscure**: Exclude problems with ≤N solvers (customizable threshold)
+- **Quick Fetch**: Double-click to fetch immediately
+
+#### LeetCode
+
+- **Difficulty Checkboxes**: Select multiple difficulties (Easy, Medium, Hard)
+- **Tag Chips**: Select/remove tags as chips (Array, DP, Graph, etc.)
+- **Accepted Filter**: Exclude obscure problems by minimum accepted count (e.g., ≥1000)
+- **Solved Filter**: All / Exclude my solved / Only my solved (uses LeetCode login session)
+- **Count**: Set number of problems to pick (1–20)
+
+> Search and Random are not available for Programmers and SWEA.
+
+### Login & Submit
+
+Log in to each platform via the built-in JCEF browser and submit your code directly.
+
+<p align="center">
+  <img src="docs/screenshots/boj-login.png" width="600" alt="BOJ Login"/>
+</p>
+
+Click **Submit**, confirm the dialog, and your code & language are auto-filled.
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
+</p>
+
+### Local Test Execution
+
+Write your code and click **Run All** to execute all test cases and see PASS/FAIL results instantly. Each test case shows **execution time (ms)** and **memory usage (KB/MB)**.
+
+<p align="center">
+  <img src="docs/screenshots/test-cases-list.png" width="700" alt="Test Cases List"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/test-all-pass.png" width="700" alt="All Pass"/>
+</p>
+
+Failed cases are highlighted in red and auto-expanded.
+
+<p align="center">
+  <img src="docs/screenshots/test-all-fail.png" width="700" alt="Test Fail"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/test-detail.png" width="600" alt="Test Detail"/>
+</p>
+
+Programmers and LeetCode solution functions are automatically wrapped for testing.
+
+<p align="center">
+  <img src="docs/screenshots/programmers-test.png" width="700" alt="Programmers Test"/>
+</p>
+
+### Code Editor
+
+When a problem is fetched, boilerplate code is auto-generated so you can start coding immediately.
+
+<p align="center">
+  <img src="docs/screenshots/code-editor.png" width="500" alt="Code Editor"/>
+</p>
+
+### Code Templates
+
+Save frequently used boilerplate as templates for quick access. Syntax-highlighted preview included.
+
+<p align="center">
+  <img src="docs/screenshots/template-panel.png" width="700" alt="Template Panel"/>
+</p>
+
+### Timer
+
+Provides a **Stopwatch** and a **Countdown Timer**.
+
+- **Stopwatch**: Lap records with memo
+- **Countdown**: 3 display modes selectable via checkboxes
+  - **Circular Dial Timer**: Remaining time shown as a red circle, elapsed time as a white gap growing clockwise
+  - **Digital Clock**: Large numerical time display
+  - **Progress Bar**: Linear progress indicator
+- Preset buttons for 30min, 1hr, 2hr, 3hr
+- Notification when time's up
+
+<p align="center">
+  <img src="docs/screenshots/stopwatch.png" width="700" alt="Stopwatch"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/countdown-running.png" width="500" alt="Countdown Running"/>
+</p>
+
+### Settings & Exam Mode
+
+- **Auto Complete ON/OFF**: Toggle code auto-completion popups
+- **Inspections ON/OFF**: Enable power save mode to stop background analysis
+- **Paste Block**: Block pasting text copied from external programs
+- **Focus Alert**: Show alert when IDE window loses focus
+- **Language**: Switch between Korean / English
+
+One-click **Exam Mode** enables all 4 restrictions; **Normal Mode** disables them all.
+
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="600" alt="Settings"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/exam-mode-editor.png" width="700" alt="Exam Mode"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/normal-mode-autocomplete.png" width="600" alt="Normal Mode"/>
+</p>
+
+### GitHub Integration
+
+Push your accepted solutions to GitHub automatically — just like BaekjoonHub.
+
+- **One-Click Login**: Log in to GitHub via built-in browser — token is auto-generated and saved
+- **Repo Selector**: Choose from your repositories via dropdown after login
+- **Auto Push**: Automatically push code to GitHub when your submission is accepted
+- **Manual Push**: Click the GitHub button to push anytime
+- **Smart Detection**: Only pushes on "Accepted" — wrong answers are never pushed
+- **All Platforms**: Works with BOJ, Programmers, SWEA, and LeetCode
+- **Structured Commits**: `[Platform #ID] Problem Title (Language)` format with README
+
+Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repository.
+
+---
+
+## Installation
+
+### JetBrains Marketplace
+1. IntelliJ IDEA > Settings > Plugins > Marketplace
+2. Search "CodingTestKit" and install
+
+### Manual Install
+1. Download `.zip` from [Releases](https://github.com/dj258255/codingtestkit/releases)
+2. IntelliJ IDEA > Settings > Plugins > ⚙ > Install Plugin from Disk
+
+## Quick Start
+
+1. Open **CodingTestKit** from the right sidebar
+2. Select platform and language
+3. Enter problem ID and click **Fetch**
+4. Write code, click **Run All**
+5. Click **Submit**, verify in built-in browser
+
+## Requirements
+
+- IntelliJ IDEA 2024.1+
+- JDK 17+ (for Java execution)
+- Language compilers (for respective language tests)
+
+## Build
+
+```bash
+./gradlew buildPlugin
+```
+
+---
+
+# 한국어
 
 ## 왜 만들었나?
 
 코딩테스트를 준비하면서 항상 불편했습니다. 문제를 풀려면 브라우저에서 문제를 읽고, IDE에서 코드를 작성하고, 다시 브라우저로 돌아가 제출하고... 이 과정을 반복해야 했습니다.
 
-기존에도 문제를 가져오거나 제출을 도와주는 도구들은 있었지만, **실제 코딩테스트 환경을 그대로 재현**해주는 것은 없었습니다. 코딩테스트에서는 자동완성도 없고, 코드 검사도 없고, 시간 제한 안에서 풀어야 합니다.
-
-CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현**하기 위해 만들었습니다:
+CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하기 위해 만들었습니다:
 
 - **시험 모드**: 자동완성과 코드 검사를 끄고, 외부 붙여넣기 차단과 포커스 이탈 감지까지 실전과 동일한 환경에서 연습
 - **실행 시간 & 메모리 측정**: 테스트 케이스별 실행 시간(ms)과 메모리 사용량(KB/MB)을 표시
-- **타이머**: 스톱워치와 카운트다운으로 실제 시험 시간을 관리
+- **타이머**: 스톱워치, 원형 다이얼 카운트다운 타이머, 프로그레스 바, 디지털 시계
 - **올인원**: 문제 읽기, 코드 작성, 테스트, 제출까지 IDE를 벗어나지 않고 전부 해결
-
-브라우저와 IDE를 왔다갔다 하지 않고, **IntelliJ 하나로 코딩테스트의 모든 과정을 끝내는 것**이 이 플러그인의 목표입니다.
+- **문제 번역**: 한 클릭으로 한국어 ↔ 영어 번역 (캐싱 및 rate limit 보호 내장)
+- **GitHub 연동**: 채점 통과 시 자동으로 GitHub에 푸시 (백준허브 스타일)
 
 ## 지원 플랫폼
 
-| 플랫폼 | 문제 크롤링 | 로컬 테스트 | 코드 제출 |
-|--------|:---------:|:---------:|:--------:|
-| **백준 (BOJ)** | O | O | O |
-| **프로그래머스** | O | O | O |
-| **SWEA** | O | O | O |
+| 플랫폼 | 문제 가져오기 | 로컬 테스트 | 코드 제출 | 검색 | 랜덤 |
+|--------|:---------:|:---------:|:--------:|:----:|:----:|
+| **백준 (BOJ)** | O | O | O | O | O |
+| **프로그래머스** | O | O | O | - | - |
+| **SWEA** | O | O | O | - | - |
+| **LeetCode** | O | O | O | O | O |
 
 ## 지원 언어
 
-| 언어 | 백준 | 프로그래머스 | SWEA |
-|------|:----:|:----------:|:----:|
-| Java | O | O | O |
-| Python | O | O | O |
-| C++ | O | O | O |
-| Kotlin | O | O | X |
+| 언어 | 백준 | 프로그래머스 | SWEA | LeetCode |
+|------|:----:|:----------:|:----:|:--------:|
+| Java | O | O | O | O |
+| Python | O | O | O | O |
+| C++ | O | O | O | O |
+| Kotlin | O | O | X | O |
 
 ---
 
 ## 주요 기능
 
+### 다국어 지원 (i18n)
+
+설정에서 **한국어 / English** 전환이 가능합니다. 모든 UI 텍스트가 선택한 언어로 표시됩니다.
+
 ### 문제 가져오기
 
 플랫폼과 언어를 선택하고 문제 번호만 입력하면 문제 설명, 테스트 케이스가 자동으로 추출됩니다.
+
+- **백준**: 문제 번호 입력 (예: `1000`)
+- **프로그래머스**: URL의 `/lessons/` 뒤 숫자 (예: `12947`)
+- **SWEA**: 문제 번호 또는 URL 붙여넣기
+- **LeetCode**: 문제 번호, slug, 또는 URL 입력 (예: `1`, `two-sum`, URL)
 
 <p align="center">
   <img src="docs/screenshots/main-panel.png" width="500" alt="메인 패널"/>
@@ -63,19 +377,23 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/folder-structure.png" width="250" alt="폴더 구조"/>
 </p>
 
-- 백준: `problems/백준/Gold III/16236. 아기 상어/`
-- 프로그래머스: `problems/프로그래머스/Level1/12937. 짝수와 홀수/`
-- SWEA: `problems/SWEA/D3/1204. 최빈수 구하기/`
-
-### 문제 보기
-
-백준 #16236 "아기 상어" 문제를 예시로 살펴보겠습니다.
+### 문제 보기 & 번역
 
 <p align="center">
   <img src="docs/screenshots/boj-submit-success.png" width="700" alt="문제 가져오기 예시"/>
 </p>
 
-플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다. README.md 프리뷰도 함께 생성됩니다.
+플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다.
+
+#### 문제 번역 (한 ↔ 영)
+
+문제 설명을 한국어 ↔ 영어로 한 클릭에 번역합니다.
+
+- **토글 번역**: 번역 버튼 클릭으로 원문/번역 전환
+- **자동 언어 감지**: 한국어/영어를 자동 감지하여 반대 언어로 번역
+- **번역 캐싱**: 번역 결과를 캐시하여 같은 문제를 다시 번역하지 않음
+- **Rate Limit 보호**: 요청 간 딜레이 및 exponential backoff 재시도로 IP 차단 방지
+- IntelliJ 번역 플러그인(YiiGuxing Translation Plugin 등)과 동일한 Google Translate 비공식 API 사용
 
 <p align="center">
   <img src="docs/screenshots/problem-view-1.png" width="420" alt="문제 보기 - 상단"/>
@@ -92,6 +410,42 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/programmers-problem.png" width="700" alt="프로그래머스 문제"/>
 </p>
 
+### 문제 검색
+
+#### 백준 (solved.ac)
+
+- **자동완성**: 문제 번호나 제목을 입력하면 실시간으로 검색 결과 표시
+- **정렬 옵션**: 난이도순, 번호순, 제목순, 푼 사람순으로 정렬
+- **바로 가져오기**: 검색 결과에서 더블클릭으로 즉시 가져오기
+
+#### LeetCode
+
+- **키워드 검색**: 문제 제목이나 키워드로 검색
+- **난이도 필터**: Easy, Medium, Hard 필터링
+- **태그 필터**: Array, DP, Graph 등 알고리즘 태그로 필터링
+- **자동 검색**: 입력 시 자동으로 검색 (디바운스 적용)
+
+### 랜덤 문제 뽑기
+
+#### 백준 (solved.ac)
+
+- **티어 범위 설정**: Bronze V ~ Ruby I 까지 원하는 난이도 범위 지정
+- **클래스 필터**: Class 1~10 기준으로 문제 필터링
+- **알고리즘 태그 칩**: 선택한 태그가 칩/뱃지로 표시되며, × 클릭으로 개별 제거 가능
+- **풀이 필터**: 전체 / 내가 푼 문제 제외 / 내가 푼 문제에서만 (로그인 시 핸들 자동 감지)
+- **듣보 문제 제외**: 맞은 사람 N명 이하인 문제 제외 (기준값 사용자 설정 가능, 기본 100명)
+- **즉시 가져오기**: 뽑힌 문제를 더블클릭으로 바로 가져오기
+
+#### LeetCode
+
+- **난이도 체크박스**: Easy, Medium, Hard 중 원하는 난이도 복수 선택
+- **태그 칩 선택**: Array, DP, Graph 등 태그를 칩으로 선택/제거
+- **정답자 수 필터**: 정답자 N명 이상인 문제만 표시 (듣보 문제 제외, 기본 1000명)
+- **풀이 필터**: 전체 / 내가 푼 문제 제외 / 내가 푼 문제에서만 (LeetCode 로그인 세션 활용)
+- **개수 설정**: 뽑을 문제 수 지정 (1~20개)
+
+> 프로그래머스와 SWEA는 검색/랜덤 기능을 지원하지 않습니다.
+
 ### 로그인 & 제출
 
 내장 JCEF 브라우저를 통해 각 플랫폼에 로그인하고, 코드를 직접 제출할 수 있습니다.
@@ -100,19 +454,15 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
   <img src="docs/screenshots/boj-login.png" width="600" alt="백준 로그인"/>
 </p>
 
-**제출** 버튼을 누르면 제출 확인 다이얼로그가 표시됩니다. 문제 정보, 언어, 파일 경로를 한눈에 확인하고 **예(Y)** 를 누르면 내장 브라우저가 열립니다.
+**제출** 버튼을 누르면 제출 확인 다이얼로그가 표시되고, 코드와 언어가 자동으로 입력됩니다.
 
 <p align="center">
-  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="제출 확인 다이얼로그"/>
+  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="제출 확인"/>
 </p>
-
-코드와 언어가 자동으로 입력됩니다. 만약 자동 입력이 되지 않는 경우 하단의 **코드 붙여넣기** 버튼을 누르면 코드가 자동으로 채워집니다. 사용자는 스크롤만 내려서 **제출** 버튼을 누르면 끝입니다.
 
 <p align="center">
   <img src="docs/screenshots/boj-submit-code.png" width="700" alt="코드 자동 입력"/>
 </p>
-
-백준뿐만 아니라 **프로그래머스**, **SWEA**도 동일한 방식으로 로그인과 제출이 가능합니다.
 
 ### 로컬 테스트 실행
 
@@ -132,13 +482,11 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
   <img src="docs/screenshots/test-all-fail.png" width="700" alt="테스트 실패"/>
 </p>
 
-각 테스트 케이스를 펼치면 입력, 예상 출력, 실제 출력을 비교할 수 있습니다.
-
 <p align="center">
   <img src="docs/screenshots/test-detail.png" width="600" alt="테스트 상세"/>
 </p>
 
-프로그래머스의 solution 함수도 자동으로 래핑하여 테스트합니다.
+프로그래머스와 LeetCode의 solution 함수도 자동으로 래핑하여 테스트합니다.
 
 <p align="center">
   <img src="docs/screenshots/programmers-test.png" width="700" alt="프로그래머스 테스트"/>
@@ -146,13 +494,7 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 ### 코드 에디터
 
-문제를 가져오면 기본 코드가 자동 생성되어 에디터에서 바로 작성할 수 있습니다. 소스 루트가 자동 등록되어 자동완성과 컴파일이 정상 동작합니다.
-
-<p align="center">
-  <img src="docs/screenshots/fetch-notification.png" width="700" alt="기본 코드 자동 생성"/>
-</p>
-
-정답 코드를 작성하고 로컬에서 바로 테스트할 수 있습니다.
+문제를 가져오면 기본 코드가 자동 생성되어 에디터에서 바로 작성할 수 있습니다.
 
 <p align="center">
   <img src="docs/screenshots/code-editor.png" width="500" alt="코드 에디터"/>
@@ -160,7 +502,7 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 ### 코드 템플릿
 
-코딩테스트에서 매번 반복되는 도입부(입출력 설정 등)를 템플릿으로 저장해두면 빠르게 넘길 수 있습니다. 구문 강조가 적용된 미리보기를 제공합니다.
+자주 쓰는 코드를 템플릿으로 저장해두면 빠르게 불러올 수 있습니다. 구문 강조가 적용된 미리보기를 제공합니다.
 
 <p align="center">
   <img src="docs/screenshots/template-panel.png" width="700" alt="템플릿 패널"/>
@@ -168,7 +510,15 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 ### 타이머
 
-**스톱워치**와 **카운트다운 타이머**를 제공합니다. 스톱워치에는 랩 기록과 메모 기능이 있고, 카운트다운 타이머는 시간이 종료되면 알림을 표시합니다.
+**스톱워치**와 **카운트다운 타이머**를 제공합니다.
+
+- **스톱워치**: 랩 기록과 메모 기능
+- **카운트다운**: 3가지 표시 모드를 체크박스로 선택 가능
+  - **원형 다이얼 타이머**: 남은 시간이 빨간 원으로, 경과 시간이 빈 갭으로 시계방향으로 줄어듦
+  - **디지털 시계**: 큰 숫자로 남은 시간 표시
+  - **프로그레스 바**: 막대형 진행률 표시
+- 30분, 1시간, 2시간, 3시간 프리셋 버튼
+- 시간 종료 시 알림
 
 <p align="center">
   <img src="docs/screenshots/stopwatch.png" width="700" alt="스톱워치"/>
@@ -178,18 +528,13 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
   <img src="docs/screenshots/countdown-running.png" width="500" alt="카운트다운 실행 중"/>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/countdown-end.png" width="500" alt="타이머 종료"/>
-</p>
-
 ### 설정 & 시험 모드
-
-자동완성과 코드 검사를 끄고 켜는 **시험 모드**를 제공합니다. 실제 코딩테스트 환경과 동일한 조건에서 연습할 수 있습니다.
 
 - **자동완성 ON/OFF**: 코드 자동완성 팝업을 끄고 켤 수 있습니다
 - **코드 검사 ON/OFF**: 절전 모드를 활성화하여 백그라운드 분석을 중지합니다
-- **외부 붙여넣기 차단**: 외부 프로그램에서 복사한 텍스트의 붙여넣기를 차단합니다 (IDE 내부 복사/붙여넣기는 정상 동작)
-- **포커스 이탈 감지**: IDE 창에서 포커스가 벗어나면 경고를 표시합니다 (실제 시험에서 부정행위 방지와 동일)
+- **외부 붙여넣기 차단**: 외부 프로그램에서 복사한 텍스트의 붙여넣기를 차단합니다
+- **포커스 이탈 감지**: IDE 창에서 포커스가 벗어나면 경고를 표시합니다
+- **언어 설정**: 한국어 / English 전환 가능
 
 **시험 모드** 버튼을 누르면 4가지 설정이 한 번에 적용되고, **일반 모드** 버튼을 누르면 모두 해제됩니다.
 
@@ -197,29 +542,27 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
   <img src="docs/screenshots/settings.png" width="600" alt="설정"/>
 </p>
 
-#### 시험 모드 (자동완성 OFF)
-
-시험 모드에서는 코드 자동완성과 검사가 비활성화됩니다. `Integer.`을 입력해도 자동완성 팝업이 표시되지 않아, 실제 시험과 동일한 환경에서 연습할 수 있습니다.
-
 <p align="center">
-  <img src="docs/screenshots/exam-mode-editor.png" width="700" alt="시험 모드 - 에디터"/>
+  <img src="docs/screenshots/exam-mode-editor.png" width="700" alt="시험 모드"/>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/exam-mode-no-autocomplete.png" width="400" alt="시험 모드 - 자동완성 없음"/>
+  <img src="docs/screenshots/normal-mode-autocomplete.png" width="600" alt="일반 모드"/>
 </p>
 
-#### 일반 모드 (자동완성 ON)
+### GitHub 연동
 
-일반 모드에서는 `Integer.`을 입력하면 `parseInt`, `bitCount` 등 메서드 목록이 자동으로 표시됩니다.
+백준허브처럼 맞은 문제를 자동으로 GitHub에 푸시합니다.
 
-<p align="center">
-  <img src="docs/screenshots/normal-mode-editor.png" width="700" alt="일반 모드 - 에디터"/>
-</p>
+- **원클릭 로그인**: 내장 브라우저에서 GitHub에 로그인하면 토큰이 자동 생성 및 저장
+- **레포 선택**: 로그인 후 드롭다운에서 레포 선택
+- **자동 푸시**: 채점 결과가 "맞았습니다"일 때만 자동으로 GitHub에 커밋
+- **수동 푸시**: GitHub 버튼을 눌러서 원할 때 직접 푸시
+- **스마트 감지**: 틀린 코드는 절대 푸시하지 않음 — "Accepted"일 때만 동작
+- **전 플랫폼 지원**: 백준, 프로그래머스, SWEA, LeetCode 모두 지원
+- **구조화된 커밋**: `[플랫폼 #번호] 문제 제목 (언어)` 형식 + README 자동 생성
 
-<p align="center">
-  <img src="docs/screenshots/normal-mode-autocomplete.png" width="600" alt="일반 모드 - 자동완성"/>
-</p>
+설정: 설정 > GitHub 연동 > "GitHub 로그인" 클릭 후 레포 선택.
 
 ---
 
@@ -233,34 +576,13 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 1. [Releases](https://github.com/dj258255/codingtestkit/releases)에서 `.zip` 파일 다운로드
 2. IntelliJ IDEA > Settings > Plugins > 톱니바퀴 > Install Plugin from Disk
 
----
+## 빠른 시작
 
-## 사용법
-
-### 1. 문제 가져오기
 1. 우측 사이드바에서 **CodingTestKit** 열기
 2. 플랫폼과 언어 선택
 3. 문제 번호 입력 후 **가져오기** 클릭
-   - 백준: `1000` (문제 번호)
-   - 프로그래머스: `12947` (URL의 `/lessons/` 뒤 숫자)
-   - SWEA: `1204` (문제 번호)
-
-### 2. 로그인
-1. **로그인** 버튼 클릭
-2. 내장 브라우저에서 해당 플랫폼에 로그인
-3. 로그인 감지 시 자동으로 쿠키 저장 및 닫힘
-
-### 3. 테스트 실행
-1. **테스트** 탭 이동
-2. 코드 작성 후 **전체 실행** 클릭
-3. PASS/FAIL 결과 확인 (FAIL 시 자동 펼침)
-
-### 4. 코드 제출
-1. **제출** 버튼 클릭
-2. 내장 브라우저에서 코드 자동 입력 확인
-3. 제출 버튼 클릭 후 결과 확인
-
----
+4. 코드 작성 후 **전체 실행** 클릭
+5. **제출** 버튼 클릭, 내장 브라우저에서 확인
 
 ## 요구 사항
 
@@ -274,12 +596,8 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 ./gradlew buildPlugin
 ```
 
-빌드된 플러그인은 `build/distributions/` 폴더에 생성됩니다.
+---
 
-## 라이선스
+## License
 
-MIT License
-
-## 제작자
-
-- **dj258255** - [GitHub](https://github.com/dj258255)
+MIT License — **dj258255** ([GitHub](https://github.com/dj258255))

@@ -21,7 +21,8 @@ enum class ProblemSource(
 ) {
     BAEKJOON("백준", "baekjoon", "Main"),
     PROGRAMMERS("프로그래머스", "programmers", "Solution"),
-    SWEA("SWEA", "swea", "Solution");
+    SWEA("SWEA", "swea", "Solution"),
+    LEETCODE("LeetCode", "leetcode", "Solution");
 
     companion object {
         fun fromDisplayName(name: String): ProblemSource {
@@ -89,6 +90,7 @@ enum class Language(
                     |    }
                     |}
                 """.trimMargin()
+                ProblemSource.LEETCODE -> ""
             }
             PYTHON -> when (source) {
                 ProblemSource.BAEKJOON -> ""
@@ -102,6 +104,7 @@ enum class Language(
                     |for tc in range(1, T + 1):
                     |    print(f"#{tc}")
                 """.trimMargin()
+                ProblemSource.LEETCODE -> ""
             }
             CPP -> when (source) {
                 ProblemSource.BAEKJOON -> """
@@ -136,6 +139,7 @@ enum class Language(
                     |    return 0;
                     |}
                 """.trimMargin()
+                ProblemSource.LEETCODE -> ""
             }
             KOTLIN -> when (source) {
                 ProblemSource.BAEKJOON -> """
@@ -157,6 +161,7 @@ enum class Language(
                     |    }
                     |}
                 """.trimMargin()
+                ProblemSource.LEETCODE -> ""
             }
         }
     }

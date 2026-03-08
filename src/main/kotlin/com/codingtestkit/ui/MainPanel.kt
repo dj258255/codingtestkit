@@ -1,10 +1,12 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.I18n
 import com.codingtestkit.service.ProblemFileManager
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -27,11 +29,11 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         border = JBUI.Borders.empty()
 
         val tabbedPane = JBTabbedPane()
-        tabbedPane.addTab("문제", AllIcons.Actions.Download, problemPanel)
-        tabbedPane.addTab("테스트", AllIcons.Actions.Execute, testPanel)
-        tabbedPane.addTab("템플릿", AllIcons.Actions.Copy, templatePanel)
-        tabbedPane.addTab("타이머", AllIcons.Vcs.History, timerPanel)
-        tabbedPane.addTab("설정", AllIcons.General.Settings, settingsPanel)
+        tabbedPane.addTab(I18n.t("문제", "Problems"), AllIcons.Actions.Download, problemPanel)
+        tabbedPane.addTab(I18n.t("테스트", "Tests"), AllIcons.Actions.Execute, testPanel)
+        tabbedPane.addTab(I18n.t("템플릿", "Templates"), AllIcons.Actions.Copy, templatePanel)
+        tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Vcs.History, timerPanel)
+        tabbedPane.addTab(I18n.t("설정", "Settings"), AllIcons.General.Settings, settingsPanel)
 
         add(tabbedPane, BorderLayout.CENTER)
 
@@ -51,20 +53,39 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                     override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
                         detectAndLoadProblem(file, basePath)
                     }
+                    override fun selectionChanged(event: FileEditorManagerEvent) {
+                        val file = event.newFile ?: return
+                        detectAndLoadProblem(file, basePath)
+                    }
                 }
             )
 
-            // 초기 로드: 현재 열려있는 파일 확인
-            val currentFile = FileEditorManager.getInstance(project).selectedFiles.firstOrNull()
-            if (currentFile != null) {
-                detectAndLoadProblem(currentFile, basePath)
+            // IDE 시작 시 이전 세션 소스 루트 정리
+            ApplicationManager.getApplication().invokeLater {
+                ProblemFileManager.clearSourceRoots(project)
+                val currentFile = FileEditorManager.getInstance(project).selectedFiles.firstOrNull()
+                if (currentFile != null) {
+                    detectAndLoadProblem(currentFile, basePath)
+                }
             }
         }
     }
 
+    private var sourceRootsCleared = false
+
     private fun detectAndLoadProblem(file: VirtualFile, basePath: String) {
         val filePath = file.path
-        if (!filePath.contains("/problems/")) return
+        if (!filePath.contains("/problems/")) {
+            if (!sourceRootsCleared) {
+                sourceRootsCleared = true
+                lastLoadedFolder = null
+                ApplicationManager.getApplication().invokeLater {
+                    ProblemFileManager.clearSourceRoots(project)
+                }
+            }
+            return
+        }
+        sourceRootsCleared = false
 
         val folder = ProblemFileManager.findProblemFolder(filePath, basePath) ?: return
         val folderPath = folder.absolutePath
@@ -77,7 +98,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         testPanel.setParameterNames(problem.parameterNames)
         testPanel.setTestCases(problem.testCases)
 
-        // 현재 문제 폴더만 소스 루트로 전환 (중복 클래스 방지)
+        // 현재 문제 폴더를 소스 루트로 전환 (자동완성 활성화)
         ApplicationManager.getApplication().invokeLater {
             val vfs = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
             val folderVf = vfs.findFileByIoFile(folder)

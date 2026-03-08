@@ -1,5 +1,6 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.I18n
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.model.TestCase
@@ -18,11 +19,11 @@ import javax.swing.*
 class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray())
-    private val runButton = JButton("전체 실행", AllIcons.Actions.Execute).apply {
-        toolTipText = "모든 테스트 케이스를 실행합니다"
+    private val runButton = JButton(I18n.t("전체 실행", "Run All"), AllIcons.Actions.Execute).apply {
+        toolTipText = I18n.t("모든 테스트 케이스를 실행합니다", "Run all test cases")
     }
     private val addButton = JButton(AllIcons.General.Add).apply {
-        toolTipText = "테스트 케이스 추가"
+        toolTipText = I18n.t("테스트 케이스 추가", "Add test case")
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
     }
     private val statusLabel = JLabel("").apply {
@@ -60,7 +61,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         val leftControls = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
-        leftControls.add(JLabel("언어:").apply {
+        leftControls.add(JLabel(I18n.t("언어:", "Lang:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         })
@@ -113,20 +114,20 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun updateInfoLabel() {
-        if (problemSource == ProblemSource.PROGRAMMERS) {
+        if (problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE) {
             if (parameterNames.isNotEmpty()) {
-                infoLabel.text = "파라미터: ${parameterNames.joinToString(", ")}"
+                infoLabel.text = I18n.t("파라미터", "Params") + ": ${parameterNames.joinToString(", ")}"
                 infoLabel.icon = AllIcons.General.Information
             } else {
-                infoLabel.text = "+ 버튼으로 추가하세요"
+                infoLabel.text = I18n.t("+ 버튼으로 추가하세요", "Click + to add")
                 infoLabel.icon = AllIcons.General.Information
             }
         } else {
             if (testCases.isNotEmpty()) {
-                infoLabel.text = "${testCases.size}개 테스트 케이스"
+                infoLabel.text = I18n.t("${testCases.size}개 테스트 케이스", "${testCases.size} test cases")
                 infoLabel.icon = AllIcons.General.InspectionsOK
             } else {
-                infoLabel.text = "문제를 먼저 가져오세요"
+                infoLabel.text = I18n.t("문제를 먼저 가져오세요", "Fetch a problem first")
                 infoLabel.icon = null
             }
         }
@@ -159,8 +160,8 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (index < 0 || index >= testCases.size) return
         val result = javax.swing.JOptionPane.showConfirmDialog(
             this,
-            "테스트 케이스 #${index + 1}을 삭제하시겠습니까?",
-            "삭제 확인",
+            I18n.t("테스트 케이스 #${index + 1}을 삭제하시겠습니까?", "Delete test case #${index + 1}?"),
+            I18n.t("삭제 확인", "Confirm Delete"),
             javax.swing.JOptionPane.YES_NO_OPTION
         )
         if (result == javax.swing.JOptionPane.YES_OPTION) {
@@ -182,7 +183,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun runAllTests() {
         val code = getCurrentCode()
         if (code.isBlank()) {
-            statusLabel.text = "코드 없음"
+            statusLabel.text = I18n.t("코드 없음", "No code")
             statusLabel.icon = AllIcons.General.Warning
             statusLabel.foreground = JBColor(Color(200, 120, 0), Color(230, 160, 50))
             return
@@ -192,7 +193,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         syncCardsToTestCases()
 
         if (testCases.isEmpty()) {
-            statusLabel.text = "케이스 없음"
+            statusLabel.text = I18n.t("케이스 없음", "No cases")
             statusLabel.icon = AllIcons.General.Warning
             statusLabel.foreground = JBColor(Color(200, 120, 0), Color(230, 160, 50))
             return
@@ -200,7 +201,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val language = getSelectedLanguage()
         runButton.isEnabled = false
-        statusLabel.text = "실행 중..."
+        statusLabel.text = I18n.t("실행 중...", "Running...")
         statusLabel.icon = AllIcons.Process.Step_1
         statusLabel.foreground = JBColor.foreground()
 
@@ -210,7 +211,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         ApplicationManager.getApplication().executeOnPooledThread {
             var passCount = 0
             for ((i, tc) in testCases.withIndex()) {
-                val result = if (problemSource == ProblemSource.PROGRAMMERS) {
+                val result = if (problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE) {
                     CodeRunner.runProgrammers(code, language, tc, parameterNames)
                 } else {
                     CodeRunner.run(code, language, tc)
@@ -270,7 +271,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             SwingUtilities.invokeLater {
                 runButton.isEnabled = true
                 val allPassed = finalPassCount == testCases.size
-                statusLabel.text = "$finalPassCount / ${testCases.size} 통과"
+                statusLabel.text = "$finalPassCount / ${testCases.size} ${I18n.t("통과", "passed")}"
                 statusLabel.icon = if (allPassed) AllIcons.General.InspectionsOK else AllIcons.General.Error
                 statusLabel.foreground = if (allPassed) {
                     JBColor(Color(46, 160, 67), Color(80, 200, 80))
@@ -363,14 +364,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             val inputPreview = testCase.input.lines().firstOrNull()?.take(30) ?: ""
             if (inputPreview.isNotBlank()) {
-                summaryLabel.text = "입력: $inputPreview..."
+                summaryLabel.text = "${I18n.t("입력", "Input")}: $inputPreview..."
             }
             headerPanel.add(summaryLabel, BorderLayout.CENTER)
 
             // 삭제 버튼
             val deleteBtn = JLabel(AllIcons.Actions.Close).apply {
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                toolTipText = "이 테스트 케이스 삭제"
+                toolTipText = I18n.t("이 테스트 케이스 삭제", "Delete this test case")
                 border = JBUI.Borders.empty(0, 4)
             }
             deleteBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
@@ -390,15 +391,15 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 isVisible = false
             }
 
-            contentPanel.add(createFieldPanel("입력", inputArea))
+            contentPanel.add(createFieldPanel(I18n.t("입력", "Input"), inputArea))
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            contentPanel.add(createFieldPanel("예상 출력", expectedArea))
+            contentPanel.add(createFieldPanel(I18n.t("예상 출력", "Expected"), expectedArea))
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            contentPanel.add(createFieldPanel("실제 출력", actualArea))
+            contentPanel.add(createFieldPanel(I18n.t("실제 출력", "Actual"), actualArea))
 
             // 디버그 출력 (조건부 표시)
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            debugPanel.add(JLabel("디버그 출력").apply {
+            debugPanel.add(JLabel(I18n.t("디버그 출력", "Debug Output")).apply {
                 font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
                 foreground = JBColor(Color(150, 120, 50), Color(200, 180, 100))
                 icon = AllIcons.General.Information
@@ -528,7 +529,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         fun setRunning() {
             statusIcon.icon = AllIcons.Process.Step_1
-            titleLabel.text = "#$number 실행 중..."
+            titleLabel.text = "#$number ${I18n.t("실행 중...", "Running...")}"
             actualArea.text = ""
             debugPanel.isVisible = false
             debugArea.text = ""

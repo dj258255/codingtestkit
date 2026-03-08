@@ -93,6 +93,8 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                     !url.contains("/sign_in") && !url.contains("/login")
             ProblemSource.SWEA -> url.contains("swexpertacademy") &&
                     !url.contains("login") && !url.contains("signUp")
+            ProblemSource.LEETCODE -> url.contains("leetcode.com") &&
+                    !url.contains("/accounts/login") && !url.contains("/accounts/signup")
         }
     }
 
@@ -205,6 +207,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         ProblemSource.BAEKJOON -> "www.acmicpc.net"
         ProblemSource.PROGRAMMERS -> "school.programmers.co.kr"
         ProblemSource.SWEA -> "swexpertacademy.com"
+        ProblemSource.LEETCODE -> "leetcode.com"
     }
 
     fun getCookies(): String = cookies

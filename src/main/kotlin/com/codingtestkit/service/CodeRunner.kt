@@ -130,8 +130,110 @@ object CodeRunner {
 
     // ─── 프로그래머스 테스트 래퍼 생성 ───
 
+    /**
+     * 프로그래머스 입력값을 Java 리터럴로 변환
+     * [1, 2, 3] → new int[]{1, 2, 3}
+     * [[1,2],[3,4]] → new int[][]{{1,2},{3,4}}
+     * ["a","b"] → new String[]{"a","b"}
+     * "hello" → "hello" (그대로)
+     * 123 → 123 (그대로)
+     */
+    private fun toJavaLiteral(value: String): String {
+        val v = value.trim()
+        if (!v.startsWith("[")) return v
+
+        // 2차원 배열: [[1,2],[3,4]]
+        if (v.startsWith("[[")) {
+            val inner = v.removePrefix("[").removeSuffix("]")
+            // 내부 배열들을 분리
+            val arrays = mutableListOf<String>()
+            var depth = 0
+            var current = StringBuilder()
+            for (c in inner) {
+                if (c == '[') depth++
+                if (c == ']') depth--
+                current.append(c)
+                if (depth == 0 && current.isNotBlank()) {
+                    val arr = current.toString().trim().removePrefix(",").trim()
+                    if (arr.isNotBlank()) arrays.add(arr)
+                    current = StringBuilder()
+                }
+            }
+            val converted = arrays.joinToString(", ") { toJavaLiteral(it) }
+            // 내부 타입 감지
+            val firstInner = arrays.firstOrNull() ?: ""
+            val innerContent = firstInner.removePrefix("[").removeSuffix("]").trim()
+            val type = detectJavaArrayType(innerContent)
+            return "new ${type}[]{$converted}"
+        }
+
+        // 1차원 배열: [1, 2, 3]
+        val content = v.removePrefix("[").removeSuffix("]").trim()
+        if (content.isEmpty()) return "new int[]{}"
+        val type = detectJavaArrayType(content)
+        // 내부 배열 표기를 {} 로 변환
+        return "new ${type}{${content}}"
+    }
+
+    private fun detectJavaArrayType(content: String): String {
+        val first = content.split(",").firstOrNull()?.trim() ?: ""
+        return when {
+            first.startsWith("\"") -> "String[]"
+            first == "true" || first == "false" -> "boolean[]"
+            first.contains(".") -> "double[]"
+            first.toLongOrNull() != null && (first.toLong() > Int.MAX_VALUE || first.toLong() < Int.MIN_VALUE) -> "long[]"
+            else -> "int[]"
+        }
+    }
+
+    /**
+     * C++ 배열 변환: [1,2,3] → {1,2,3} (vector 초기화)
+     */
+    private fun toCppLiteral(value: String): String {
+        val v = value.trim()
+        if (!v.startsWith("[")) return v
+        return v.replace('[', '{').replace(']', '}')
+    }
+
+    /**
+     * Kotlin 배열 변환: [1,2,3] → intArrayOf(1,2,3)
+     */
+    private fun toKotlinLiteral(value: String): String {
+        val v = value.trim()
+        if (!v.startsWith("[")) return v
+
+        if (v.startsWith("[[")) {
+            val inner = v.removePrefix("[").removeSuffix("]")
+            val arrays = mutableListOf<String>()
+            var depth = 0
+            var current = StringBuilder()
+            for (c in inner) {
+                if (c == '[') depth++
+                if (c == ']') depth--
+                current.append(c)
+                if (depth == 0 && current.isNotBlank()) {
+                    val arr = current.toString().trim().removePrefix(",").trim()
+                    if (arr.isNotBlank()) arrays.add(arr)
+                    current = StringBuilder()
+                }
+            }
+            val converted = arrays.joinToString(", ") { toKotlinLiteral(it) }
+            return "arrayOf($converted)"
+        }
+
+        val content = v.removePrefix("[").removeSuffix("]").trim()
+        if (content.isEmpty()) return "intArrayOf()"
+        val first = content.split(",").firstOrNull()?.trim() ?: ""
+        return when {
+            first.startsWith("\"") -> "arrayOf($content)"
+            first == "true" || first == "false" -> "booleanArrayOf($content)"
+            first.contains(".") -> "doubleArrayOf($content)"
+            else -> "intArrayOf($content)"
+        }
+    }
+
     private fun wrapJava(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
-        val args = inputValues.joinToString(", ")
+        val args = inputValues.joinToString(", ") { toJavaLiteral(it) }
         // Solution 클래스에서 solution 메서드 호출
         val solutionClass = if (code.contains("class Solution")) {
             code
@@ -182,7 +284,7 @@ else:
     }
 
     private fun wrapCpp(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
-        val args = inputValues.joinToString(", ")
+        val args = inputValues.joinToString(", ") { toCppLiteral(it) }
         val hasInclude = code.contains("#include")
         val includes = if (hasInclude) "" else """
 #include <iostream>
@@ -206,7 +308,7 @@ int main() {
     }
 
     private fun wrapKotlin(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
-        val args = inputValues.joinToString(", ")
+        val args = inputValues.joinToString(", ") { toKotlinLiteral(it) }
         return """
 $code
 

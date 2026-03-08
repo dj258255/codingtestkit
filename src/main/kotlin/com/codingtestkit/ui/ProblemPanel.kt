@@ -1,5 +1,6 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.I18n
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.Problem
 import com.codingtestkit.model.ProblemSource
@@ -30,14 +31,27 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         renderer = createComboRenderer()
     }
     private val problemIdField = JTextField().apply {
-        toolTipText = "문제 번호 또는 URL을 입력하세요"
+        toolTipText = I18n.t("문제 번호 또는 URL을 입력하세요", "Enter problem number or URL")
     }
-    private val fetchButton = JButton("가져오기", AllIcons.Actions.Download).apply {
-        toolTipText = "문제를 가져옵니다"
+    private val fetchButton = JButton(I18n.t("가져오기", "Fetch"), AllIcons.Actions.Download).apply {
+        toolTipText = I18n.t("문제를 가져옵니다", "Fetch the problem")
     }
-    private val loginButton = JButton("로그인", AllIcons.General.User)
-    private val submitButton = JButton("제출", AllIcons.Actions.Upload).apply {
-        toolTipText = "현재 에디터의 코드를 제출합니다"
+    private val randomButton = JButton(I18n.t("랜덤", "Random"), AllIcons.Actions.Refresh).apply {
+        toolTipText = I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
+    }
+    private val searchButton2 = JButton(I18n.t("검색", "Search"), AllIcons.Actions.Search).apply {
+        toolTipText = I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
+    }
+    private val loginButton = JButton(I18n.t("로그인", "Login"), AllIcons.General.User)
+    private val submitButton = JButton(I18n.t("제출", "Submit"), AllIcons.Actions.Upload).apply {
+        toolTipText = I18n.t("현재 에디터의 코드를 제출합니다", "Submit code from current editor")
+    }
+    private val githubPushButton = JButton("GitHub", AllIcons.Vcs.Push).apply {
+        toolTipText = I18n.t("현재 문제를 GitHub에 푸시합니다", "Push current problem to GitHub")
+    }
+    private val translateButton = JButton(I18n.t("번역", "Translate"), AllIcons.Actions.Preview).apply {
+        toolTipText = I18n.t("문제를 번역합니다 (한↔영)", "Translate problem (KR↔EN)")
+        isEnabled = false
     }
     private val loginStatusLabel = JLabel("").apply {
         foreground = JBColor.GRAY
@@ -48,13 +62,16 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         isEditable = false
         border = JBUI.Borders.empty(8)
         text = "<html><body style='font-family:sans-serif; padding:8px; color:#999;'>" +
-                "<p style='text-align:center; margin-top:40px;'>문제 번호를 입력하고<br>'가져오기'를 클릭하세요</p>" +
+                "<p style='text-align:center; margin-top:40px;'>${I18n.t("문제 번호를 입력하고<br>'가져오기'를 클릭하세요", "Enter a problem number and<br>click 'Fetch'")}</p>" +
                 "</body></html>"
     }
 
     var onProblemFetched: ((Problem) -> Unit)? = null
     private var currentProblem: Problem? = null
     private var currentProblemFolder: java.io.File? = null
+    private var isTranslated = false
+    private var originalHtml: String? = null
+    private var translatedHtml: String? = null
 
     init {
         border = JBUI.Borders.empty()
@@ -64,15 +81,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
 
-        // Row 1: 플랫폼 + 언어
+        // Row 1: 플랫폼 + 언어 + 로그인 상태
         val row1 = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
             alignmentX = LEFT_ALIGNMENT
         }
-        row1.add(createLabel("플랫폼"))
+        row1.add(createLabel(I18n.t("플랫폼", "Platform")))
         row1.add(sourceCombo)
         row1.add(Box.createHorizontalStrut(JBUI.scale(4)))
-        row1.add(createLabel("언어"))
+        row1.add(createLabel(I18n.t("언어", "Lang")))
         row1.add(languageCombo)
+        row1.add(Box.createHorizontalStrut(JBUI.scale(8)))
+        row1.add(loginButton)
+        row1.add(loginStatusLabel)
         topPanel.add(row1)
         topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
@@ -81,20 +101,23 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             alignmentX = LEFT_ALIGNMENT
             maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(32))
         }
-        row2.add(createLabel(" 번호 "), BorderLayout.WEST)
+        row2.add(createLabel(I18n.t(" 번호 ", " ID ")), BorderLayout.WEST)
         row2.add(problemIdField, BorderLayout.CENTER)
-        row2.add(fetchButton, BorderLayout.EAST)
+        val fetchPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(2), 0))
+        fetchPanel.add(fetchButton)
+        fetchPanel.add(randomButton)
+        fetchPanel.add(searchButton2)
+        row2.add(fetchPanel, BorderLayout.EAST)
         topPanel.add(row2)
         topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
-        // Row 3: 로그인 + 상태 + 제출
+        // Row 3: 제출 + GitHub
         val row3 = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
             alignmentX = LEFT_ALIGNMENT
         }
-        row3.add(loginButton)
-        row3.add(loginStatusLabel)
-        row3.add(Box.createHorizontalStrut(JBUI.scale(8)))
         row3.add(submitButton)
+        row3.add(githubPushButton)
+        row3.add(translateButton)
         topPanel.add(row3)
 
         add(topPanel, BorderLayout.NORTH)
@@ -106,6 +129,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         add(scrollPane, BorderLayout.CENTER)
 
         submitButton.isEnabled = false
+        githubPushButton.isEnabled = false
         updateLoginButton()
 
         // 이벤트
@@ -114,8 +138,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             updatePlaceholder()
         }
         fetchButton.addActionListener { fetchProblem() }
+        randomButton.addActionListener { openRandomDialog() }
+        searchButton2.addActionListener { openSearchDialog() }
         loginButton.addActionListener { handleLogin() }
         submitButton.addActionListener { submitSolution() }
+        githubPushButton.addActionListener { pushToGitHub() }
+        translateButton.addActionListener { translateProblem() }
         problemIdField.addActionListener { fetchProblem() }
         updatePlaceholder()
     }
@@ -123,12 +151,30 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun updatePlaceholder() {
         val source = getSelectedSource()
         val (placeholder, tooltip) = when (source) {
-            ProblemSource.BAEKJOON -> "예: 1000" to "백준 문제 번호 (URL의 /problem/1000 에서 1000)"
-            ProblemSource.PROGRAMMERS -> "예: 12947 (URL의 lessons/뒤 숫자)" to "프로그래머스: URL이 /lessons/12947 이면 12947 입력"
-            ProblemSource.SWEA -> "예: 2001 또는 URL 붙여넣기" to "SWEA: 문제 번호 또는 URL을 입력하세요"
+            ProblemSource.BAEKJOON -> I18n.t("예: 1000", "e.g. 1000") to
+                    I18n.t("백준 문제 번호 (URL의 /problem/1000 에서 1000)", "BOJ problem number (1000 from /problem/1000)")
+            ProblemSource.PROGRAMMERS -> I18n.t("예: 12947 (URL의 lessons/뒤 숫자)", "e.g. 12947 (number after /lessons/)") to
+                    I18n.t("프로그래머스: URL이 /lessons/12947 이면 12947 입력", "Programmers: Enter 12947 if URL is /lessons/12947")
+            ProblemSource.SWEA -> I18n.t("예: 2001 또는 URL 붙여넣기", "e.g. 2001 or paste URL") to
+                    I18n.t("SWEA: 문제 번호 또는 URL을 입력하세요", "SWEA: Enter problem number or URL")
+            ProblemSource.LEETCODE -> I18n.t("예: 1 또는 two-sum", "e.g. 1 or two-sum") to
+                    I18n.t("LeetCode: 문제 번호, slug, 또는 URL 입력", "LeetCode: Enter number, slug, or URL")
         }
         problemIdField.putClientProperty("JTextField.placeholderText", placeholder)
         problemIdField.toolTipText = tooltip
+
+        // 프로그래머스/SWEA는 검색·랜덤 미지원
+        val hasSearchRandom = source == ProblemSource.BAEKJOON || source == ProblemSource.LEETCODE
+        randomButton.isVisible = hasSearchRandom
+        searchButton2.isVisible = hasSearchRandom
+
+        if (hasSearchRandom) {
+            val isLeetCode = source == ProblemSource.LEETCODE
+            randomButton.toolTipText = if (isLeetCode) I18n.t("LeetCode에서 랜덤 문제를 뽑습니다", "Pick random problems from LeetCode")
+                else I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
+            searchButton2.toolTipText = if (isLeetCode) I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
+                else I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
+        }
     }
 
     private fun createComboRenderer(): ListCellRenderer<Any?> {
@@ -157,7 +203,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val source = getSelectedSource()
         val auth = AuthService.getInstance()
         if (auth.isLoggedIn(source)) {
-            loginButton.text = "로그아웃"
+            loginButton.text = I18n.t("로그아웃", "Logout")
             loginButton.icon = AllIcons.Actions.Cancel
             val username = auth.getUsername(source)
             if (username.isNotBlank()) {
@@ -165,12 +211,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 loginStatusLabel.foreground = JBColor(java.awt.Color(0, 130, 0), java.awt.Color(80, 200, 80))
                 loginStatusLabel.icon = AllIcons.General.InspectionsOK
             } else {
-                loginStatusLabel.text = "로그인됨"
+                loginStatusLabel.text = I18n.t("로그인됨", "Logged in")
                 loginStatusLabel.foreground = JBColor(java.awt.Color(0, 130, 0), java.awt.Color(80, 200, 80))
                 loginStatusLabel.icon = AllIcons.General.InspectionsOK
             }
         } else {
-            loginButton.text = "로그인"
+            loginButton.text = I18n.t("로그인", "Login")
             loginButton.icon = AllIcons.General.User
             loginStatusLabel.text = ""
             loginStatusLabel.icon = null
@@ -184,7 +230,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (auth.isLoggedIn(source)) {
             auth.logout(source)
             updateLoginButton()
-            Messages.showInfoMessage(project, "${source.displayName} 로그아웃되었습니다.", "CodingTestKit")
+            Messages.showInfoMessage(project, I18n.t("${source.displayName} 로그아웃되었습니다.", "Logged out from ${source.displayName}."), "CodingTestKit")
             return
         }
 
@@ -193,10 +239,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             val cookies = dialog.getCookies()
             if (cookies.isNotBlank()) {
                 auth.setCookies(source, cookies)
-                loginStatusLabel.text = "유저 정보 가져오는 중..."
+                loginStatusLabel.text = I18n.t("유저 정보 가져오는 중...", "Fetching user info...")
                 loginStatusLabel.foreground = JBColor.GRAY
                 loginStatusLabel.icon = AllIcons.Process.Step_1
-                loginButton.text = "로그아웃"
+                loginButton.text = I18n.t("로그아웃", "Logout")
                 loginButton.icon = AllIcons.Actions.Cancel
 
                 // 백그라운드에서 유저네임 가져오기 (최대 2회 시도)
@@ -214,10 +260,68 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
+    private fun openSearchDialog() {
+        val source = getSelectedSource()
+        if (source == ProblemSource.LEETCODE) {
+            val dialog = LeetCodeSearchDialog(project)
+            if (dialog.showAndGet()) {
+                val slug = dialog.selectedProblemSlug ?: return
+                problemIdField.text = slug
+                fetchProblem()
+            }
+        } else {
+            val dialog = ProblemSearchDialog(project)
+            if (dialog.showAndGet()) {
+                val problemId = dialog.selectedProblemId ?: return
+                problemIdField.text = problemId.toString()
+                sourceCombo.selectedIndex = 0 // 백준
+                fetchProblem()
+            }
+        }
+    }
+
+    private fun openRandomDialog() {
+        val source = getSelectedSource()
+        if (source == ProblemSource.LEETCODE) {
+            val dialog = LeetCodeRandomDialog(project)
+            if (dialog.showAndGet()) {
+                val slugs = dialog.selectedProblemSlugs
+                if (slugs.isEmpty()) return
+                fetchMultipleProblems(slugs)
+            }
+        } else {
+            val dialog = RandomProblemDialog(project)
+            if (dialog.showAndGet()) {
+                val ids = dialog.selectedProblemIds
+                if (ids.isEmpty()) return
+                sourceCombo.selectedIndex = 0 // 백준
+                fetchMultipleProblems(ids.map { it.toString() })
+            }
+        }
+    }
+
+    private fun fetchMultipleProblems(problemIds: List<String>) {
+        if (problemIds.size == 1) {
+            problemIdField.text = problemIds[0]
+            fetchProblem()
+            return
+        }
+        // 여러 문제를 순차적으로 가져오기
+        Thread {
+            for (id in problemIds) {
+                SwingUtilities.invokeAndWait {
+                    problemIdField.text = id
+                    fetchProblem()
+                }
+                Thread.sleep(500) // API 부하 방지
+            }
+        }.start()
+    }
+
     private fun fetchProblem() {
         val problemId = problemIdField.text.trim()
         if (problemId.isBlank()) {
-            Messages.showWarningDialog(project, "문제 번호를 입력하세요.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("문제 번호를 입력하세요.", "Please enter a problem number."), "CodingTestKit")
             return
         }
 
@@ -233,13 +337,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         fetchButton.isEnabled = false
-        fetchButton.text = "가져오는 중..."
+        fetchButton.text = I18n.t("가져오는 중...", "Fetching...")
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 val problem = when (source) {
                     ProblemSource.BAEKJOON -> BaekjoonCrawler.fetchProblem(id)
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
+                    ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension)
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 
@@ -262,7 +367,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             val problem = dialog.getProblem()
             if (problem != null) {
                 fetchButton.isEnabled = false
-                fetchButton.text = "파일 생성 중..."
+                fetchButton.text = I18n.t("파일 생성 중...", "Creating files...")
                 val inputFileContent = dialog.inputFileContent
                 val outputFileContent = dialog.outputFileContent
                 val imageUrls = dialog.imageUrls
@@ -333,7 +438,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     }
                 }
             } else {
-                Messages.showWarningDialog(project, "SWEA 문제를 가져오지 못했습니다.", "CodingTestKit")
+                Messages.showWarningDialog(project, I18n.t("SWEA 문제를 가져오지 못했습니다.", "Failed to fetch SWEA problem."), "CodingTestKit")
             }
         }
     }
@@ -341,17 +446,22 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun handleFetchSuccess(problem: Problem, files: ProblemFileManager.CreatedFiles) {
         currentProblem = problem
         currentProblemFolder = files.folder
+        isTranslated = false
+        translatedHtml = null
+        translateButton.text = I18n.t("번역", "Translate")
         displayProblem(problem)
+        translateButton.isEnabled = true
         submitButton.isEnabled = true
+        githubPushButton.isEnabled = true
         onProblemFetched?.invoke(problem)
         fetchButton.isEnabled = true
-        fetchButton.text = "가져오기"
+        fetchButton.text = I18n.t("가져오기", "Fetch")
 
         com.intellij.notification.NotificationGroupManager.getInstance()
             .getNotificationGroup("CodingTestKit")
             .createNotification(
-                "문제를 가져왔습니다!",
-                "폴더: ${files.folder.name} | 코드: ${files.codeFile.name}",
+                I18n.t("문제를 가져왔습니다!", "Problem fetched!"),
+                I18n.t("폴더", "Folder") + ": ${files.folder.name} | " + I18n.t("코드", "Code") + ": ${files.codeFile.name}",
                 com.intellij.notification.NotificationType.INFORMATION
             )
             .notify(project)
@@ -365,6 +475,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         currentProblemFolder = folder
         displayProblem(problem)
         submitButton.isEnabled = true
+        githubPushButton.isEnabled = true
 
         // 플랫폼/번호 필드도 업데이트
         problemIdField.text = problem.id
@@ -378,9 +489,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private fun handleFetchError(e: Exception) {
         problemDisplay.text = "<html><body style='font-family:sans-serif; padding:10px; color:#cc4444;'>" +
-                "<h3>오류 발생</h3><p>${e.message}</p></body></html>"
+                "<h3>${I18n.t("오류 발생", "Error")}</h3><p>${e.message}</p></body></html>"
         fetchButton.isEnabled = true
-        fetchButton.text = "가져오기"
+        fetchButton.text = I18n.t("가져오기", "Fetch")
     }
 
     private fun submitSolution() {
@@ -391,26 +502,26 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
         val code = editor?.document?.text
-        val fileName = editor?.virtualFile?.name ?: "알 수 없음"
+        val fileName = editor?.virtualFile?.name ?: I18n.t("알 수 없음", "Unknown")
         val filePath = editor?.virtualFile?.path ?: ""
         if (code.isNullOrBlank()) {
-            Messages.showWarningDialog(project, "에디터에 코드가 없습니다.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("에디터에 코드가 없습니다.", "No code in editor."), "CodingTestKit")
             return
         }
 
         if (cookies.isBlank()) {
-            Messages.showWarningDialog(project, "먼저 ${source.displayName}에 로그인하세요.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("먼저 ${source.displayName}에 로그인하세요.", "Please log in to ${source.displayName} first."), "CodingTestKit")
             return
         }
 
         val confirm = Messages.showYesNoDialog(
             project,
             "[${source.displayName} #${problem.id}] ${problem.title}\n" +
-                    "언어: ${language.displayName}\n" +
-                    "파일: $fileName (${code.lines().size}줄)\n" +
-                    "경로: $filePath\n\n" +
-                    "이 파일을 제출하시겠습니까?",
-            "코드 제출",
+                    "${I18n.t("언어", "Language")}: ${language.displayName}\n" +
+                    "${I18n.t("파일", "File")}: $fileName (${code.lines().size}${I18n.t("줄", " lines")})\n" +
+                    "${I18n.t("경로", "Path")}: $filePath\n\n" +
+                    I18n.t("이 파일을 제출하시겠습니까?", "Submit this file?"),
+            I18n.t("코드 제출", "Code Submission"),
             Messages.getQuestionIcon()
         )
         if (confirm != Messages.YES) return
@@ -422,7 +533,88 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             problem.id
         }
         val dialog = CodeSubmitDialog(project, source, submitId, code, language)
+
+        // 채점 통과(Accepted) 시 자동 GitHub 푸시
+        val github = GitHubService.getInstance()
+        if (github.isConfigured() && github.autoPushEnabled) {
+            val capturedProblem = problem
+            val capturedCode = code
+            val capturedLang = language
+            dialog.onAccepted = {
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val result = github.pushSolution(capturedProblem, capturedCode, capturedLang)
+                    SwingUtilities.invokeLater {
+                        val notification = com.intellij.notification.NotificationGroupManager.getInstance()
+                            .getNotificationGroup("CodingTestKit")
+                        if (result.success) {
+                            notification.createNotification(
+                                "GitHub Push",
+                                I18n.t("GitHub에 자동 푸시되었습니다!", "Auto-pushed to GitHub!"),
+                                com.intellij.notification.NotificationType.INFORMATION
+                            ).notify(project)
+                        } else {
+                            notification.createNotification(
+                                "GitHub Push",
+                                I18n.t("GitHub 푸시 실패: ${result.message}", "GitHub push failed: ${result.message}"),
+                                com.intellij.notification.NotificationType.WARNING
+                            ).notify(project)
+                        }
+                    }
+                }
+            }
+        }
+
         dialog.show()
+    }
+
+    private fun pushToGitHub() {
+        val problem = currentProblem ?: return
+        val github = GitHubService.getInstance()
+        val language = getSelectedLanguage()
+
+        if (!github.isConfigured()) {
+            Messages.showWarningDialog(project,
+                I18n.t("설정에서 GitHub 토큰과 저장소를 먼저 설정해주세요.",
+                    "Please configure GitHub token and repository in Settings first."),
+                "GitHub Push")
+            return
+        }
+
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+        val code = editor?.document?.text
+        if (code.isNullOrBlank()) {
+            Messages.showWarningDialog(project,
+                I18n.t("에디터에 코드가 없습니다.", "No code in editor."), "GitHub Push")
+            return
+        }
+
+        githubPushButton.isEnabled = false
+        githubPushButton.text = I18n.t("푸시 중...", "Pushing...")
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = github.pushSolution(problem, code, language)
+            SwingUtilities.invokeLater {
+                githubPushButton.isEnabled = true
+                githubPushButton.text = "GitHub"
+                val notification = com.intellij.notification.NotificationGroupManager.getInstance()
+                    .getNotificationGroup("CodingTestKit")
+                if (result.success) {
+                    notification.createNotification(
+                        "GitHub Push",
+                        I18n.t("[${problem.source.displayName} #${problem.id}] GitHub에 푸시 완료!",
+                            "[${problem.source.displayName} #${problem.id}] Pushed to GitHub!"),
+                        com.intellij.notification.NotificationType.INFORMATION
+                    ).notify(project)
+                } else {
+                    notification.createNotification(
+                        "GitHub Push",
+                        I18n.t("GitHub 푸시 실패: ${result.message}",
+                            "GitHub push failed: ${result.message}"),
+                        com.intellij.notification.NotificationType.WARNING
+                    ).notify(project)
+                }
+            }
+        }
     }
 
     private fun extractProblemId(input: String): String {
@@ -440,19 +632,47 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
-    private fun displayProblem(problem: Problem) {
+    /**
+     * @param overrideLang 번역 시 예제 헤더 등을 타겟 언어로 강제 ("ko" or "en"), null이면 UI 언어 사용
+     */
+    private fun displayProblem(problem: Problem, overrideLang: String? = null) {
+        // overrideLang이 지정되면 I18n 대신 직접 선택
+        fun t(ko: String, en: String): String = when (overrideLang) {
+            "ko" -> ko
+            "en" -> en
+            else -> I18n.t(ko, en)
+        }
+
+        // 플랫폼 이름도 타겟 언어에 맞게 변환
+        val sourceName = when (overrideLang) {
+            "en" -> when (problem.source) {
+                ProblemSource.BAEKJOON -> "BOJ (Baekjoon)"
+                ProblemSource.PROGRAMMERS -> "Programmers"
+                ProblemSource.SWEA -> "SWEA"
+                ProblemSource.LEETCODE -> "LeetCode"
+            }
+            "ko" -> when (problem.source) {
+                ProblemSource.BAEKJOON -> "백준"
+                ProblemSource.PROGRAMMERS -> "프로그래머스"
+                ProblemSource.SWEA -> "SWEA"
+                ProblemSource.LEETCODE -> "LeetCode"
+            }
+            else -> problem.source.displayName
+        }
+
         val html = buildString {
             append("<html><head><style>")
             append("table { border-collapse:collapse; margin:8px 0; }")
             append("th, td { padding:6px 12px; border:1px solid #555; font-family:monospace; }")
             append("th { background:#3c3f41; color:#bbb; font-weight:bold; }")
+            append("img { max-width:100%; }")
             append("</style></head>")
             append("<body style='font-family:-apple-system,sans-serif; padding:10px; line-height:1.6;'>")
             append("<h2 style='margin:0 0 8px 0;'>${problem.title}</h2>")
             append("<div style='color:#888; font-size:12px; margin-bottom:12px;'>")
-            append("${problem.source.displayName} #${problem.id}")
+            append("$sourceName #${problem.id}")
             if (problem.timeLimit.isNotBlank()) {
-                append(" &nbsp;|&nbsp; 시간: ${problem.timeLimit} &nbsp;|&nbsp; 메모리: ${problem.memoryLimit}")
+                append(" &nbsp;|&nbsp; ${t("시간", "Time")}: ${problem.timeLimit} &nbsp;|&nbsp; ${t("메모리", "Memory")}: ${problem.memoryLimit}")
             }
             append("</div>")
             append("<hr style='border:none; border-top:1px solid #444; margin:8px 0;'>")
@@ -464,6 +684,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val localFile = java.io.File(currentProblemFolder, fileName)
                     "src=\"file://${localFile.absolutePath}\""
                 }
+            }
+            // 이미지를 <p>로 감싸서 전후 여백 확보 (JEditorPane은 CSS margin on img 미지원)
+            desc = desc.replace(Regex("""(<img\b[^>]*?/?>)""", RegexOption.IGNORE_CASE)) { m ->
+                "<p>${m.groupValues[1]}</p>"
             }
             append(desc)
 
@@ -477,18 +701,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                             val outputPreview = truncatePreview(tc.expectedOutput, 5)
                             val inputHtml = inputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
                             val outputHtml = outputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            append("<h2>예제 입력 ${i + 1}</h2>")
+                            append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
                             append("<div style='$preStyle'>$inputHtml</div>")
-                            append("<div style='color:#888; font-size:11px;'>전체 데이터는 <code>input.txt</code> 참고</div>")
-                            append("<h2>예제 출력 ${i + 1}</h2>")
+                            append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>input.txt</code> 참고", "See <code>input.txt</code> for full data")}</div>")
+                            append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
                             append("<div style='$preStyle'>$outputHtml</div>")
-                            append("<div style='color:#888; font-size:11px;'>전체 데이터는 <code>output.txt</code> 참고</div>")
+                            append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>output.txt</code> 참고", "See <code>output.txt</code> for full data")}</div>")
                         } else {
                             val inputHtml = tc.input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
                             val outputHtml = tc.expectedOutput.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            append("<h2>예제 입력 ${i + 1}</h2>")
+                            append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
                             append("<div style='$preStyle'>$inputHtml</div>")
-                            append("<h2>예제 출력 ${i + 1}</h2>")
+                            append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
                             append("<div style='$preStyle'>$outputHtml</div>")
                         }
                     }
@@ -496,7 +720,67 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             append("</body></html>")
         }
+        originalHtml = html
         problemDisplay.text = html
         problemDisplay.caretPosition = 0
+    }
+
+    private fun translateProblem() {
+        val html = originalHtml ?: return
+        val problem = currentProblem ?: return
+
+        // 이미 번역된 상태면 원문으로 복원
+        if (isTranslated) {
+            isTranslated = false
+            translateButton.text = I18n.t("번역", "Translate")
+            problemDisplay.text = html
+            problemDisplay.caretPosition = 0
+            return
+        }
+
+        // 캐시된 번역이 있으면 바로 표시
+        if (translatedHtml != null) {
+            isTranslated = true
+            translateButton.text = I18n.t("원문", "Original")
+            problemDisplay.text = translatedHtml
+            problemDisplay.caretPosition = 0
+            return
+        }
+
+        // 번역 실행
+        translateButton.isEnabled = false
+        translateButton.text = I18n.t("번역 중...", "Translating...")
+
+        val descLang = TranslateService.detectLanguage(problem.description)
+        val targetLang = if (descLang == "ko") "en" else "ko"
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val translatedDesc = TranslateService.translate(problem.description, descLang, targetLang)
+                val translatedTitle = TranslateService.translate(problem.title, descLang, targetLang)
+                // 번역된 설명으로 HTML 재생성
+                val translatedProblem = problem.copy(description = translatedDesc, title = translatedTitle)
+                SwingUtilities.invokeLater {
+                    // 번역된 HTML 빌드 (displayProblem과 동일한 로직이지만 originalHtml을 덮어쓰지 않음)
+                    val prevOriginal = originalHtml
+                    displayProblem(translatedProblem, overrideLang = targetLang)
+                    translatedHtml = originalHtml
+                    originalHtml = prevOriginal
+
+                    isTranslated = true
+                    translateButton.text = I18n.t("원문", "Original")
+                    translateButton.isEnabled = true
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    translateButton.text = I18n.t("번역 실패", "Failed")
+                    translateButton.isEnabled = true
+                    // 2초 후 원래 텍스트 복원
+                    Timer(2000) {
+                        translateButton.text = I18n.t("번역", "Translate")
+                    }.apply { isRepeats = false; start() }
+                }
+            }
+        }
     }
 }

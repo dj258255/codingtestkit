@@ -81,8 +81,7 @@ object ProblemFileManager {
     private const val CTK_MODULE_NAME = "CodingTestKit-Problem"
 
     /**
-     * 전용 모듈에 현재 문제 폴더를 소스 루트로 등록
-     * 별도 모듈이므로 기존 src/Main.java와 중복 클래스 충돌 없음
+     * 전용 모듈에 현재 문제 폴더를 소스 루트로 등록 (자동완성 활성화)
      */
     fun markAsSourceRoot(project: Project, folder: VirtualFile) {
         val moduleManager = ModuleManager.getInstance(project)
@@ -109,6 +108,16 @@ object ProblemFileManager {
         }
     }
 
+    fun clearSourceRoots(project: Project) {
+        val moduleManager = ModuleManager.getInstance(project)
+        val module = moduleManager.findModuleByName(CTK_MODULE_NAME) ?: return
+        ModuleRootModificationUtil.updateModel(module) { model ->
+            for (entry in model.contentEntries.toList()) {
+                model.removeContentEntry(entry)
+            }
+        }
+    }
+
     /**
      * 문제를 Markdown으로 변환
      */
@@ -131,7 +140,7 @@ object ProblemFileManager {
         sb.appendLine(HtmlToMarkdown.convert(problem.description))
 
         // 테스트 케이스 (프로그래머스는 description에 이미 입출력 예 테이블 포함)
-        if (problem.testCases.isNotEmpty() && problem.source != ProblemSource.PROGRAMMERS) {
+        if (problem.testCases.isNotEmpty() && problem.source != ProblemSource.PROGRAMMERS && problem.source != ProblemSource.LEETCODE) {
             sb.appendLine()
             sb.appendLine("---")
             sb.appendLine()

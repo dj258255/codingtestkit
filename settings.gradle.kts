@@ -1,1 +1,1 @@
-rootProject.name = "cusplu"
+rootProject.name = "CodingTestKit"

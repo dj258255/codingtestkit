@@ -76,18 +76,9 @@ object BaekjoonCrawler {
                 .body()
                 .text()
             val level = JsonParser.parseString(json).asJsonObject.get("level")?.asInt ?: 0
-            solvedAcLevelToString(level)
+            SolvedAcApi.levelToString(level)
         } catch (_: Exception) {
             "Unrated"
         }
-    }
-
-    private fun solvedAcLevelToString(level: Int): String {
-        if (level == 0) return "Unrated"
-        val tiers = arrayOf("Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ruby")
-        val ranks = arrayOf("V", "IV", "III", "II", "I")
-        val tierIdx = (level - 1) / 5
-        val rankIdx = (level - 1) % 5
-        return if (tierIdx in tiers.indices) "${tiers[tierIdx]} ${ranks[rankIdx]}" else "Unrated"
     }
 }

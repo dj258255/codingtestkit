@@ -2,30 +2,66 @@
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
     <version>1.0.0</version>
-    <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">beomsu</vendor>
+    <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
-        <h2>CodingTestKit - 알고리즘 문제 풀이 올인원 플러그인</h2>
+        <!-- ===== ENGLISH ===== -->
+        <h2>CodingTestKit - Algorithm Problem Solver</h2>
+        <p>An all-in-one IntelliJ plugin to fetch, test, and submit algorithm problems — all without leaving your IDE.</p>
+
+        <h3>Supported Platforms</h3>
+        <ul>
+            <li><b>BOJ (Baekjoon)</b> – Fetch, test, submit, search, random</li>
+            <li><b>Programmers</b> – Fetch, test, submit</li>
+            <li><b>SWEA</b> – Fetch, test, submit</li>
+            <li><b>LeetCode</b> – Fetch, test, submit, search, random</li>
+        </ul>
+
+        <h3>Key Features</h3>
+        <ul>
+            <li><b>Fetch Problems</b> – Auto-extract problem description and test cases by entering a number</li>
+            <li><b>Search</b> – Search by keyword, tag, difficulty on BOJ (solved.ac) and LeetCode</li>
+            <li><b>Random Picker</b> – Tier/class range, tag chips, solved filter (all/exclude/only), accepted count filter</li>
+            <li><b>Local Test</b> – Run and compare code directly in the IDE (Java, Python, C++, Kotlin)</li>
+            <li><b>Performance</b> – Execution time (ms) and memory usage per test case</li>
+            <li><b>Submit</b> – Submit directly via built-in JCEF browser</li>
+            <li><b>Exam Mode</b> – Disable autocomplete, block paste, detect focus loss</li>
+            <li><b>Timer</b> – Stopwatch (lap records &amp; memo) + circular dial countdown timer</li>
+            <li><b>Templates</b> – Save and load code templates with syntax highlighting</li>
+            <li><b>GitHub Push</b> – One-click login, repo selector, auto-push on accepted</li>
+            <li><b>i18n</b> – Korean / English UI</li>
+        </ul>
+
+        <h3>Supported Languages</h3>
+        <p>Java, Python, C++, Kotlin</p>
+
+        <hr/>
+
+        <!-- ===== 한국어 ===== -->
+        <h2>CodingTestKit - 알고리즘 문제 풀이 도구</h2>
         <p>IntelliJ IDE에서 알고리즘 문제를 가져오고, 테스트하고, 제출까지 한번에!</p>
 
         <h3>지원 플랫폼</h3>
         <ul>
-            <li><b>백준 (BOJ)</b> - 문제 크롤링, 테스트 케이스 자동 추출, 코드 제출</li>
-            <li><b>프로그래머스</b> - 문제 크롤링, 입출력 예 파싱, 코드 제출</li>
-            <li><b>SWEA</b> - 문제 크롤링, 코드 제출</li>
+            <li><b>백준 (BOJ)</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤</li>
+            <li><b>프로그래머스</b> – 문제 가져오기, 테스트, 제출</li>
+            <li><b>SWEA</b> – 문제 가져오기, 테스트, 제출</li>
+            <li><b>LeetCode</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤</li>
         </ul>
 
         <h3>주요 기능</h3>
         <ul>
-            <li>문제 가져오기 - 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
-            <li>로컬 테스트 - Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 및 결과 비교</li>
-            <li>실행 시간 & 메모리 측정 - 테스트 케이스별 실행 시간(ms)과 메모리 사용량(KB/MB) 표시</li>
-            <li>코드 제출 - JCEF 브라우저로 각 플랫폼에 직접 제출</li>
-            <li>자동 문제 인식 - 코드 파일 열면 해당 문제 자동 로드</li>
-            <li>시험 모드 - 자동완성/검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지로 실제 시험 환경 재현</li>
-            <li>코드 템플릿 - 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
-            <li>타이머 - 스톱워치 / 카운트다운으로 시험 시간 관리</li>
-            <li>디버그 출력 분리 - System.out.println 디버그 출력을 자동 구분</li>
+            <li><b>문제 가져오기</b> – 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
+            <li><b>문제 검색</b> – 백준(solved.ac), LeetCode에서 키워드·태그·난이도로 검색</li>
+            <li><b>랜덤 뽑기</b> – 티어/클래스 범위, 태그 칩, 풀이 필터(전체/제외/에서만), 정답자 수 필터</li>
+            <li><b>로컬 테스트</b> – Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 및 결과 비교</li>
+            <li><b>실행 시간 &amp; 메모리</b> – 테스트 케이스별 실행 시간(ms)과 메모리 사용량 표시</li>
+            <li><b>코드 제출</b> – JCEF 브라우저로 각 플랫폼에 직접 제출</li>
+            <li><b>시험 모드</b> – 자동완성/검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
+            <li><b>타이머</b> – 스톱워치(랩 기록·메모) + 원형 다이얼 카운트다운 타이머</li>
+            <li><b>코드 템플릿</b> – 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
+            <li><b>GitHub 연동</b> – 원클릭 로그인, 레포 선택, 채점 통과 시 자동 푸시</li>
+            <li><b>다국어</b> – 한국어 / English UI 전환</li>
         </ul>
 
         <h3>지원 언어</h3>
@@ -34,17 +70,41 @@
 
     <change-notes><![CDATA[
         <h3>v1.0.0 (2026-03-08)</h3>
+
+        <b>English</b>
+        <ul>
+            <li>Initial release</li>
+            <li>Fetch problems from BOJ, Programmers, SWEA, LeetCode</li>
+            <li>Local test execution for Java, Python, C++, Kotlin</li>
+            <li>Per-case execution time and memory usage</li>
+            <li>JCEF browser-based login and code submission</li>
+            <li>BOJ (solved.ac) and LeetCode problem search &amp; random picker</li>
+            <li>Random picker: tier/class range, tag chips, solved filter, accepted count filter</li>
+            <li>Exam mode: disable autocomplete, inspections, block paste, focus alert</li>
+            <li>Code templates with syntax-highlighted preview</li>
+            <li>Stopwatch (lap &amp; memo) and circular dial countdown timer</li>
+            <li>GitHub one-click login, repo selector, auto-push on accepted</li>
+            <li>Bilingual UI (Korean / English)</li>
+            <li>Auto-wrap solution functions for Programmers &amp; LeetCode</li>
+            <li>Automatic debug output separation</li>
+        </ul>
+
+        <b>한국어</b>
         <ul>
             <li>첫 정식 릴리스</li>
-            <li>백준, 프로그래머스, SWEA 문제 크롤링 지원</li>
+            <li>백준, 프로그래머스, SWEA, LeetCode 문제 가져오기 지원</li>
             <li>Java, Python, C++, Kotlin 로컬 테스트 실행</li>
-            <li>테스트 케이스별 실행 시간(ms) 및 메모리 사용량(KB/MB) 표시</li>
+            <li>테스트 케이스별 실행 시간(ms) 및 메모리 사용량 표시</li>
             <li>JCEF 브라우저 기반 로그인 및 코드 제출</li>
+            <li>백준(solved.ac), LeetCode 문제 검색 및 랜덤 뽑기</li>
+            <li>랜덤 뽑기: 티어/클래스 범위, 태그 칩, 풀이 필터(전체/제외/에서만), 정답자 수 필터</li>
             <li>시험 모드: 자동완성 끄기, 코드 검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
             <li>코드 템플릿 저장/불러오기 (구문 강조 미리보기)</li>
-            <li>스톱워치 및 카운트다운 타이머</li>
-            <li>디버그 출력 자동 분리 (System.out.println)</li>
-            <li>프로그래머스 solution 함수 자동 래핑 실행</li>
+            <li>스톱워치(랩·메모) 및 원형 다이얼 카운트다운 타이머</li>
+            <li>GitHub 원클릭 로그인, 레포 선택, 채점 통과 시 자동 푸시</li>
+            <li>다국어 지원 (한국어 / English)</li>
+            <li>프로그래머스·LeetCode solution 함수 자동 래핑 실행</li>
+            <li>디버그 출력 자동 분리</li>
         </ul>
     ]]></change-notes>
 
@@ -58,6 +118,9 @@
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
+        <applicationService serviceImplementation="com.codingtestkit.service.GitHubService"/>
         <notificationGroup id="CodingTestKit" displayType="BALLOON"/>
+        <daemon.highlightInfoFilter
+                implementation="com.codingtestkit.service.DuplicateClassHighlightFilter"/>
     </extensions>
 </idea-plugin>

@@ -1,5 +1,6 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.I18n
 import com.codingtestkit.model.CodeTemplate
 import com.codingtestkit.model.Language
 import com.codingtestkit.service.TemplateService
@@ -27,17 +28,17 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private val templateList = JBList<String>()
     private val templateListModel = DefaultListModel<String>()
     private val nameField = JTextField().apply {
-        toolTipText = "템플릿 이름을 입력하세요"
+        toolTipText = I18n.t("템플릿 이름을 입력하세요", "Enter template name")
     }
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray())
-    private val saveButton = JButton("저장", AllIcons.Actions.MenuSaveall).apply {
-        toolTipText = "현재 에디터의 코드를 템플릿으로 저장"
+    private val saveButton = JButton(I18n.t("저장", "Save"), AllIcons.Actions.MenuSaveall).apply {
+        toolTipText = I18n.t("현재 에디터의 코드를 템플릿으로 저장", "Save current editor code as template")
     }
-    private val loadButton = JButton("불러오기", AllIcons.Actions.Upload).apply {
-        toolTipText = "선택한 템플릿을 에디터에 불러오기"
+    private val loadButton = JButton(I18n.t("불러오기", "Load"), AllIcons.Actions.Upload).apply {
+        toolTipText = I18n.t("선택한 템플릿을 에디터에 불러오기", "Load selected template into editor")
     }
     private val deleteButton = JButton(AllIcons.General.Remove).apply {
-        toolTipText = "선택한 템플릿 삭제"
+        toolTipText = I18n.t("선택한 템플릿 삭제", "Delete selected template")
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
     }
     private var previewEditor: EditorEx? = null
@@ -58,14 +59,14 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         }
 
         val namePanel = JPanel(BorderLayout(JBUI.scale(4), 0))
-        namePanel.add(JLabel("이름:").apply {
+        namePanel.add(JLabel(I18n.t("이름:", "Name:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         }, BorderLayout.WEST)
         namePanel.add(nameField, BorderLayout.CENTER)
 
         val langPanel = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
-        langPanel.add(JLabel("언어:").apply {
+        langPanel.add(JLabel(I18n.t("언어:", "Lang:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         })
@@ -101,7 +102,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         templateList.model = templateListModel
         templateList.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        templateList.emptyText.text = "저장된 템플릿이 없습니다"
+        templateList.emptyText.text = I18n.t("저장된 템플릿이 없습니다", "No saved templates")
         templateList.cellRenderer = TemplateListRenderer()
         val listScrollPane = JBScrollPane(templateList).apply {
             minimumSize = Dimension(0, JBUI.scale(80))
@@ -113,7 +114,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             background = JBColor(Color(240, 240, 240), Color(50, 50, 50))
             border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
         }
-        previewHeader.add(JLabel("미리보기").apply {
+        previewHeader.add(JLabel(I18n.t("미리보기", "Preview")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
             icon = AllIcons.Actions.Preview
@@ -152,13 +153,13 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private fun saveTemplate() {
         val name = nameField.text.trim()
         if (name.isBlank()) {
-            Messages.showWarningDialog(project, "템플릿 이름을 입력하세요.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("템플릿 이름을 입력하세요.", "Please enter a template name."), "CodingTestKit")
             return
         }
 
         val code = getCurrentEditorCode()
         if (code.isBlank()) {
-            Messages.showWarningDialog(project, "에디터에 코드가 없습니다.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("에디터에 코드가 없습니다.", "No code in editor."), "CodingTestKit")
             return
         }
 
@@ -171,18 +172,18 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         TemplateService.getInstance(project).saveTemplate(template)
         refreshTemplateList()
-        Messages.showInfoMessage(project, "'$name' 템플릿이 저장되었습니다.", "CodingTestKit")
+        Messages.showInfoMessage(project, I18n.t("'$name' 템플릿이 저장되었습니다.", "Template '$name' saved."), "CodingTestKit")
     }
 
     private fun loadTemplate() {
         val template = getSelectedTemplate() ?: run {
-            Messages.showWarningDialog(project, "템플릿을 선택하세요.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("템플릿을 선택하세요.", "Please select a template."), "CodingTestKit")
             return
         }
 
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
         if (editor == null) {
-            Messages.showWarningDialog(project, "열려 있는 에디터가 없습니다.", "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("열려 있는 에디터가 없습니다.", "No open editor."), "CodingTestKit")
             return
         }
 
@@ -190,7 +191,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             editor.document.setText(template.code)
         }
 
-        Messages.showInfoMessage(project, "'${template.name}' 템플릿을 불러왔습니다.", "CodingTestKit")
+        Messages.showInfoMessage(project, I18n.t("'${template.name}' 템플릿을 불러왔습니다.", "Template '${template.name}' loaded."), "CodingTestKit")
     }
 
     private fun deleteTemplate() {
@@ -199,8 +200,8 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
         val confirm = Messages.showYesNoDialog(
             project,
-            "'$name' 템플릿을 삭제하시겠습니까?",
-            "템플릿 삭제",
+            I18n.t("'$name' 템플릿을 삭제하시겠습니까?", "Delete template '$name'?"),
+            I18n.t("템플릿 삭제", "Delete Template"),
             Messages.getQuestionIcon()
         )
         if (confirm != Messages.YES) return
