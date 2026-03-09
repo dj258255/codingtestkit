@@ -171,9 +171,11 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
         val codeSha = pushFile("$folderPath/$codeFileName", code, commitMsg)
             ?: return PushResult(false, "Failed to push code file")
 
-        // 2. README 푸시
-        val readme = buildReadme(problem, language)
-        pushFile("$folderPath/README.md", readme, "$commitMsg - README")
+        // 2. README 푸시 (설정에서 켜진 경우만)
+        if (PluginSettingsService.getInstance().generateReadme) {
+            val readme = buildReadme(problem, language)
+            pushFile("$folderPath/README.md", readme, "$commitMsg - README")
+        }
 
         return PushResult(true, codeSha)
     }

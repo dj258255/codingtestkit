@@ -4,6 +4,7 @@ import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.LeetCodeApi
+import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -109,6 +110,17 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         I18n.t("내가 푼 문제 제외", "Exclude my solved"),
         I18n.t("내가 푼 문제에서만", "Only my solved")
     )).apply {
+        preferredSize = Dimension(JBUI.scale(200), preferredSize.height)
+        renderer = object : DefaultListCellRenderer() {
+            override fun getListCellRendererComponent(
+                list: JList<*>?, value: Any?, index: Int,
+                isSelected: Boolean, cellHasFocus: Boolean
+            ): Component {
+                val c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                border = JBUI.Borders.empty(4, 8)
+                return c
+            }
+        }
         val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
         isEnabled = cookies.isNotBlank()
         if (cookies.isBlank()) toolTipText = I18n.t(
@@ -142,11 +154,20 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
             }
         }
     }
-    private val resultTable = JBTable(tableModel)
+    private val resultTable = JBTable(tableModel).apply {
+        emptyText.text = I18n.t("표시할 항목이 없습니다", "No items to display")
+    }
     private val statusLabel = JLabel(I18n.t("조건을 선택하고 '뽑기'를 클릭하세요", "Select filters and click 'Pick'"))
 
     private var results: List<LeetCodeApi.LeetCodeProblemInfo> = emptyList()
     private var headerCheck = JCheckBox().apply { horizontalAlignment = SwingConstants.CENTER }
+    private var translatedTitles: Map<String, String> = emptyMap()
+    private var showingTranslated = false
+    private val translateButton = JButton("KO").apply {
+        toolTipText = I18n.t("한국어로 번역", "Translate to Korean")
+        preferredSize = Dimension(JBUI.scale(50), preferredSize.height)
+        addActionListener { toggleTranslation() }
+    }
     var selectedProblemSlugs: List<String> = emptyList()
         private set
 
@@ -248,7 +269,7 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(65)
         resultTable.columnModel.getColumn(5).preferredWidth = JBUI.scale(180)
 
-        // 헤더 전체 선택 체크박스 (기본 헤더 스타일 적용)
+        // 헤더 전체 선택 체크박스
         resultTable.columnModel.getColumn(0).headerRenderer =
             javax.swing.table.TableCellRenderer { table, _, _, _, _, _ ->
                 val defaultRenderer = table.tableHeader.defaultRenderer
@@ -278,7 +299,11 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
 
         statusLabel.foreground = JBColor.GRAY
         statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
-        panel.add(statusLabel, BorderLayout.SOUTH)
+        val bottomPanel = JPanel(BorderLayout()).apply {
+            add(statusLabel, BorderLayout.CENTER)
+            add(translateButton, BorderLayout.EAST)
+        }
+        panel.add(bottomPanel, BorderLayout.SOUTH)
 
         // 이벤트
         addTagButton.addActionListener { showTagPopup() }
@@ -464,12 +489,12 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
 
                 val allProblems = mutableListOf<LeetCodeApi.LeetCodeProblemInfo>()
 
-                for (diff in selectedDifficulties) {
-                    val result = LeetCodeApi.searchProblems(
-                        difficulty = diff, tags = tags, limit = 50
-                    )
-                    allProblems.addAll(result.problems)
-                }
+                val result = LeetCodeApi.searchProblems(
+                    tags = tags, limit = 150, cookies = cookies.ifBlank { null }
+                )
+                allProblems.addAll(result.problems.filter {
+                    it.difficulty.uppercase() in selectedDifficulties
+                })
 
                 // 정답자 수 필터 적용
                 if (useAcceptedFilter) {
@@ -532,6 +557,52 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
     private fun createLabel(text: String): JLabel {
         return JLabel(text).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(13f).toFloat())
+        }
+    }
+
+    private fun toggleTranslation() {
+        if (results.isEmpty()) return
+        showingTranslated = !showingTranslated
+        if (showingTranslated && translatedTitles.isEmpty()) {
+            translateButton.isEnabled = false
+            translateButton.text = "..."
+            Thread {
+                try {
+                    val batch = results.map { it.title }.joinToString("\n")
+                    val translated = TranslateService.translate(batch, "en", "ko")
+                    val translatedList = translated.split("\n")
+                    val map = mutableMapOf<String, String>()
+                    for ((idx, p) in results.withIndex()) {
+                        if (idx < translatedList.size) map[p.titleSlug] = translatedList[idx].trim()
+                    }
+                    translatedTitles = map
+                    SwingUtilities.invokeLater { applyTranslation(); translateButton.isEnabled = true }
+                } catch (_: Exception) {
+                    SwingUtilities.invokeLater {
+                        showingTranslated = false
+                        translateButton.text = "KO"
+                        translateButton.isEnabled = true
+                        statusLabel.text = I18n.t("번역 실패", "Translation failed")
+                        statusLabel.foreground = JBColor.RED
+                    }
+                }
+            }.start()
+        } else {
+            applyTranslation()
+        }
+    }
+
+    private fun applyTranslation() {
+        translateButton.text = if (showingTranslated) "EN" else "KO"
+        translateButton.toolTipText = if (showingTranslated) I18n.t("영어로 보기", "Show in English") else I18n.t("한국어로 번역", "Translate to Korean")
+        for ((idx, p) in results.withIndex()) {
+            if (idx < tableModel.rowCount) {
+                val title = if (showingTranslated) translatedTitles[p.titleSlug] ?: p.title else p.title
+                tableModel.setValueAt(title, idx, 2)
+                val tags = if (showingTranslated) p.tags.take(3).map { LeetCodeSearchDialog.tagToKo(it) }.joinToString(", ")
+                    else p.tags.take(3).joinToString(", ")
+                tableModel.setValueAt(tags, idx, 5)
+            }
         }
     }
 

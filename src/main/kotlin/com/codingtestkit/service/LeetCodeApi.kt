@@ -10,7 +10,7 @@ import org.jsoup.Jsoup
 
 object LeetCodeApi {
 
-    private const val GRAPHQL_URL = "https://leetcode.com/graphql"
+    private const val GRAPHQL_URL = "https://leetcode.com/graphql/"
     private val gson = Gson()
 
     data class LeetCodeProblemInfo(
@@ -30,8 +30,8 @@ object LeetCodeApi {
     /**
      * 문제 번호 또는 slug로 문제를 가져옴
      */
-    fun fetchProblem(input: String, language: String = "java"): Problem {
-        val slug = resolveSlug(input)
+    fun fetchProblem(input: String, language: String = "java", cookies: String? = null): Problem {
+        val slug = resolveSlug(input, cookies)
 
         val query = """
             query questionData(${'$'}titleSlug: String!) {
@@ -42,7 +42,7 @@ object LeetCodeApi {
                 titleSlug
                 content
                 difficulty
-                exampleTestcaseInput
+                exampleTestcases
                 sampleTestCase
                 codeSnippets {
                   lang
@@ -58,7 +58,7 @@ object LeetCodeApi {
             }
         """.trimIndent()
 
-        val result = graphql(query, mapOf("titleSlug" to slug))
+        val result = graphql(query, mapOf("titleSlug" to slug), cookies)
         val question = result.getAsJsonObject("data")?.getAsJsonObject("question")
             ?: throw RuntimeException("Problem not found: $input")
 
@@ -80,7 +80,7 @@ object LeetCodeApi {
         }?.asJsonObject?.get("code")?.asString ?: ""
 
         // 테스트 케이스 추출
-        val testCases = extractTestCases(content, question.get("exampleTestcaseInput")?.asString)
+        val testCases = extractTestCases(content, question.get("exampleTestcases")?.asString)
 
         // metaData에서 파라미터 이름 추출
         val paramNames = extractParamNames(question.get("metaData")?.asString)
@@ -93,7 +93,8 @@ object LeetCodeApi {
             testCases = testCases,
             difficulty = difficulty,
             parameterNames = paramNames,
-            initialCode = initialCode
+            initialCode = initialCode,
+            contestProbId = slug  // titleSlug 저장 (제출 URL에 필요)
         )
     }
 
@@ -175,7 +176,7 @@ object LeetCodeApi {
      * - 숫자 → frontendId로 검색해서 slug 찾기
      * - 그 외 → slug로 직접 사용
      */
-    private fun resolveSlug(input: String): String {
+    private fun resolveSlug(input: String, cookies: String? = null): String {
         val trimmed = input.trim()
 
         // URL에서 slug 추출: https://leetcode.com/problems/two-sum/
@@ -184,7 +185,7 @@ object LeetCodeApi {
 
         // 숫자면 frontendId로 검색
         if (trimmed.all { it.isDigit() }) {
-            val result = searchProblems(query = trimmed, limit = 50)
+            val result = searchProblems(query = trimmed, limit = 50, cookies = cookies)
             val exact = result.problems.firstOrNull { it.frontendId == trimmed }
             if (exact != null) return exact.titleSlug
             throw RuntimeException("Problem #$trimmed not found")
@@ -269,6 +270,9 @@ object LeetCodeApi {
     @Volatile
     private var cachedStats: Map<String, ProblemStat>? = null
 
+    @Volatile
+    private var cachedCsrfToken: String? = null
+
     /**
      * /api/problems/all/ 에서 전체 문제 통계를 가져옴
      * cookies가 있으면 풀이 상태(status)도 포함됨
@@ -280,10 +284,11 @@ object LeetCodeApi {
             .ignoreContentType(true)
             .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
             .header("Referer", "https://leetcode.com")
+            .method(Connection.Method.GET)
             .timeout(20000)
         if (!cookies.isNullOrBlank()) conn.header("Cookie", cookies)
 
-        val json = conn.get().body().text()
+        val json = conn.execute().body()
         val root = JsonParser.parseString(json).asJsonObject
         val pairs = root.getAsJsonArray("stat_status_pairs") ?: return emptyMap()
 
@@ -301,22 +306,90 @@ object LeetCodeApi {
     }
 
     /** 캐시 초기화 (재로그인 시 호출) */
-    fun clearStatsCache() { cachedStats = null }
+    fun clearStatsCache() {
+        cachedStats = null
+        cachedCsrfToken = null
+    }
 
     private fun graphql(query: String, variables: Map<String, Any?>, cookies: String? = null): com.google.gson.JsonObject {
         val body = gson.toJson(mapOf("query" to query, "variables" to variables))
+
+        // 항상 새 CSRF 토큰 사용 (쿠키에 있는 건 만료됐을 수 있음)
+        val csrfToken = cachedCsrfToken ?: fetchCsrfToken().also { cachedCsrfToken = it }
 
         val conn = Jsoup.connect(GRAPHQL_URL)
             .method(Connection.Method.POST)
             .header("Content-Type", "application/json")
             .header("Referer", "https://leetcode.com")
-            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+            .header("Origin", "https://leetcode.com")
+            .header("x-csrftoken", csrfToken)
+            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .requestBody(body)
             .ignoreContentType(true)
+            .ignoreHttpErrors(true)
             .timeout(15000)
-        if (!cookies.isNullOrBlank()) conn.header("Cookie", cookies)
-        val response = conn.execute().body()
 
-        return JsonParser.parseString(response).asJsonObject
+        if (!cookies.isNullOrBlank()) {
+            // 쿠키의 csrftoken을 새 토큰으로 교체
+            val cleaned = cookies.replace(Regex("csrftoken=[^;]*;?\\s*"), "").trimEnd(';', ' ')
+            conn.header("Cookie", "$cleaned; csrftoken=$csrfToken")
+        } else {
+            conn.header("Cookie", "csrftoken=$csrfToken")
+        }
+
+        val resp = conn.execute()
+        val respBody = resp.body()
+
+        // 400/403이면 CSRF 토큰 갱신 후 재시도
+        if (resp.statusCode() in listOf(400, 403)) {
+            cachedCsrfToken = null
+            val newToken = fetchCsrfToken().also { cachedCsrfToken = it }
+
+            val retryConn = Jsoup.connect(GRAPHQL_URL)
+                .method(Connection.Method.POST)
+                .header("Content-Type", "application/json")
+                .header("Referer", "https://leetcode.com")
+                .header("Origin", "https://leetcode.com")
+                .header("x-csrftoken", newToken)
+                .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .requestBody(body)
+                .ignoreContentType(true)
+                .ignoreHttpErrors(true)
+                .timeout(15000)
+
+            if (!cookies.isNullOrBlank()) {
+                val cleaned = cookies.replace(Regex("csrftoken=[^;]*;?\\s*"), "").trimEnd(';', ' ')
+                retryConn.header("Cookie", "$cleaned; csrftoken=$newToken")
+            } else {
+                retryConn.header("Cookie", "csrftoken=$newToken")
+            }
+
+            val retryResp = retryConn.execute()
+            if (retryResp.statusCode() >= 400) {
+                throw RuntimeException("LeetCode API error: ${retryResp.statusCode()}")
+            }
+            return JsonParser.parseString(retryResp.body()).asJsonObject
+        }
+
+        return JsonParser.parseString(respBody).asJsonObject
+    }
+
+    /** 쿠키 문자열에서 csrftoken 값 추출 */
+    private fun extractCsrfToken(cookies: String?): String? {
+        if (cookies.isNullOrBlank()) return null
+        val match = Regex("csrftoken=([^;]+)").find(cookies)
+        return match?.groupValues?.get(1)
+    }
+
+    /** LeetCode graphql 엔드포인트에서 CSRF 토큰 가져오기 */
+    private fun fetchCsrfToken(): String {
+        val response = Jsoup.connect(GRAPHQL_URL)
+            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Referer", "https://leetcode.com")
+            .ignoreContentType(true)
+            .ignoreHttpErrors(true)
+            .method(Connection.Method.GET)
+            .execute()
+        return response.cookie("csrftoken") ?: ""
     }
 }

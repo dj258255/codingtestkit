@@ -68,6 +68,21 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     }
 
     /**
+     * 저장된 쿠키가 아직 유효한지 실제 사이트에 요청해서 확인.
+     * 유효하지 않으면 자동 로그아웃하고 false 반환.
+     */
+    fun validateSession(source: ProblemSource): Boolean {
+        if (!isLoggedIn(source)) return false
+        val valid = try {
+            fetchUsername(source).isNotBlank()
+        } catch (_: Exception) {
+            false
+        }
+        if (!valid) logout(source)
+        return valid
+    }
+
+    /**
      * 쿠키로 사이트에 접속해서 유저네임 가져오기
      */
     fun fetchUsername(source: ProblemSource): String {
@@ -121,12 +136,15 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     }
 
     private fun fetchLeetCodeUsername(cookies: String): String {
-        val json = Jsoup.connect("https://leetcode.com/graphql")
+        val csrfToken = Regex("csrftoken=([^;]+)").find(cookies)?.groupValues?.get(1) ?: ""
+        val json = Jsoup.connect("https://leetcode.com/graphql/")
             .method(org.jsoup.Connection.Method.POST)
             .header("Content-Type", "application/json")
             .header("Cookie", cookies)
             .header("Referer", "https://leetcode.com")
-            .userAgent("Mozilla/5.0")
+            .header("Origin", "https://leetcode.com")
+            .header("x-csrftoken", csrfToken)
+            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
             .requestBody("""{"query":"{ userStatus { username } }"}""")
             .ignoreContentType(true)
             .timeout(5000)

@@ -27,6 +27,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private val inspectionToggle = JCheckBox(I18n.t("코드 검사 끄기 (Inspections OFF)", "Inspections OFF"))
     private val pasteBlockToggle = JCheckBox(I18n.t("외부 붙여넣기 차단 (Paste Block)", "Paste Block"))
     private val focusAlertToggle = JCheckBox(I18n.t("포커스 이탈 감지 (Focus Alert)", "Focus Alert"))
+    private val readmeToggle = JCheckBox(I18n.t("README.md 생성", "Generate README.md"))
 
     private var focusListener: WindowAdapter? = null
     private var focusLostCount = 0
@@ -154,6 +155,23 @@ class SettingsPanel(private val project: Project) : JPanel() {
         presetPanel.add(normalModeBtn)
         toggleSection.add(presetPanel)
         add(toggleSection)
+        add(Box.createVerticalStrut(JBUI.scale(8)))
+
+        // 파일 설정
+        val fileSection = createSection(I18n.t("파일 설정", "File Settings"))
+        readmeToggle.alignmentX = LEFT_ALIGNMENT
+        readmeToggle.isOpaque = false
+        readmeToggle.font = readmeToggle.font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
+        readmeToggle.toolTipText = I18n.t(
+            "문제를 가져올 때 README.md 파일을 함께 생성합니다",
+            "Generate a README.md file when fetching problems"
+        )
+        readmeToggle.isSelected = com.codingtestkit.service.PluginSettingsService.getInstance().generateReadme
+        readmeToggle.addActionListener {
+            com.codingtestkit.service.PluginSettingsService.getInstance().generateReadme = readmeToggle.isSelected
+        }
+        fileSection.add(readmeToggle)
+        add(fileSection)
         add(Box.createVerticalStrut(JBUI.scale(8)))
 
         // 도움말

@@ -2,6 +2,7 @@ package com.codingtestkit.ui
 
 import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.AuthService
+import com.codingtestkit.service.I18n
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.jcef.JBCefApp
@@ -22,14 +23,14 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
     private var cookies = ""
     private var extracted = false
-    private val statusLabel = JLabel("로그인하면 자동으로 완료됩니다...").apply {
+    private val statusLabel = JLabel(I18n.t("로그인하면 자동으로 완료됩니다...", "Login will complete automatically...")).apply {
         foreground = Color.GRAY
     }
 
     init {
-        title = "${source.displayName} 로그인"
+        title = I18n.t("${source.localizedName()} 로그인", "${source.localizedName()} Login")
         setSize(900, 700)
-        setOKButtonText("완료")
+        setOKButtonText(I18n.t("완료", "Done"))
         init()
     }
 
@@ -55,7 +56,10 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
         // 상단 안내
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        topPanel.add(JLabel("<html><b>${source.displayName}</b>에 로그인하세요. 로그인하면 자동으로 닫힙니다.</html>"))
+        topPanel.add(JLabel("<html>${I18n.t(
+            "<b>${source.localizedName()}</b>에 로그인하세요. 로그인하면 자동으로 닫힙니다.",
+            "Log in to <b>${source.localizedName()}</b>. The dialog will close automatically after login."
+        )}</html>"))
         panel.add(topPanel, BorderLayout.NORTH)
 
         // 브라우저
@@ -84,7 +88,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
                 if (isLoggedInUrl(url)) {
                     SwingUtilities.invokeLater {
-                        statusLabel.text = "로그인 감지! 쿠키 추출 중..."
+                        statusLabel.text = I18n.t("로그인 감지! 쿠키 추출 중...", "Login detected! Extracting cookies...")
                         statusLabel.foreground = Color(0, 120, 0)
                     }
                     extractCookiesAndClose(browser)
@@ -137,7 +141,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                             doOKAction()
                         } else {
                             extracted = false
-                            statusLabel.text = "쿠키를 가져오지 못했습니다. 다시 로그인해주세요."
+                            statusLabel.text = I18n.t("쿠키를 가져오지 못했습니다. 다시 로그인해주세요.", "Failed to get cookies. Please login again.")
                             statusLabel.foreground = Color.RED
                         }
                     }
@@ -164,7 +168,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                                     doOKAction()
                                 } else {
                                     extracted = false
-                                    statusLabel.text = "쿠키를 가져오지 못했습니다. 다시 시도해주세요."
+                                    statusLabel.text = I18n.t("쿠키를 가져오지 못했습니다. 다시 시도해주세요.", "Failed to get cookies. Please try again.")
                                     statusLabel.foreground = Color.RED
                                 }
                             }
@@ -186,15 +190,21 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
         val auth = AuthService.getInstance()
 
-        panel.add(JLabel("<html><b>JCEF 브라우저를 사용할 수 없습니다.</b><br><br>" +
+        panel.add(JLabel("<html>${I18n.t(
+                "<b>JCEF 브라우저를 사용할 수 없습니다.</b><br><br>" +
                 "1. 브라우저에서 <b>${getDomain()}</b>에 로그인<br>" +
                 "2. F12 > Console > <code>document.cookie</code> 입력<br>" +
-                "3. 결과를 아래에 붙여넣기</html>"), BorderLayout.NORTH)
+                "3. 결과를 아래에 붙여넣기",
+                "<b>JCEF browser is not available.</b><br><br>" +
+                "1. Log in to <b>${getDomain()}</b> in your browser<br>" +
+                "2. F12 > Console > type <code>document.cookie</code><br>" +
+                "3. Paste the result below"
+        )}</html>"), BorderLayout.NORTH)
 
         val cookieField = JTextArea(6, 40).apply {
             lineWrap = true
             wrapStyleWord = true
-            border = BorderFactory.createTitledBorder("쿠키 값")
+            border = BorderFactory.createTitledBorder(I18n.t("쿠키 값", "Cookie Value"))
         }
         cookieField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
             override fun insertUpdate(e: javax.swing.event.DocumentEvent?) { cookies = cookieField.text.trim() }
@@ -203,7 +213,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         })
         panel.add(JScrollPane(cookieField), BorderLayout.CENTER)
 
-        val openBtn = JButton("브라우저에서 로그인 페이지 열기")
+        val openBtn = JButton(I18n.t("브라우저에서 로그인 페이지 열기", "Open login page in browser"))
         openBtn.addActionListener {
             try { java.awt.Desktop.getDesktop().browse(java.net.URI(auth.getLoginUrl(source))) }
             catch (_: Exception) {}

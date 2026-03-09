@@ -37,7 +37,7 @@ import javax.swing.*
 
 class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
-    private val sourceCombo = ComboBox(ProblemSource.entries.map { it.displayName }.toTypedArray()).apply {
+    private val sourceCombo = ComboBox(ProblemSource.entries.map { it.localizedName() }.toTypedArray()).apply {
         preferredSize = Dimension(JBUI.scale(100), preferredSize.height)
         renderer = createComboRenderer()
     }
@@ -179,6 +179,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                                 path == "/auto-render.min.js" -> KaTeXResourceHandler("/katex/auto-render.min.js", "text/javascript")
                                 path.startsWith("/fonts/") && path.endsWith(".woff2") ->
                                     KaTeXResourceHandler("/katex$path", "font/woff2")
+                                path.startsWith("/img_") -> {
+                                    val folder = currentProblemFolder
+                                    if (folder != null) {
+                                        val fileName = path.removePrefix("/")
+                                        val file = java.io.File(folder, fileName)
+                                        if (file.exists()) LocalImageHandler(file) else null
+                                    } else null
+                                }
                                 else -> null
                             }
                         }
@@ -212,6 +220,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         githubPushButton.isEnabled = false
         updateLoginButton()
         updateGitHubButton()
+
+        // 백그라운드에서 저장된 쿠키 유효성 검증
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val auth = AuthService.getInstance()
+            for (source in ProblemSource.entries) {
+                if (auth.isLoggedIn(source)) {
+                    if (!auth.validateSession(source)) {
+                        SwingUtilities.invokeLater { updateLoginButton() }
+                    }
+                }
+            }
+        }
 
         // 이벤트
         sourceCombo.addActionListener {
@@ -289,7 +309,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             loginButton.icon = AllIcons.Actions.Cancel
             val username = auth.getUsername(source)
             if (username.isNotBlank()) {
-                loginButton.toolTipText = "${source.displayName}: $username"
+                loginButton.toolTipText = "${source.localizedName()}: $username"
             }
         } else {
             loginButton.text = I18n.t("로그인", "Login")
@@ -305,7 +325,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (auth.isLoggedIn(source)) {
             auth.logout(source)
             updateLoginButton()
-            Messages.showInfoMessage(project, I18n.t("${source.displayName} 로그아웃되었습니다.", "Logged out from ${source.displayName}."), "CodingTestKit")
+            Messages.showInfoMessage(project, I18n.t("${source.localizedName()} 로그아웃되었습니다.", "Logged out from ${source.localizedName()}."), "CodingTestKit")
             return
         }
 
@@ -410,17 +430,36 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun fetchProblem() {
         val problemId = problemIdField.text.trim()
         if (problemId.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t("문제 번호를 입력하세요.", "Please enter a problem number."), "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("문제 번호를 입력하세요.", "Please enter a problem number or URL."), "CodingTestKit")
             return
         }
 
-        val id = extractProblemId(problemId)
+        // URL이면 플랫폼 자동 감지 + ID 추출
+        val parsed = parseUrlOrId(problemId)
+        if (parsed != null) {
+            val (detectedSource, detectedId) = parsed
+            // 콤보박스를 감지된 플랫폼으로 변경
+            val sourceIdx = ProblemSource.entries.indexOfFirst { it == detectedSource }
+            if (sourceIdx >= 0) sourceCombo.selectedIndex = sourceIdx
+            problemIdField.text = detectedId
+        }
+
+        val id = extractProblemId(problemIdField.text.trim())
         val source = getSelectedSource()
         val language = getSelectedLanguage()
         val cookies = AuthService.getInstance().getCookies(source)
 
-        // SWEA는 JS 렌더링이 필요하므로 JCEF 브라우저로 가져옴
+        // SWEA는 로그인 필요 + JS 렌더링이 필요하므로 JCEF 브라우저로 가져옴
         if (source == ProblemSource.SWEA) {
+            if (!AuthService.getInstance().isLoggedIn(ProblemSource.SWEA)) {
+                Messages.showWarningDialog(
+                    project,
+                    I18n.t("SWEA에 로그인이 필요합니다.\n위 '로그인' 버튼으로 먼저 로그인해주세요.",
+                        "SWEA login required.\nPlease log in via the 'Login' button above."),
+                    "CodingTestKit"
+                )
+                return
+            }
             fetchSweaProblem(id, language)
             return
         }
@@ -433,7 +472,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val problem = when (source) {
                     ProblemSource.BAEKJOON -> BaekjoonCrawler.fetchProblem(id)
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
-                    ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension)
+                    ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 
@@ -484,7 +523,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                             try {
                                 val response = org.jsoup.Jsoup.connect(url)
                                     .header("Cookie", sweaCookies)
-                                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+                                    .header("Referer", "https://swexpertacademy.com/")
+                                    .header("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+                                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                                     .ignoreContentType(true)
                                     .followRedirects(true)
                                     .maxBodySize(10 * 1024 * 1024)
@@ -493,10 +534,19 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                                 val bytes = response.bodyAsBytes()
                                 val contentType = response.contentType() ?: ""
                                 println("[CodingTestKit] Image $idx: status=${response.statusCode()}, type=$contentType, size=${bytes.size}")
+                                // 실제 이미지인지 확인 (HTML이 반환되면 저장하지 않음)
+                                if (!contentType.contains("image") && bytes.size < 50000) {
+                                    val preview = String(bytes.take(200).toByteArray())
+                                    if (preview.contains("<html", ignoreCase = true) || preview.contains("<!DOCTYPE", ignoreCase = true)) {
+                                        println("[CodingTestKit] Skipping non-image response for $url")
+                                        continue
+                                    }
+                                }
                                 val ext = when {
                                     contentType.contains("jpeg") || contentType.contains("jpg") -> "jpg"
                                     contentType.contains("gif") -> "gif"
                                     contentType.contains("webp") -> "webp"
+                                    contentType.contains("svg") -> "svg"
                                     url.contains(".jpg") || url.contains(".jpeg") -> "jpg"
                                     url.contains(".gif") -> "gif"
                                     else -> "png"
@@ -562,24 +612,35 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     fun loadExistingProblem(problem: Problem, folder: java.io.File) {
         currentProblem = problem
         currentProblemFolder = folder
+        isTranslated = false
+        translatedHtml = null
+        translateButton.text = I18n.t("번역", "Translate")
         displayProblem(problem)
         submitButton.isEnabled = true
         githubPushButton.isEnabled = true
+        translateButton.isEnabled = true
 
         // 플랫폼/번호 필드도 업데이트
         problemIdField.text = problem.id
-        for (i in 0 until sourceCombo.itemCount) {
-            if (sourceCombo.getItemAt(i) == problem.source.displayName) {
-                sourceCombo.selectedIndex = i
-                break
-            }
-        }
+        val sourceIdx = ProblemSource.entries.indexOf(problem.source)
+        if (sourceIdx >= 0) sourceCombo.selectedIndex = sourceIdx
     }
 
     private fun handleFetchError(e: Exception) {
+        val msg = e.message ?: ""
+        val isLeetCode = getSelectedSource() == ProblemSource.LEETCODE
+        val isLoggedIn = AuthService.getInstance().isLoggedIn(ProblemSource.LEETCODE)
+        val userMsg = when {
+            isLeetCode && !isLoggedIn && (msg.contains("400") || msg.contains("403") || msg.contains("499")) ->
+                I18n.t(
+                    "LeetCode에 로그인이 필요합니다.<br>위 '로그인' 버튼으로 LeetCode에 먼저 로그인해주세요.",
+                    "LeetCode login required.<br>Please log in via the 'Login' button above."
+                )
+            else -> msg
+        }
         setDisplayHtml("<!DOCTYPE html><html><head><meta charset='utf-8'></head>" +
                 "<body style='font-family:sans-serif; padding:10px; color:#cc4444;'>" +
-                "<h3>${I18n.t("오류 발생", "Error")}</h3><p>${e.message}</p></body></html>")
+                "<h3>${I18n.t("오류 발생", "Error")}</h3><p>$userMsg</p></body></html>")
         fetchButton.isEnabled = true
         fetchButton.text = I18n.t("가져오기", "Fetch")
     }
@@ -600,13 +661,13 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         if (cookies.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t("먼저 ${source.displayName}에 로그인하세요.", "Please log in to ${source.displayName} first."), "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t("먼저 ${source.localizedName()}에 로그인하세요.", "Please log in to ${source.localizedName()} first."), "CodingTestKit")
             return
         }
 
         val confirm = Messages.showYesNoDialog(
             project,
-            "[${source.displayName} #${problem.id}] ${problem.title}\n" +
+            "[${source.localizedName()} #${problem.id}] ${problem.title}\n" +
                     "${I18n.t("언어", "Language")}: ${language.displayName}\n" +
                     "${I18n.t("파일", "File")}: $fileName (${code.lines().size}${I18n.t("줄", " lines")})\n" +
                     "${I18n.t("경로", "Path")}: $filePath\n\n" +
@@ -617,10 +678,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (confirm != Messages.YES) return
 
         // JCEF 브라우저로 제출 (코드 자동 입력, 사용자가 직접 제출 확인)
-        val submitId = if (source == ProblemSource.SWEA && problem.contestProbId.isNotBlank()) {
-            problem.contestProbId
-        } else {
-            problem.id
+        // SWEA: contestProbId, LeetCode: titleSlug (contestProbId에 저장됨)
+        val submitId = when {
+            (source == ProblemSource.SWEA || source == ProblemSource.LEETCODE)
+                && problem.contestProbId.isNotBlank() -> problem.contestProbId
+            // LeetCode: slug가 없으면 title에서 생성 (예: "Two Sum" → "two-sum")
+            source == ProblemSource.LEETCODE -> problem.title.lowercase()
+                .replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            else -> problem.id
         }
         val dialog = CodeSubmitDialog(project, source, submitId, code, language)
 
@@ -662,6 +727,13 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val github = GitHubService.getInstance()
         val language = getSelectedLanguage()
 
+        val confirm = Messages.showYesNoDialog(project,
+            I18n.t("GitHub에 코드를 푸시하시겠습니까?\n[${problem.source.localizedName()} #${problem.id}] ${problem.title}",
+                "Push code to GitHub?\n[${problem.source.localizedName()} #${problem.id}] ${problem.title}"),
+            "GitHub Push",
+            Messages.getQuestionIcon())
+        if (confirm != Messages.YES) return
+
         if (!github.isConfigured()) {
             Messages.showWarningDialog(project,
                 I18n.t("설정에서 GitHub 토큰과 저장소를 먼저 설정해주세요.",
@@ -691,8 +763,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 if (result.success) {
                     notification.createNotification(
                         "GitHub Push",
-                        I18n.t("[${problem.source.displayName} #${problem.id}] GitHub에 푸시 완료!",
-                            "[${problem.source.displayName} #${problem.id}] Pushed to GitHub!"),
+                        I18n.t("[${problem.source.localizedName()} #${problem.id}] GitHub에 푸시 완료!",
+                            "[${problem.source.localizedName()} #${problem.id}] Pushed to GitHub!"),
                         com.intellij.notification.NotificationType.INFORMATION
                     ).notify(project)
                 } else {
@@ -707,10 +779,35 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
+    /**
+     * URL 또는 문제 번호에서 플랫폼과 ID를 감지
+     * 반환: Pair(ProblemSource, ID) 또는 null (일반 번호 입력 시)
+     */
+    private fun parseUrlOrId(input: String): Pair<ProblemSource, String>? {
+        val text = input.trim()
+        if (!text.contains("://")) return null
+
+        // 백준: https://www.acmicpc.net/problem/23971
+        val bojMatch = Regex("acmicpc\\.net/problem/(\\d+)").find(text)
+        if (bojMatch != null) return ProblemSource.BAEKJOON to bojMatch.groupValues[1]
+
+        // 프로그래머스: https://school.programmers.co.kr/learn/courses/30/lessons/258705
+        val progMatch = Regex("programmers\\.co\\.kr/learn/courses/\\d+/lessons/(\\d+)").find(text)
+        if (progMatch != null) return ProblemSource.PROGRAMMERS to progMatch.groupValues[1]
+
+        // SWEA: https://swexpertacademy.com/...?contestProbId=AZv-iZeqx2PHBIN6...
+        val sweaMatch = Regex("contestProbId=([A-Za-z0-9_-]+)").find(text)
+        if (sweaMatch != null) return ProblemSource.SWEA to sweaMatch.groupValues[1]
+
+        // LeetCode: https://leetcode.com/problems/two-sum/description/
+        val lcMatch = Regex("leetcode\\.com/problems/([\\w-]+)").find(text)
+        if (lcMatch != null) return ProblemSource.LEETCODE to lcMatch.groupValues[1]
+
+        return null
+    }
+
     private fun extractProblemId(input: String): String {
-        val urlPattern = Regex("(?:problems?|lessons|contestProbId=)/?([\\w]+)")
-        val match = urlPattern.find(input)
-        return match?.groupValues?.get(1) ?: input.trim()
+        return input.trim()
     }
 
     private fun truncatePreview(text: String, maxLines: Int): String {
@@ -719,6 +816,50 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             lines.take(maxLines).joinToString("\n") + "\n..."
         } else {
             text
+        }
+    }
+
+    /**
+     * 로컬 이미지 파일을 http://localhost/img_* 로 서빙하는 CEF 리소스 핸들러
+     */
+    private class LocalImageHandler(private val file: java.io.File) : CefResourceHandler {
+        private var stream: InputStream? = null
+        private var responseLength = 0
+
+        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
+            val bytes = file.readBytes()
+            stream = ByteArrayInputStream(bytes)
+            responseLength = bytes.size
+            callback.Continue()
+            return true
+        }
+
+        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
+            response.mimeType = when {
+                file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") -> "image/jpeg"
+                file.name.endsWith(".gif") -> "image/gif"
+                file.name.endsWith(".webp") -> "image/webp"
+                else -> "image/png"
+            }
+            response.status = 200
+            responseLength.set(this.responseLength)
+        }
+
+        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
+            val s = stream ?: return false
+            val available = s.available()
+            if (available == 0) {
+                bytesRead.set(0)
+                return false
+            }
+            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
+            bytesRead.set(read)
+            return true
+        }
+
+        override fun cancel() {
+            stream?.close()
+            stream = null
         }
     }
 
@@ -843,7 +984,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 ProblemSource.SWEA -> "SWEA"
                 ProblemSource.LEETCODE -> "LeetCode"
             }
-            else -> problem.source.displayName
+            else -> problem.source.localizedName()
         }
 
         val isDark = !JBColor.isBright()
@@ -858,32 +999,39 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 append("<link rel='stylesheet' href='katex.min.css'>")
                 append("<style>")
                 if (isDark) {
-                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.6; color: #bbb; background: #2b2d30; }")
-                    append("h2 { color: #e0e0e0; margin: 0 0 8px 0; }")
+                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.7; color: #d4d4d4; background: #1e1f22; }")
+                    append("h2 { color: #e8e8e8; margin: 0 0 8px 0; }")
+                    append("h3, h4 { color: #e0e0e0; }")
+                    append("b, strong { color: #e8e8e8; }")
                     append("table { border-collapse: collapse; margin: 8px 0; }")
-                    append("th, td { padding: 6px 12px; border: 1px solid #555; font-family: monospace; }")
-                    append("th { background: #3c3f41; color: #bbb; font-weight: bold; }")
+                    append("th, td { padding: 6px 12px; border: 1px solid #444; font-family: monospace; }")
+                    append("th { background: #2b2d30; color: #ccc; font-weight: bold; }")
                     append("img { max-width: 100%; }")
-                    append("hr { border: none; border-top: 1px solid #444; margin: 8px 0; }")
-                    append("pre { background: #1e1e1e; color: #a9b7c6; padding: 10px; border: 1px solid #555; font-family: monospace; border-radius: 4px; white-space: pre-wrap; }")
-                    append("code { background: #1e1e1e; color: #a9b7c6; padding: 2px 5px; border-radius: 3px; }")
+                    append("hr { border: none; border-top: 1px solid #3c3f41; margin: 12px 0; }")
+                    append("pre { background: #1a1a1a; color: #c5c8c6; padding: 12px; border: 1px solid #3c3f41; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
+                    append("code { background: #2b2d30; color: #c5c8c6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")
                     append("a { color: #589df6; pointer-events: none; cursor: default; text-decoration: none; }")
+                    append("li { margin: 3px 0; }")
+                    append("p { margin: 8px 0; }")
                     append(".bg-red, td.bg-red { background-color: rgba(255, 100, 100, 0.3); }")
                     append(".bg-green, td.bg-green { background-color: rgba(100, 200, 100, 0.3); }")
                     append(".bg-blue, td.bg-blue { background-color: rgba(100, 150, 255, 0.3); }")
                     append(".bg-yellow, td.bg-yellow { background-color: rgba(255, 220, 100, 0.3); }")
                     append(".katex { color: #e0e0e0; }")
                 } else {
-                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.6; color: #333; background: #fff; }")
-                    append("h2 { color: #222; margin: 0 0 8px 0; }")
+                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.7; color: #1a1a1a; background: #fff; }")
+                    append("h2 { color: #111; margin: 0 0 8px 0; }")
+                    append("h3, h4 { color: #222; }")
                     append("table { border-collapse: collapse; margin: 8px 0; }")
-                    append("th, td { padding: 6px 12px; border: 1px solid #ccc; font-family: monospace; }")
+                    append("th, td { padding: 6px 12px; border: 1px solid #d0d0d0; font-family: monospace; }")
                     append("th { background: #f0f0f0; color: #333; font-weight: bold; }")
                     append("img { max-width: 100%; }")
-                    append("hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }")
-                    append("pre { background: #f5f5f5; color: #333; padding: 10px; border: 1px solid #ddd; font-family: monospace; border-radius: 4px; white-space: pre-wrap; }")
-                    append("code { background: #f5f5f5; color: #333; padding: 2px 5px; border-radius: 3px; }")
+                    append("hr { border: none; border-top: 1px solid #e0e0e0; margin: 12px 0; }")
+                    append("pre { background: #f6f8fa; color: #24292e; padding: 12px; border: 1px solid #e1e4e8; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
+                    append("code { background: #f0f2f5; color: #24292e; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")
                     append("a { color: #0366d6; pointer-events: none; cursor: default; text-decoration: none; }")
+                    append("li { margin: 3px 0; }")
+                    append("p { margin: 8px 0; }")
                     append(".bg-red, td.bg-red { background-color: rgba(255, 200, 200, 0.6); }")
                     append(".bg-green, td.bg-green { background-color: rgba(200, 255, 200, 0.6); }")
                     append(".bg-blue, td.bg-blue { background-color: rgba(200, 220, 255, 0.6); }")
@@ -913,21 +1061,87 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             } else {
                 append("<h2 style='margin:0 0 8px 0;'>${problem.title}</h2>")
             }
-            append("<div style='color:#888; font-size:12px; margin-bottom:12px;'>")
+            val metaColor = if (isDark) "#888" else "#666"
+            append("<div style='color:$metaColor; font-size:12px; margin-bottom:12px;'>")
             append("$sourceName #${problem.id}")
             if (problem.timeLimit.isNotBlank()) {
-                append(" &nbsp;|&nbsp; ${t("시간", "Time")}: ${problem.timeLimit} &nbsp;|&nbsp; ${t("메모리", "Memory")}: ${problem.memoryLimit}")
+                val timeDisplay = if (overrideLang == "en" || (overrideLang == null && I18n.currentLang == I18n.Lang.EN))
+                    problem.timeLimit.replace("초", "sec") else problem.timeLimit
+                append(" &nbsp;|&nbsp; ${t("시간", "Time")}: $timeDisplay &nbsp;|&nbsp; ${t("메모리", "Memory")}: ${problem.memoryLimit}")
             }
             append("</div>")
             if (useCef) append("<hr>") else append("<hr style='border:none; border-top:1px solid #444; margin:8px 0;'>")
 
-            // SWEA: 이미지 로컬 경로 변환 (img_X.png → file:///절대경로/img_X.png)
+            // SWEA: 불필요 영역 제거 + 이미지 로컬 경로 변환 + 스타일 정리
             var desc = problem.description
-            if (problem.source == ProblemSource.SWEA && currentProblemFolder != null) {
-                desc = desc.replace(Regex("""src="(img_\d+\.\w+)"""")) { match ->
-                    val fileName = match.groupValues[1]
-                    val localFile = java.io.File(currentProblemFolder, fileName)
-                    "src=\"file://${localFile.absolutePath}\""
+            if (problem.source == ProblemSource.SWEA) {
+                // 1) 다운로드 링크 태그 제거
+                desc = desc.replace(Regex("""<a[^>]*>[^<]*다운로드[^<]*</a>"""), "")
+                desc = desc.replace(Regex("""<a[^>]*>[^<]*sample_[^<]*</a>""", RegexOption.IGNORE_CASE), "")
+                // 남은 다운로드/파일명 텍스트 제거
+                desc = desc.replace(Regex("""\d*_?sample_(?:input|output)\S*\s*다운로드""", RegexOption.IGNORE_CASE), "")
+                desc = desc.replace(Regex("""\d*_?sample_(?:input|output)\S*""", RegexOption.IGNORE_CASE), "")
+
+                // 2) 하단 불필요 영역 잘라내기: 댓글, 추천, 무단복제 등
+                for (cutText in listOf("댓글", "함께 풀면 도움", "이 Problem과 함께")) {
+                    val cutIdx = desc.indexOf(cutText)
+                    if (cutIdx > 0) {
+                        val tagStart = desc.lastIndexOf('<', cutIdx)
+                        desc = if (tagStart > 0 && cutIdx - tagStart < 100) desc.substring(0, tagStart) else desc.substring(0, cutIdx)
+                        break
+                    }
+                }
+
+                // 3) 인라인 샘플 데이터 영역 제거 (예제 입출력과 중복)
+                // "다운로드" 텍스트가 남아있으면 그 앞의 "입력" 헤더부터 잘라냄
+                val dlIdx = desc.indexOf("다운로드")
+                if (dlIdx > 0) {
+                    val before = desc.substring(0, dlIdx)
+                    var sampleStart = before.lastIndexOf("입력")
+                    while (sampleStart > 0 && desc.getOrNull(sampleStart - 1) == '[') {
+                        sampleStart = before.lastIndexOf("입력", sampleStart - 1)
+                    }
+                    if (sampleStart > 0) {
+                        val tagStart = desc.lastIndexOf('<', sampleStart)
+                        desc = if (tagStart >= 0 && sampleStart - tagStart < 80) desc.substring(0, tagStart) else desc.substring(0, sampleStart)
+                    } else {
+                        desc = desc.substring(0, dlIdx)
+                    }
+                }
+
+                // 4) 하이라이트 배경색 제거
+                desc = desc.replace(Regex("""background-color\s*:\s*[^;"]+"""), "")
+                desc = desc.replace(Regex("""background\s*:\s*(?:rgb\([^)]+\)|#[0-9a-fA-F]+|yellow|white|#fff\b)[^;"]*"""), "")
+                // 5) 시간/메모리 제한 중복 제거 (헤더에 이미 표시됨)
+                desc = desc.replace(Regex("""<ul>\s*<li>.*?시간.*?</li>\s*<li>.*?메모리.*?</li>\s*</ul>""", RegexOption.DOT_MATCHES_ALL), "")
+                // 6) "무단 복제 금지" 경고문 제거
+                desc = desc.replace(Regex("""<[^>]*>.*?무단\s*복제.*?</[^>]*>""", RegexOption.DOT_MATCHES_ALL), "")
+                // 7) 빈 테이블/빈 요소 정리
+                desc = desc.replace(Regex("""<table[^>]*>\s*</table>""", RegexOption.DOT_MATCHES_ALL), "")
+                desc = desc.replace(Regex("""<(?:div|p|span)[^>]*>\s*</(?:div|p|span)>"""), "")
+                // 시작/끝부분 빈 줄/공백 정리
+                desc = desc.replace(Regex("""^(\s*<br\s*/?>|\s*<p>\s*</p>|\s*&nbsp;|\s*<div>\s*</div>)+"""), "")
+                desc = desc.replace(Regex("""(\s*<br\s*/?>)+\s*$"""), "")
+                // 인라인 color 스타일 제거 (CSS 테마 색상을 따르도록)
+                desc = desc.replace(Regex("""(?:;\s*)?color\s*:\s*[^;"]+"""), "")
+                // <pre> 블록 내부의 <br> 태그 정리 (이중 개행 방지)
+                desc = desc.replace(Regex("""(<pre[^>]*>)(.*?)(</pre>)""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))) { m ->
+                    val content = m.groupValues[2]
+                        .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), "\n")
+                        .replace(Regex("""\n{2,}"""), "\n")
+                    m.groupValues[1] + content + m.groupValues[3]
+                }
+                // 8) 이미지 로컬 경로 변환: JCEF에서는 http://localhost/로, JEditorPane에서는 file://로
+                if (currentProblemFolder != null) {
+                    desc = desc.replace(Regex("""src="(img_\d+\.\w+)"""")) { match ->
+                        val fileName = match.groupValues[1]
+                        if (useCef) {
+                            "src=\"http://localhost/$fileName\""
+                        } else {
+                            val localFile = java.io.File(currentProblemFolder, fileName)
+                            "src=\"file://${localFile.absolutePath}\""
+                        }
+                    }
                 }
             }
 
@@ -970,12 +1184,43 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     "<i>${m.groupValues[1]}</i>"
                 }
             }
+            // BOJ 섹션 제목을 UI 언어에 맞게 치환
+            if (problem.source == ProblemSource.BAEKJOON) {
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*예제 입력\s*(\d+)\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("예제 입력", "Sample Input")} ${m.groupValues[2]}${m.groupValues[3]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*예제 출력\s*(\d+)\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("예제 출력", "Sample Output")} ${m.groupValues[2]}${m.groupValues[3]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*문제\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("문제", "Problem")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*입력\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("입력", "Input")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*출력\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("출력", "Output")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*제한\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("제한", "Constraints")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*힌트\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("힌트", "Hint")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*노트\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("노트", "Note")}${m.groupValues[2]}"
+                }
+                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*부분 ?점수\s*(</h\d>)""")) { m ->
+                    "${m.groupValues[1]}${t("부분 점수", "Partial Score")}${m.groupValues[2]}"
+                }
+            }
             append(desc)
 
-            // 예제 입출력 표시 (백준/프로그래머스는 description에 이미 포함)
+            // 예제 입출력 표시 (백준/프로그래머스/리트코드는 description에 이미 포함)
             if (problem.testCases.isNotEmpty()
                 && problem.source != ProblemSource.PROGRAMMERS
-                && problem.source != ProblemSource.BAEKJOON) {
+                && problem.source != ProblemSource.BAEKJOON
+                && problem.source != ProblemSource.LEETCODE) {
                 for ((i, tc) in problem.testCases.withIndex()) {
                     val preStyle = if (useCef) {
                         if (isDark) "background:#1e1e1e; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace; white-space:pre-wrap; border-radius:4px;"

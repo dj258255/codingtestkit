@@ -4,6 +4,7 @@ import com.codingtestkit.service.AuthService
 import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.LeetCodeApi
+import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -64,16 +65,24 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
     private val searchButton = JButton(I18n.t("검색", "Search"))
 
     private val tableModel = object : DefaultTableModel(
-        arrayOf(I18n.t("상태", ""), "#", I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"),
+        arrayOf("#", I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"),
             I18n.t("정답률", "AC Rate"), I18n.t("태그", "Tags")), 0
     ) {
         override fun isCellEditable(row: Int, column: Int) = false
     }
-    private val resultTable = JBTable(tableModel)
+    private val resultTable = JBTable(tableModel).apply {
+        emptyText.text = I18n.t("표시할 항목이 없습니다", "No items to display")
+    }
     private val statusLabel = JLabel(I18n.t("키워드를 입력하고 검색하세요", "Enter a keyword and search"))
 
     private var results: List<LeetCodeApi.LeetCodeProblemInfo> = emptyList()
-    private var problemStats: Map<String, LeetCodeApi.ProblemStat> = emptyMap()
+    private var translatedTitles: Map<String, String> = emptyMap() // slug → translated title
+    private var showingTranslated = false
+    private val translateButton = JButton("KO").apply {
+        toolTipText = I18n.t("한국어로 번역", "Translate to Korean")
+        preferredSize = Dimension(JBUI.scale(50), preferredSize.height)
+        addActionListener { toggleTranslation() }
+    }
     var selectedProblemSlug: String? = null
         private set
 
@@ -106,28 +115,22 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         // 결과 테이블
         resultTable.selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
         resultTable.rowHeight = JBUI.scale(24)
-        resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(30)
-        resultTable.columnModel.getColumn(0).maxWidth = JBUI.scale(30)
-        resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(50)
-        resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(240)
+        resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(50)
+        resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(260)
+        resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(70)
         resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(70)
-        resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(70)
-        resultTable.columnModel.getColumn(5).preferredWidth = JBUI.scale(190)
-
-        // 백그라운드에서 풀이 상태 로드
-        Thread {
-            try {
-                val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
-                problemStats = LeetCodeApi.fetchAllProblemStats(cookies.ifBlank { null })
-            } catch (_: Exception) { }
-        }.start()
+        resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(190)
 
         panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
 
-        // 상태
+        // 하단: 상태 라벨 + 번역 버튼
         statusLabel.foreground = JBColor.GRAY
         statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
-        panel.add(statusLabel, BorderLayout.SOUTH)
+        val bottomPanel = JPanel(BorderLayout()).apply {
+            add(statusLabel, BorderLayout.CENTER)
+            add(translateButton, BorderLayout.EAST)
+        }
+        panel.add(bottomPanel, BorderLayout.SOUTH)
 
         // 이벤트
         searchButton.addActionListener { doSearch() }
@@ -196,14 +199,7 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
                 results = result.problems
                 SwingUtilities.invokeLater {
                     for (p in results) {
-                        val stat = problemStats[p.frontendId]
-                        val statusMark = when (stat?.status) {
-                            "ac" -> "\u2713"      // ✓
-                            "notac" -> "\u2717"    // ✗
-                            else -> ""
-                        }
                         tableModel.addRow(arrayOf(
-                            statusMark,
                             p.frontendId,
                             p.title,
                             p.difficulty,
@@ -240,6 +236,78 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
             font = font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
             return c
         }
+    }
+
+    private fun toggleTranslation() {
+        if (results.isEmpty()) return
+        showingTranslated = !showingTranslated
+        if (showingTranslated && translatedTitles.isEmpty()) {
+            // 번역 실행 (백그라운드)
+            translateButton.isEnabled = false
+            translateButton.text = "..."
+            Thread {
+                try {
+                    val titles = results.map { it.title }
+                    val batch = titles.joinToString("\n")
+                    val translated = TranslateService.translate(batch, "en", "ko")
+                    val translatedList = translated.split("\n")
+                    val map = mutableMapOf<String, String>()
+                    for ((idx, p) in results.withIndex()) {
+                        if (idx < translatedList.size) map[p.titleSlug] = translatedList[idx].trim()
+                    }
+                    translatedTitles = map
+                    SwingUtilities.invokeLater { applyTranslation(); translateButton.isEnabled = true }
+                } catch (_: Exception) {
+                    SwingUtilities.invokeLater {
+                        showingTranslated = false
+                        translateButton.text = "KO"
+                        translateButton.isEnabled = true
+                        statusLabel.text = I18n.t("번역 실패", "Translation failed")
+                        statusLabel.foreground = JBColor.RED
+                    }
+                }
+            }.start()
+        } else {
+            applyTranslation()
+        }
+    }
+
+    private fun applyTranslation() {
+        translateButton.text = if (showingTranslated) "EN" else "KO"
+        translateButton.toolTipText = if (showingTranslated) I18n.t("영어로 보기", "Show in English") else I18n.t("한국어로 번역", "Translate to Korean")
+        for ((idx, p) in results.withIndex()) {
+            if (idx < tableModel.rowCount) {
+                val title = if (showingTranslated) translatedTitles[p.titleSlug] ?: p.title else p.title
+                tableModel.setValueAt(title, idx, 1)
+                val tags = if (showingTranslated) p.tags.take(3).map { tagToKo(it) }.joinToString(", ")
+                    else p.tags.take(3).joinToString(", ")
+                tableModel.setValueAt(tags, idx, 4)
+            }
+        }
+    }
+
+    companion object {
+        private val tagKoMap = mapOf(
+            "Array" to "배열", "String" to "문자열", "Hash Table" to "해시 테이블",
+            "Dynamic Programming" to "동적 프로그래밍", "Math" to "수학", "Sorting" to "정렬",
+            "Greedy" to "그리디", "Depth-First Search" to "DFS", "Breadth-First Search" to "BFS",
+            "Binary Search" to "이분 탐색", "Tree" to "트리", "Graph" to "그래프",
+            "Linked List" to "연결 리스트", "Stack" to "스택", "Heap (Priority Queue)" to "힙",
+            "Two Pointers" to "투 포인터", "Sliding Window" to "슬라이딩 윈도우",
+            "Backtracking" to "백트래킹", "Divide and Conquer" to "분할 정복",
+            "Bit Manipulation" to "비트 조작", "Union Find" to "유니온 파인드",
+            "Matrix" to "행렬", "Simulation" to "시뮬레이션", "Recursion" to "재귀",
+            "Binary Tree" to "이진 트리", "Trie" to "트라이", "Queue" to "큐",
+            "Design" to "설계", "Prefix Sum" to "누적 합", "Counting" to "카운팅",
+            "Database" to "데이터베이스", "Enumeration" to "열거", "Geometry" to "기하학",
+            "Number Theory" to "정수론", "Topological Sort" to "위상 정렬",
+            "Segment Tree" to "세그먼트 트리", "Binary Indexed Tree" to "펜윅 트리",
+            "Memoization" to "메모이제이션", "Monotonic Stack" to "단조 스택",
+            "Ordered Set" to "정렬 집합", "Interactive" to "인터랙티브",
+            "Brainteaser" to "브레인티저", "Combinatorics" to "조합론"
+        )
+
+        fun tagToKo(tag: String): String = tagKoMap[tag] ?: tag
     }
 
     override fun getPreferredFocusedComponent(): JComponent = searchField

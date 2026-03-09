@@ -238,7 +238,13 @@ object CodeRunner {
 
     private fun wrapJava(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
         val args = inputValues.joinToString(", ") { toJavaLiteral(it) }
-        // Solution 클래스에서 solution 메서드 호출
+
+        // Solution 클래스에서 메서드 이름 추출 (solution 우선, 없으면 마지막 public 메서드)
+        val javaMethods = Regex("""public\s+\S+\s+(\w+)\s*\(""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it != "main" && it != "Solution" }.toList()
+        val methodName = javaMethods.find { it == "solution" } ?: javaMethods.lastOrNull() ?: "solution"
+
         val solutionClass = if (code.contains("class Solution")) {
             code
         } else {
@@ -256,18 +262,26 @@ object CodeRunner {
 $solutionClass
 ///MAIN_SEPARATOR///
 ${importBlock}import java.util.Arrays;
+import java.io.PrintStream;
 class Main {
     public static void main(String[] args) {
         Solution sol = new Solution();
-        printResult(sol.solution($args));
+        // 사용자 debug 출력(System.out.println)을 stderr로 리다이렉트
+        PrintStream origOut = System.out;
+        System.setOut(System.err);
+        Object _result = sol.$methodName($args);
+        // stdout 복원 후 리턴값만 출력
+        System.setOut(origOut);
+        printResult(_result);
     }
+    static String compact(String s) { return s.replace(", ", ","); }
     static void printResult(Object o) {
         if (o instanceof String) System.out.println("\"" + o + "\"");
-        else if (o instanceof int[]) System.out.println(Arrays.toString((int[])o));
-        else if (o instanceof long[]) System.out.println(Arrays.toString((long[])o));
-        else if (o instanceof double[]) System.out.println(Arrays.toString((double[])o));
-        else if (o instanceof boolean[]) System.out.println(Arrays.toString((boolean[])o));
-        else if (o instanceof Object[]) System.out.println(Arrays.deepToString((Object[])o));
+        else if (o instanceof int[]) System.out.println(compact(Arrays.toString((int[])o)));
+        else if (o instanceof long[]) System.out.println(compact(Arrays.toString((long[])o)));
+        else if (o instanceof double[]) System.out.println(compact(Arrays.toString((double[])o)));
+        else if (o instanceof boolean[]) System.out.println(compact(Arrays.toString((boolean[])o)));
+        else if (o instanceof Object[]) System.out.println(compact(Arrays.deepToString((Object[])o)));
         else System.out.println(o);
     }
 }
@@ -276,12 +290,44 @@ class Main {
 
     private fun wrapPython(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
         val args = inputValues.joinToString(", ")
+        val hasClass = code.contains("class Solution")
+
+        // 클래스 기반(LeetCode): def 메서드명(self, ...) 에서 추출
+        // 함수 기반(Programmers): def 메서드명(...) 에서 추출 (solution 우선)
+        val methodName = if (hasClass) {
+            val methods = Regex("""def\s+(\w+)\s*\(\s*self""").findAll(code)
+                .map { it.groupValues[1] }
+                .filter { it != "__init__" }.toList()
+            methods.lastOrNull() ?: "solution"
+        } else {
+            val funcs = Regex("""def\s+(\w+)\s*\(""").findAll(code)
+                .map { it.groupValues[1] }
+                .filter { it != "__init__" }.toList()
+            funcs.find { it == "solution" } ?: funcs.lastOrNull() ?: "solution"
+        }
+
+        val callExpr = if (hasClass) {
+            "_sol = Solution()\n_result = _sol.$methodName($args)"
+        } else {
+            "_result = $methodName($args)"
+        }
+
         return """
+import sys as _sys
+
 $code
 
-_result = solution($args)
+# 사용자 print()를 stderr로 리다이렉트
+_orig_stdout = _sys.stdout
+_sys.stdout = _sys.stderr
+$callExpr
+# stdout 복원 후 리턴값만 출력
+_sys.stdout = _orig_stdout
 if isinstance(_result, str):
     print(f'"{_result}"')
+elif isinstance(_result, list):
+    import json as _json
+    print(_json.dumps(_result, separators=(',', ':')))
 else:
     print(_result)
 """.trimIndent()
@@ -289,6 +335,14 @@ else:
 
     private fun wrapCpp(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
         val args = inputValues.joinToString(", ") { toCppLiteral(it) }
+        val hasClass = code.contains("class Solution")
+
+        // C++: 함수/메서드명 추출 (solution 이름 우선, 없으면 마지막 매칭)
+        val excluded = setOf("Solution", "main")
+        val cppMethods = Regex("""\b(\w+)\s*\([^)]*\)\s*\{""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it !in excluded && !it.startsWith("~") }.toList()
+        val methodName = cppMethods.find { it == "solution" } ?: cppMethods.lastOrNull() ?: "solution"
         val hasInclude = code.contains("#include")
         val includes = if (hasInclude) "" else """
 #include <iostream>
@@ -297,15 +351,34 @@ else:
 using namespace std;
 """.trimIndent()
 
+        val callExpr = if (hasClass) {
+            "    Solution sol;\n    auto _result = sol.$methodName($args);"
+        } else {
+            "    auto _result = $methodName($args);"
+        }
+
         return """
 $includes
 $code
 
-template<typename T> void printResult(T r) { cout << r << endl; }
-void printResult(string r) { cout << "\"" << r << "\"" << endl; }
+template<typename T> void _print(T r) { cout << r; }
+void _print(string r) { cout << "\"" << r << "\""; }
+void _print(bool r) { cout << (r ? "true" : "false"); }
+template<typename T> void _print(vector<T> v) {
+    cout << "[";
+    for (size_t i = 0; i < v.size(); i++) { if (i) cout << ","; _print(v[i]); }
+    cout << "]";
+}
+template<typename T> void printResult(T r) { _print(r); cout << endl; }
 
 int main() {
-    printResult(solution($args));
+    // 사용자 cout을 stderr로 리다이렉트
+    auto* _origBuf = cout.rdbuf();
+    cout.rdbuf(cerr.rdbuf());
+$callExpr
+    // stdout 복원 후 리턴값만 출력
+    cout.rdbuf(_origBuf);
+    printResult(_result);
     return 0;
 }
 """.trimIndent()
@@ -313,24 +386,62 @@ int main() {
 
     private fun wrapKotlin(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
         val args = inputValues.joinToString(", ") { toKotlinLiteral(it) }
+        val hasClass = code.contains("class Solution")
+
+        // Kotlin: fun 메서드명(...) 에서 메서드명 추출 (solution 우선, 없으면 마지막)
+        val ktMethods = Regex("""fun\s+(\w+)\s*\(""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it != "main" }.toList()
+        val methodName = ktMethods.find { it == "solution" } ?: ktMethods.lastOrNull() ?: "solution"
+
+        val callExpr = if (hasClass) {
+            "    val sol = Solution()\n    val result = sol.$methodName($args)"
+        } else {
+            "    val result = $methodName($args)"
+        }
+
         return """
 $code
 
 fun main() {
-    val result = solution($args)
-    if (result is String) println("\"${'$'}result\"")
-    else println(result)
+    // 사용자 println을 stderr로 리다이렉트
+    val _origOut = System.out
+    System.setOut(System.err)
+$callExpr
+    // stdout 복원 후 리턴값만 출력
+    System.setOut(_origOut)
+    fun compact(s: String) = s.replace(", ", ",")
+    when (result) {
+        is String -> println("\"${'$'}result\"")
+        is IntArray -> println(compact(result.contentToString()))
+        is LongArray -> println(compact(result.contentToString()))
+        is DoubleArray -> println(compact(result.contentToString()))
+        is BooleanArray -> println(compact(result.contentToString()))
+        is Array<*> -> println(compact(result.contentDeepToString()))
+        else -> println(result)
+    }
 }
 """.trimIndent()
     }
 
     private fun wrapJavaScript(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
         val args = inputValues.joinToString(", ")
+        // JS: var/function/arrow 메서드명 또는 prototype.메서드명 추출 (solution 우선)
+        val jsFuncs = Regex("""(?:var|const|let)\s+(\w+)\s*=\s*(?:function|\([^)]*\)\s*=>|\w+\s*=>)|\.prototype\.(\w+)\s*=|function\s+(\w+)""").findAll(code)
+            .mapNotNull { it.groupValues.drop(1).firstOrNull { g -> g.isNotBlank() } }
+            .filter { it != "main" }.toList()
+        val methodName = jsFuncs.find { it == "solution" } ?: jsFuncs.lastOrNull() ?: "solution"
         return """
 $code
 
-const _result = solution($args);
+// 사용자 console.log를 stderr로 리다이렉트
+const _origLog = console.log;
+console.log = (...a) => process.stderr.write(a.join(' ') + '\n');
+const _result = $methodName($args);
+// stdout 복원 후 리턴값만 출력
+console.log = _origLog;
 if (typeof _result === 'string') console.log('"' + _result + '"');
+else if (Array.isArray(_result)) console.log(JSON.stringify(_result));
 else console.log(_result);
 """.trimIndent()
     }

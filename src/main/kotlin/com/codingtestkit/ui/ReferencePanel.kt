@@ -27,82 +27,82 @@ class ReferencePanel : JPanel(BorderLayout()) {
     private val languages = listOf(
         LangRef(
             "Java",
-            "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/module-summary.html",
+            "https://devdocs.io/openjdk~21/",
             listOf(
-                "String" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html",
-                "Arrays" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Arrays.html",
-                "ArrayList" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ArrayList.html",
-                "HashMap" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/HashMap.html",
-                "Collections" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collections.html",
-                "PriorityQueue" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/PriorityQueue.html",
-                "Math" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Math.html",
-                "Scanner" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Scanner.html",
-                "BufferedReader" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/BufferedReader.html",
-                "Stream" to "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/stream/Stream.html"
+                "String" to "https://devdocs.io/openjdk~21/java.base/java/lang/string",
+                "Arrays" to "https://devdocs.io/openjdk~21/java.base/java/util/arrays",
+                "ArrayList" to "https://devdocs.io/openjdk~21/java.base/java/util/arraylist",
+                "HashMap" to "https://devdocs.io/openjdk~21/java.base/java/util/hashmap",
+                "Collections" to "https://devdocs.io/openjdk~21/java.base/java/util/collections",
+                "PriorityQueue" to "https://devdocs.io/openjdk~21/java.base/java/util/priorityqueue",
+                "Math" to "https://devdocs.io/openjdk~21/java.base/java/lang/math",
+                "Scanner" to "https://devdocs.io/openjdk~21/java.base/java/util/scanner",
+                "BufferedReader" to "https://devdocs.io/openjdk~21/java.base/java/io/bufferedreader",
+                "Stream" to "https://devdocs.io/openjdk~21/java.base/java/util/stream/stream"
             )
         ),
         LangRef(
             "C++",
-            "https://en.cppreference.com/w/cpp",
+            "https://devdocs.io/cpp/",
             listOf(
-                "string" to "https://en.cppreference.com/w/cpp/string/basic_string",
-                "vector" to "https://en.cppreference.com/w/cpp/container/vector",
-                "map" to "https://en.cppreference.com/w/cpp/container/map",
-                "set" to "https://en.cppreference.com/w/cpp/container/set",
-                "queue" to "https://en.cppreference.com/w/cpp/container/queue",
-                "stack" to "https://en.cppreference.com/w/cpp/container/stack",
-                "algorithm" to "https://en.cppreference.com/w/cpp/algorithm",
-                "priority_queue" to "https://en.cppreference.com/w/cpp/container/priority_queue",
-                "unordered_map" to "https://en.cppreference.com/w/cpp/container/unordered_map",
-                "deque" to "https://en.cppreference.com/w/cpp/container/deque"
+                "string" to "https://devdocs.io/cpp/string/basic_string",
+                "vector" to "https://devdocs.io/cpp/container/vector",
+                "map" to "https://devdocs.io/cpp/container/map",
+                "set" to "https://devdocs.io/cpp/container/set",
+                "queue" to "https://devdocs.io/cpp/container/queue",
+                "stack" to "https://devdocs.io/cpp/container/stack",
+                "algorithm" to "https://devdocs.io/cpp/algorithm",
+                "priority_queue" to "https://devdocs.io/cpp/container/priority_queue",
+                "unordered_map" to "https://devdocs.io/cpp/container/unordered_map",
+                "deque" to "https://devdocs.io/cpp/container/deque"
             )
         ),
         LangRef(
             "Python",
-            "https://docs.python.org/3/library/index.html",
+            "https://devdocs.io/python~3.12/",
             listOf(
-                "str" to "https://docs.python.org/3/library/stdtypes.html#text-sequence-type-str",
-                "list" to "https://docs.python.org/3/library/stdtypes.html#lists",
-                "dict" to "https://docs.python.org/3/library/stdtypes.html#mapping-types-dict",
-                "set" to "https://docs.python.org/3/library/stdtypes.html#set-types-set-frozenset",
-                "collections" to "https://docs.python.org/3/library/collections.html",
-                "itertools" to "https://docs.python.org/3/library/itertools.html",
-                "heapq" to "https://docs.python.org/3/library/heapq.html",
-                "bisect" to "https://docs.python.org/3/library/bisect.html",
-                "math" to "https://docs.python.org/3/library/math.html",
-                "functools" to "https://docs.python.org/3/library/functools.html"
+                "str" to "https://devdocs.io/python~3.12/library/stdtypes#text-sequence-type-str",
+                "list" to "https://devdocs.io/python~3.12/library/stdtypes#lists",
+                "dict" to "https://devdocs.io/python~3.12/library/stdtypes#mapping-types-dict",
+                "set" to "https://devdocs.io/python~3.12/library/stdtypes#set-types-set-frozenset",
+                "collections" to "https://devdocs.io/python~3.12/library/collections",
+                "itertools" to "https://devdocs.io/python~3.12/library/itertools",
+                "heapq" to "https://devdocs.io/python~3.12/library/heapq",
+                "bisect" to "https://devdocs.io/python~3.12/library/bisect",
+                "math" to "https://devdocs.io/python~3.12/library/math",
+                "functools" to "https://devdocs.io/python~3.12/library/functools"
             )
         ),
         LangRef(
             "Kotlin",
-            "https://kotlinlang.org/api/core/kotlin-stdlib/",
+            "https://devdocs.io/kotlin/",
             listOf(
-                "String" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/",
-                "List" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/",
-                "Map" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/",
-                "Set" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-set/",
-                "Sequence" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.sequences/-sequence/",
-                "Array" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-array/",
-                "Regex" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.text/-regex/",
-                "Comparable" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-comparable/",
-                "collections" to "https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/",
-                "Scope functions" to "https://kotlinlang.org/docs/scope-functions.html"
+                "String" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin/-string/index",
+                "List" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.collections/-list/index",
+                "Map" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.collections/-map/index",
+                "Set" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.collections/-set/index",
+                "Sequence" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.sequences/-sequence/index",
+                "Array" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin/-array/index",
+                "Regex" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.text/-regex/index",
+                "Comparable" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin/-comparable/index",
+                "collections" to "https://devdocs.io/kotlin/api/core/kotlin-stdlib/kotlin.collections/index",
+                "Scope functions" to "https://devdocs.io/kotlin/docs/scope-functions"
             )
         ),
         LangRef(
             "JavaScript",
-            "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference",
+            "https://devdocs.io/javascript/",
             listOf(
-                "String" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String",
-                "Array" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array",
-                "Map" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map",
-                "Set" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set",
-                "Object" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object",
-                "Math" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math",
-                "JSON" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON",
-                "RegExp" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp",
-                "Promise" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise",
-                "Number" to "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number"
+                "String" to "https://devdocs.io/javascript/global_objects/string",
+                "Array" to "https://devdocs.io/javascript/global_objects/array",
+                "Map" to "https://devdocs.io/javascript/global_objects/map",
+                "Set" to "https://devdocs.io/javascript/global_objects/set",
+                "Object" to "https://devdocs.io/javascript/global_objects/object",
+                "Math" to "https://devdocs.io/javascript/global_objects/math",
+                "JSON" to "https://devdocs.io/javascript/global_objects/json",
+                "RegExp" to "https://devdocs.io/javascript/global_objects/regexp",
+                "Promise" to "https://devdocs.io/javascript/global_objects/promise",
+                "Number" to "https://devdocs.io/javascript/global_objects/number"
             )
         )
     )

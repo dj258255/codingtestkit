@@ -2,6 +2,7 @@ package com.codingtestkit.ui
 
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.ProblemSource
+import com.codingtestkit.service.I18n
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.jcef.JBCefApp
@@ -29,24 +30,24 @@ class CodeSubmitDialog(
     private var accepted = false
     private var codeInjected = false
     private var resultCheckTimer: Timer? = null
-    private val statusLabel = JLabel("페이지 로딩 중...").apply {
+    private val statusLabel = JLabel(I18n.t("페이지 로딩 중...", "Loading page...")).apply {
         foreground = Color.GRAY
     }
 
     init {
-        title = "${source.displayName} #$problemId 제출"
+        title = I18n.t("${source.localizedName()} #$problemId 제출", "${source.localizedName()} #$problemId Submit")
         setSize(950, 750)
         init()
     }
 
     override fun createActions(): Array<Action> {
-        myCancelAction.putValue(Action.NAME, "닫기")
+        myCancelAction.putValue(Action.NAME, I18n.t("닫기", "Close"))
         return arrayOf(cancelAction)
     }
 
     override fun createCenterPanel(): JComponent {
         if (!JBCefApp.isSupported()) {
-            return JLabel("<html>JCEF 브라우저를 사용할 수 없습니다.<br>사이트에서 직접 제출해주세요.</html>")
+            return JLabel("<html>${I18n.t("JCEF 브라우저를 사용할 수 없습니다.<br>사이트에서 직접 제출해주세요.", "JCEF browser is not available.<br>Please submit directly on the site.")}</html>")
         }
         return createBrowserPanel()
     }
@@ -59,10 +60,22 @@ class CodeSubmitDialog(
     }
 
     private fun getGuideText(): String = when (source) {
-        ProblemSource.BAEKJOON -> "코드와 언어가 자동 입력됩니다. Cloudflare 인증 후 <b>제출</b> 버튼을 클릭하세요."
-        ProblemSource.PROGRAMMERS -> "코드가 자동 입력됩니다. 확인 후 <b>제출</b> 버튼을 클릭하세요."
-        ProblemSource.SWEA -> "코드가 자동 입력됩니다. 확인 후 <b>제출</b> 버튼을 클릭하세요."
-        ProblemSource.LEETCODE -> "코드가 자동 입력됩니다. 확인 후 <b>Submit</b> 버튼을 클릭하세요."
+        ProblemSource.BAEKJOON -> I18n.t(
+            "코드와 언어가 자동 입력됩니다. Cloudflare 인증 후 <b>제출</b> 버튼을 클릭하세요.",
+            "Code and language are auto-filled. Complete Cloudflare verification, then click <b>Submit</b>.")
+        ProblemSource.PROGRAMMERS -> I18n.t(
+            "코드가 자동 입력됩니다. 확인 후 <b>제출</b> 버튼을 클릭하세요.",
+            "Code is auto-filled. Review and click <b>Submit</b>.")
+        ProblemSource.SWEA -> I18n.t(
+            "코드가 자동 입력됩니다. 확인 후 <b>제출</b> 버튼을 클릭하세요." +
+                "<br>※ 일부 문제(모의 역량테스트 등)는 권한 문제로 제출 페이지가 열리지 않을 수 있습니다. " +
+                "이 경우 SWEA 사이트에서 직접 제출해주세요.",
+            "Code is auto-filled. Review and click <b>Submit</b>." +
+                "<br>※ Some problems (mock tests, etc.) may not open due to permissions. " +
+                "In that case, please submit directly on the SWEA site.")
+        ProblemSource.LEETCODE -> I18n.t(
+            "코드가 자동 입력됩니다. 확인 후 <b>Submit</b> 버튼을 클릭하세요.",
+            "Code is auto-filled. Review and click <b>Submit</b>.")
     }
 
     private fun createBrowserPanel(): JComponent {
@@ -77,8 +90,8 @@ class CodeSubmitDialog(
 
         panel.add(browser.component, BorderLayout.CENTER)
 
-        val injectButton = JButton("코드 붙여넣기").apply {
-            toolTipText = "코드가 자동으로 입력되지 않았다면 이 버튼을 눌러보세요"
+        val injectButton = JButton(I18n.t("코드 붙여넣기", "Paste Code")).apply {
+            toolTipText = I18n.t("코드가 자동으로 입력되지 않았다면 이 버튼을 눌러보세요", "Click if code was not auto-filled")
             addActionListener {
                 when (source) {
                     ProblemSource.BAEKJOON -> injectBaekjoonCode(browser.cefBrowser)
@@ -131,7 +144,7 @@ class CodeSubmitDialog(
                     title.startsWith("__CTK_ACCEPTED__") -> markAccepted()
                     title.startsWith("__CTK_REJECTED__") -> {
                         resultCheckTimer?.stop()
-                        updateStatus("✗ 틀렸습니다. 결과를 확인하세요.", Color(200, 80, 80))
+                        updateStatus(I18n.t("✗ 틀렸습니다. 결과를 확인하세요.", "✗ Wrong answer. Check the result."), Color(200, 80, 80))
                     }
                 }
             }
@@ -175,7 +188,7 @@ class CodeSubmitDialog(
         """.trimIndent()
 
         cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
-        updateStatus("코드 입력 완료! Cloudflare 인증 후 '제출' 버튼을 클릭하세요.", Color(0, 100, 180))
+        updateStatus(I18n.t("코드 입력 완료! Cloudflare 인증 후 '제출' 버튼을 클릭하세요.", "Code filled! Complete Cloudflare verification, then click 'Submit'."), Color(0, 100, 180))
     }
 
     // ─── 프로그래머스 ───
@@ -206,56 +219,120 @@ class CodeSubmitDialog(
         }
     }
 
+    private fun getProgrammersLangDisplayName(): String = when (language) {
+        Language.JAVA -> "Java"
+        Language.PYTHON -> "Python3"
+        Language.CPP -> "C++"
+        Language.KOTLIN -> "Kotlin"
+        Language.JAVASCRIPT -> "JavaScript"
+    }
+
     private fun injectProgrammersCode(cefBrowser: CefBrowser?) {
         if (cefBrowser == null) return
         val escaped = escapeForJs(code)
+        val langValue = programmersLangMap[language] ?: "java"
+        val langDisplay = getProgrammersLangDisplayName()
 
-        // 프로그래머스는 CodeMirror, Monaco, 또는 Ace Editor 사용
         val js = """
             (function() {
-                var injected = false;
+                // ─── 1. 언어 선택 ───
+                var langChanged = false;
 
-                // 1. CodeMirror
-                var cmEl = document.querySelector('.CodeMirror');
-                if (cmEl && cmEl.CodeMirror) {
-                    cmEl.CodeMirror.setValue('$escaped');
-                    injected = true;
-                }
-
-                // 2. Monaco Editor
-                if (!injected && typeof monaco !== 'undefined') {
-                    try {
-                        var editors = monaco.editor.getEditors();
-                        if (editors && editors.length > 0) {
-                            editors[0].setValue('$escaped');
-                            injected = true;
+                // 방법 A: <select> 요소 (구 UI)
+                var selects = document.querySelectorAll('select[name="language"], select#language, select[class*="lang"]');
+                for (var i = 0; i < selects.length; i++) {
+                    var sel = selects[i];
+                    for (var k = 0; k < sel.options.length; k++) {
+                        if (sel.options[k].value === '$langValue' || sel.options[k].textContent.trim() === '$langDisplay') {
+                            sel.selectedIndex = k;
+                            sel.dispatchEvent(new Event('change', {bubbles: true}));
+                            langChanged = true;
+                            break;
                         }
-                    } catch(e) {}
+                    }
+                    if (langChanged) break;
                 }
 
-                // 3. Ace Editor
-                if (!injected && typeof ace !== 'undefined') {
-                    var aceEls = document.querySelectorAll('.ace_editor');
-                    if (aceEls.length > 0) {
-                        var editor = ace.edit(aceEls[0]);
-                        editor.setValue('$escaped', -1);
-                        injected = true;
+                // 방법 B: 커스텀 드롭다운 버튼 (신 UI)
+                if (!langChanged) {
+                    var btns = document.querySelectorAll('button, [role="button"], [class*="dropdown"] > *');
+                    var langBtn = null;
+                    var knownLangs = ['C++','Java','Python3','Python','JavaScript','Kotlin','C#','Go','Ruby','Swift','TypeScript','C'];
+                    for (var i = 0; i < btns.length; i++) {
+                        var txt = (btns[i].textContent || '').trim();
+                        for (var k = 0; k < knownLangs.length; k++) {
+                            if (txt === knownLangs[k] || txt.indexOf(knownLangs[k]) === 0) {
+                                langBtn = btns[i];
+                                break;
+                            }
+                        }
+                        if (langBtn) break;
+                    }
+                    if (langBtn && langBtn.textContent.trim() !== '$langDisplay') {
+                        langBtn.click();
+                        setTimeout(function() {
+                            var items = document.querySelectorAll('[role="menuitem"], [role="option"], li, div[class*="option"], ul li, [class*="menu"] li, [class*="dropdown"] li');
+                            for (var j = 0; j < items.length; j++) {
+                                var itemText = (items[j].textContent || '').trim();
+                                if (itemText === '$langDisplay' || itemText === '$langValue') {
+                                    items[j].click();
+                                    break;
+                                }
+                            }
+                            setTimeout(function() { _injectCode(); }, 500);
+                        }, 300);
+                        return;
                     }
                 }
 
-                // 4. textarea fallback
-                if (!injected) {
-                    var ta = document.querySelector('textarea.code-editor, textarea[name=code], textarea');
-                    if (ta) {
-                        ta.value = '$escaped';
-                        ta.dispatchEvent(new Event('input', {bubbles: true}));
+                _injectCode();
+
+                // ─── 2. 코드 입력 ───
+                function _injectCode() {
+                    var injected = false;
+
+                    // CodeMirror
+                    var cmEl = document.querySelector('.CodeMirror');
+                    if (cmEl && cmEl.CodeMirror) {
+                        cmEl.CodeMirror.setValue('$escaped');
+                        injected = true;
+                    }
+
+                    // Monaco Editor
+                    if (!injected && typeof monaco !== 'undefined') {
+                        try {
+                            var editors = monaco.editor.getEditors();
+                            if (editors && editors.length > 0) {
+                                editors[0].setValue('$escaped');
+                                injected = true;
+                            }
+                        } catch(e) {}
+                    }
+
+                    // Ace Editor
+                    if (!injected && typeof ace !== 'undefined') {
+                        var aceEls = document.querySelectorAll('.ace_editor');
+                        if (aceEls.length > 0) {
+                            var editor = ace.edit(aceEls[0]);
+                            editor.setValue('$escaped', -1);
+                            injected = true;
+                        }
+                    }
+
+                    // textarea fallback
+                    if (!injected) {
+                        var ta = document.querySelector('textarea.code-editor, textarea[name=code], textarea');
+                        if (ta) {
+                            ta.value = '$escaped';
+                            ta.dispatchEvent(new Event('input', {bubbles: true}));
+                        }
                     }
                 }
             })();
         """.trimIndent()
 
         cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
-        updateStatus("코드 입력 완료! 확인 후 '제출 후 채점하기' 버튼을 클릭하세요.", Color(0, 100, 180))
+        updateStatus(I18n.t("코드 입력 완료! 확인 후 '제출 후 채점하기' 버튼을 클릭하세요.", "Code filled! Review and click 'Submit' button."), Color(0, 100, 180))
     }
 
     // ─── SWEA ───
@@ -350,7 +427,7 @@ class CodeSubmitDialog(
         """.trimIndent()
 
         cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
-        updateStatus("코드 입력 완료! 확인 후 '제출' 버튼을 클릭하세요.", Color(0, 100, 180))
+        updateStatus(I18n.t("코드 입력 완료! 확인 후 '제출' 버튼을 클릭하세요.", "Code filled! Review and click 'Submit' button."), Color(0, 100, 180))
     }
 
     // ─── LeetCode ───
@@ -372,40 +449,96 @@ class CodeSubmitDialog(
         }
     }
 
+    private fun getLeetCodeLangName(): String = when (language) {
+        Language.JAVA -> "Java"
+        Language.PYTHON -> "Python3"
+        Language.CPP -> "C++"
+        Language.KOTLIN -> "Kotlin"
+        Language.JAVASCRIPT -> "JavaScript"
+    }
+
     private fun injectLeetCodeCode(cefBrowser: CefBrowser?) {
         if (cefBrowser == null) return
         val escaped = escapeForJs(code)
+        val langName = getLeetCodeLangName()
 
         val js = """
             (function() {
-                var injected = false;
-
-                // Monaco Editor (LeetCode uses Monaco)
-                if (typeof monaco !== 'undefined') {
-                    try {
-                        var editors = monaco.editor.getEditors();
-                        if (editors && editors.length > 0) {
-                            editors[0].setValue('$escaped');
-                            injected = true;
+                // 1. 언어 선택 변경
+                var langBtn = document.querySelector('button[id*="lang"]') ||
+                              document.querySelector('[class*="lang-btn"]') ||
+                              document.querySelector('[data-cy="lang-btn"]');
+                if (!langBtn) {
+                    // 최신 LeetCode UI: 드롭다운 버튼 찾기
+                    var btns = document.querySelectorAll('button');
+                    for (var i = 0; i < btns.length; i++) {
+                        var txt = btns[i].textContent || '';
+                        if (txt.match(/^(C\+\+|Java|Python|Python3|JavaScript|Kotlin|C#|Go|Ruby|Swift|TypeScript|Rust|PHP|Scala)/)) {
+                            langBtn = btns[i];
+                            break;
                         }
-                    } catch(e) {}
-                }
-
-                // Fallback: CodeMirror
-                if (!injected) {
-                    var cmEl = document.querySelector('.CodeMirror');
-                    if (cmEl && cmEl.CodeMirror) {
-                        cmEl.CodeMirror.setValue('$escaped');
-                        injected = true;
                     }
                 }
+                if (langBtn && langBtn.textContent.trim() !== '$langName') {
+                    console.log('LeetCode: current lang=' + langBtn.textContent.trim() + ', switching to $langName');
+                    langBtn.click();
+                    // 드롭다운 메뉴에서 올바른 언어 선택
+                    setTimeout(function() {
+                        var found = false;
+                        // 팝오버/드롭다운 내 모든 요소를 순회하며 정확한 텍스트 매칭
+                        var allEls = document.querySelectorAll('div, span, li, a, button, p, [role="menuitem"], [role="option"]');
+                        for (var j = 0; j < allEls.length; j++) {
+                            var el = allEls[j];
+                            // 자식 노드 없이 직접 텍스트를 가진 리프 요소만 체크
+                            var directText = '';
+                            for (var c = 0; c < el.childNodes.length; c++) {
+                                if (el.childNodes[c].nodeType === 3) directText += el.childNodes[c].textContent;
+                            }
+                            directText = directText.trim();
+                            if (!directText) directText = el.textContent.trim();
+                            if (directText === '$langName' && el.offsetParent !== null) {
+                                el.click();
+                                console.log('LeetCode: clicked language element', el.tagName, directText);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) console.log('LeetCode: could not find $langName in dropdown');
+                        // 언어 변경 후 코드 입력 (약간의 딜레이)
+                        setTimeout(function() { _injectCode(); }, 500);
+                    }, 300);
+                } else {
+                    _injectCode();
+                }
 
-                console.log('LeetCode code injection:', injected ? 'success' : 'failed');
+                // 2. 코드 입력
+                function _injectCode() {
+                    var injected = false;
+                    // Monaco Editor (LeetCode uses Monaco)
+                    if (typeof monaco !== 'undefined') {
+                        try {
+                            var editors = monaco.editor.getEditors();
+                            if (editors && editors.length > 0) {
+                                editors[0].setValue('$escaped');
+                                injected = true;
+                            }
+                        } catch(e) {}
+                    }
+                    // Fallback: CodeMirror
+                    if (!injected) {
+                        var cmEl = document.querySelector('.CodeMirror');
+                        if (cmEl && cmEl.CodeMirror) {
+                            cmEl.CodeMirror.setValue('$escaped');
+                            injected = true;
+                        }
+                    }
+                    console.log('LeetCode code injection:', injected ? 'success' : 'failed');
+                }
             })();
         """.trimIndent()
 
         cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
-        updateStatus("코드 입력 완료! 확인 후 'Submit' 버튼을 클릭하세요.", Color(0, 100, 180))
+        updateStatus(I18n.t("코드 입력 완료! 확인 후 'Submit' 버튼을 클릭하세요.", "Code filled! Review and click 'Submit' button."), Color(0, 100, 180))
     }
 
     // ─── 공통 ───
@@ -422,7 +555,7 @@ class CodeSubmitDialog(
     private fun markSubmitted() {
         submitted = true
         SwingUtilities.invokeLater {
-            statusLabel.text = "제출 완료! 채점 결과를 확인하는 중..."
+            statusLabel.text = I18n.t("제출 완료! 채점 결과를 확인하는 중...", "Submitted! Checking results...")
             statusLabel.foreground = Color(0, 100, 180)
         }
     }
@@ -432,7 +565,7 @@ class CodeSubmitDialog(
         accepted = true
         resultCheckTimer?.stop()
         SwingUtilities.invokeLater {
-            statusLabel.text = "✓ 맞았습니다! 닫기 버튼을 눌러주세요."
+            statusLabel.text = I18n.t("✓ 맞았습니다! 닫기 버튼을 눌러주세요.", "✓ Accepted! You can close this dialog.")
             statusLabel.foreground = Color(0, 130, 0)
             onAccepted?.invoke()
         }

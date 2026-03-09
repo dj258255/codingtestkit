@@ -278,44 +278,33 @@ object ProgrammersCrawler {
     }
 
     private fun extractDifficulty(doc: Document): String {
-        // 전체 페이지 텍스트에서 Lv. 패턴 검색
-        val levelPattern = Regex("Lv\\.?\\s*(\\d)")
+        // 1. data-challenge-level 속성 (가장 신뢰도 높음)
+        val challengeLevel = doc.select("[data-challenge-level]").attr("data-challenge-level")
+        if (challengeLevel.isNotBlank()) return "Level$challengeLevel"
 
-        // 1. 브레드크럼
-        for (li in doc.select("ol.breadcrumb li, .breadcrumb li, .algorithm-nav li, nav li")) {
-            val match = levelPattern.find(li.text())
-            if (match != null) return "Level${match.groupValues[1]}"
-        }
-
-        // 2. 챌린지 타이틀, 헤더 영역
-        for (sel in listOf(".challenge-title", ".lesson-title", "h2", "h3", ".title")) {
-            val match = levelPattern.find(doc.select(sel).text())
-            if (match != null) return "Level${match.groupValues[1]}"
-        }
-
-        // 3. 레벨 배지
-        for (sel in listOf("[class*=level]", "[class*=badge]", "span.badge")) {
-            val match = levelPattern.find(doc.select(sel).text())
-            if (match != null) return "Level${match.groupValues[1]}"
-        }
-
-        // 4. title 태그
-        val titleMatch = levelPattern.find(doc.select("title").text())
-        if (titleMatch != null) return "Level${titleMatch.groupValues[1]}"
-
-        // 5. script 태그의 JSON에서 level 필드 추출
+        // 2. script 태그의 JSON에서 level 필드 추출
         for (script in doc.select("script")) {
             val data = script.data()
-            // "level": 1 또는 "difficulty": "Level 1" 패턴
             val jsonMatch = Regex("\"level\"\\s*:\\s*(\\d)").find(data)
             if (jsonMatch != null) return "Level${jsonMatch.groupValues[1]}"
             val diffMatch = Regex("\"difficulty\"\\s*:\\s*\"?(?:Level\\s*)?(\\d)").find(data)
             if (diffMatch != null) return "Level${diffMatch.groupValues[1]}"
         }
 
-        // 6. 전체 HTML에서 마지막 시도
-        val bodyMatch = levelPattern.find(doc.body().text())
-        if (bodyMatch != null) return "Level${bodyMatch.groupValues[1]}"
+        // 3. hackle 이벤트 JSON에서 challenge_level 추출
+        val hackleMatch = Regex("\"challenge_level\"\\s*:\\s*(\\d)").find(doc.html())
+        if (hackleMatch != null) return "Level${hackleMatch.groupValues[1]}"
+
+        // 4. HTML 요소에서 Lv. 패턴 검색
+        val levelPattern = Regex("Lv\\.?\\s*(\\d)")
+        for (sel in listOf(
+            "ol.breadcrumb li", ".breadcrumb li", ".algorithm-nav li", "nav li",
+            ".challenge-title", ".lesson-title", "h2", "h3", ".title",
+            "[class*=level]", "[class*=badge]", "span.badge"
+        )) {
+            val match = levelPattern.find(doc.select(sel).text())
+            if (match != null) return "Level${match.groupValues[1]}"
+        }
 
         return "Unrated"
     }

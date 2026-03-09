@@ -4,6 +4,7 @@ import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.SolvedAcApi
+import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -73,10 +74,19 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
     ) {
         override fun isCellEditable(row: Int, column: Int) = false
     }
-    private val resultTable = JBTable(tableModel)
+    private val resultTable = JBTable(tableModel).apply {
+        emptyText.text = I18n.t("표시할 항목이 없습니다", "No items to display")
+    }
     private val statusLabel = JLabel(I18n.t("문제 제목이나 번호를 입력하세요", "Enter a problem title or number"))
 
     private var results: List<SolvedAcApi.ProblemInfo> = emptyList()
+    private var showingTranslated = false
+    private var translatedTitles: Map<Int, String> = emptyMap()
+    private val translateButton = JButton("EN").apply {
+        toolTipText = I18n.t("영어로 번역", "Translate to English")
+        preferredSize = Dimension(JBUI.scale(50), preferredSize.height)
+        addActionListener { toggleTranslation() }
+    }
     var selectedProblemId: Int? = null
         private set
 
@@ -116,10 +126,14 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
 
         panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
 
-        // 상태
+        // 하단: 상태 라벨 + 번역 버튼
         statusLabel.foreground = JBColor.GRAY
         statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
-        panel.add(statusLabel, BorderLayout.SOUTH)
+        val bottomPanel = JPanel(BorderLayout()).apply {
+            add(statusLabel, BorderLayout.CENTER)
+            add(translateButton, BorderLayout.EAST)
+        }
+        panel.add(bottomPanel, BorderLayout.SOUTH)
 
         // 이벤트
         setupAutocomplete()
@@ -192,7 +206,8 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
 
         for (p in suggestions.take(10)) {
             val level = SolvedAcApi.levelToString(p.level)
-            val text = "${p.problemId}. ${p.title}  [$level]"
+            val title = p.title
+            val text = "${p.problemId}. $title  [$level]"
             val item = JMenuItem(text).apply {
                 font = font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
             }
@@ -252,10 +267,12 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
                 val result = SolvedAcApi.searchProblems(query, sort)
                 results = result.problems
                 SwingUtilities.invokeLater {
+                    translatedTitles = emptyMap() // 새 검색 시 번역 캐시 초기화
                     for (p in results) {
+                        val title = if (showingTranslated) translatedTitles[p.problemId] ?: p.title else p.title
                         tableModel.addRow(arrayOf(
                             p.problemId,
-                            p.title,
+                            title,
                             SolvedAcApi.levelToString(p.level),
                             p.tags.take(3).joinToString(", "),
                             p.acceptedUserCount
@@ -278,6 +295,52 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
                 }
             }
         }.start()
+    }
+
+    private fun toggleTranslation() {
+        if (results.isEmpty()) return
+        showingTranslated = !showingTranslated
+        if (showingTranslated && translatedTitles.isEmpty()) {
+            translateButton.isEnabled = false
+            translateButton.text = "..."
+            Thread {
+                try {
+                    val batch = results.map { it.title }.joinToString("\n")
+                    val translated = TranslateService.translate(batch, "ko", "en")
+                    val translatedList = translated.split("\n")
+                    val map = mutableMapOf<Int, String>()
+                    for ((idx, p) in results.withIndex()) {
+                        if (idx < translatedList.size) map[p.problemId] = translatedList[idx].trim()
+                    }
+                    translatedTitles = map
+                    SwingUtilities.invokeLater { applyTranslation(); translateButton.isEnabled = true }
+                } catch (_: Exception) {
+                    SwingUtilities.invokeLater {
+                        showingTranslated = false
+                        translateButton.text = "EN"
+                        translateButton.isEnabled = true
+                        statusLabel.text = I18n.t("번역 실패", "Translation failed")
+                        statusLabel.foreground = JBColor.RED
+                    }
+                }
+            }.start()
+        } else {
+            applyTranslation()
+        }
+    }
+
+    private fun applyTranslation() {
+        translateButton.text = if (showingTranslated) "KO" else "EN"
+        translateButton.toolTipText = if (showingTranslated)
+            I18n.t("한국어 원문 보기", "Show original Korean") else I18n.t("영어로 번역", "Translate to English")
+        for ((idx, p) in results.withIndex()) {
+            if (idx < tableModel.rowCount) {
+                val title = if (showingTranslated) translatedTitles[p.problemId] ?: p.title else p.title
+                tableModel.setValueAt(title, idx, 1)
+                val tags = if (showingTranslated) p.tagsEn.take(3).joinToString(", ") else p.tags.take(3).joinToString(", ")
+                tableModel.setValueAt(tags, idx, 3)
+            }
+        }
     }
 
     override fun getPreferredFocusedComponent(): JComponent = searchField

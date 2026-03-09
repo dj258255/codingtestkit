@@ -45,6 +45,9 @@ class SweaFetchDialog(
     private val statusLabel = JLabel("SWEA 문제 페이지 로딩 중...").apply {
         foreground = Color.GRAY
     }
+    private var browserPanel: JPanel? = null
+    private var browserWrapper: JComponent? = null
+    private var showBrowserBtn: JButton? = null
 
     init {
         // 입력이 알파벳을 포함하면 contestProbId로 직접 접근
@@ -83,13 +86,15 @@ class SweaFetchDialog(
     private fun createBrowserPanel(): JComponent {
         val panel = JPanel(BorderLayout())
         panel.preferredSize = Dimension(480, 100)
+        browserPanel = panel
 
         val browser = JBCefBrowser(getInitialUrl())
 
         // 브라우저는 보이지 않지만 렌더링을 위해 컴포넌트 계층에 포함
-        val browserWrapper = browser.component
-        browserWrapper.preferredSize = Dimension(1024, 768)
-        browserWrapper.minimumSize = Dimension(0, 0)
+        val bWrapper = browser.component
+        bWrapper.preferredSize = Dimension(1024, 768)
+        bWrapper.minimumSize = Dimension(0, 0)
+        browserWrapper = bWrapper
 
         // 로딩 표시만 보이는 패널
         val loadingPanel = JPanel(BorderLayout(8, 8)).apply {
@@ -99,30 +104,31 @@ class SweaFetchDialog(
         loadingPanel.add(statusLabel, BorderLayout.CENTER)
 
         // 브라우저 보기 토글 버튼
-        val showBrowserBtn = JButton("브라우저 보기")
-        showBrowserBtn.addActionListener {
-            if (browserWrapper.isVisible) {
-                browserWrapper.isVisible = false
+        val bBtn = JButton("브라우저 보기")
+        showBrowserBtn = bBtn
+        bBtn.addActionListener {
+            if (bWrapper.isVisible) {
+                bWrapper.isVisible = false
                 panel.preferredSize = Dimension(480, 100)
-                showBrowserBtn.text = "브라우저 보기"
+                bBtn.text = "브라우저 보기"
                 setSize(500, 150)
             } else {
-                browserWrapper.isVisible = true
+                bWrapper.isVisible = true
                 panel.preferredSize = Dimension(880, 650)
-                showBrowserBtn.text = "브라우저 숨기기"
+                bBtn.text = "브라우저 숨기기"
                 setSize(900, 700)
             }
             panel.revalidate()
         }
         val btnPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 0, 0))
-        btnPanel.add(showBrowserBtn)
+        btnPanel.add(bBtn)
         loadingPanel.add(btnPanel, BorderLayout.SOUTH)
 
         panel.add(loadingPanel, BorderLayout.NORTH)
 
         // 브라우저는 기본적으로 숨김
-        browserWrapper.isVisible = false
-        panel.add(browserWrapper, BorderLayout.CENTER)
+        bWrapper.isVisible = false
+        panel.add(bWrapper, BorderLayout.CENTER)
 
         val jsQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
         jsQuery.addHandler { result ->
@@ -140,6 +146,24 @@ class SweaFetchDialog(
         return panel
     }
 
+    /**
+     * 자동 이동 실패 시: 브라우저를 표시하고 수동 클릭 안내
+     */
+    private fun showManualFallback() {
+        statusLabel.text = "자동 이동에 실패했습니다. 브라우저에서 문제를 직접 클릭해주세요."
+        statusLabel.foreground = Color(200, 120, 0)
+        // 브라우저 자동 표시
+        val bw = browserWrapper ?: return
+        val bp = browserPanel ?: return
+        if (!bw.isVisible) {
+            bw.isVisible = true
+            bp.preferredSize = Dimension(880, 650)
+            showBrowserBtn?.text = "브라우저 숨기기"
+            setSize(900, 700)
+            bp.revalidate()
+        }
+    }
+
     private fun handlePageLoaded(cefBrowser: CefBrowser?, jsQuery: JBCefJSQuery) {
         val url = cefBrowser?.url ?: ""
 
@@ -147,6 +171,11 @@ class SweaFetchDialog(
         when {
             // 상세 페이지에 도착
             url.contains("problemDetail") && url.contains("contestProbId") -> {
+                // URL에서 contestProbId 추출하여 필드에 저장
+                val cpMatch = Regex("contestProbId=([A-Za-z0-9_]+)").find(url)
+                if (cpMatch != null && contestProbId.isNullOrBlank()) {
+                    contestProbId = cpMatch.groupValues[1]
+                }
                 fetchState = FetchState.EXTRACTING
                 SwingUtilities.invokeLater {
                     statusLabel.text = "문제 상세 페이지 로딩 완료, 콘텐츠 추출 중..."
@@ -170,17 +199,28 @@ class SweaFetchDialog(
                 SwingUtilities.invokeLater {
                     statusLabel.text = "문제 목록에서 #$problemId 검색 중..."
                 }
-                // 검색 후 contestProbId 추출 시도를 여러 번 반복
+                // 검색 결과 렌더링 대기 후 여러 번 시도 (AngularJS 비동기 렌더링 고려)
                 Timer(2000) {
                     if (!extracted && fetchState == FetchState.SEARCHING) searchForProblem(cefBrowser, jsQuery)
                 }.apply { isRepeats = false; start() }
 
-                Timer(5000) {
+                Timer(4000) {
                     if (!extracted && fetchState == FetchState.SEARCHING) searchForProblem(cefBrowser, jsQuery)
                 }.apply { isRepeats = false; start() }
 
-                Timer(8000) {
+                Timer(7000) {
                     if (!extracted && fetchState == FetchState.SEARCHING) searchForProblem(cefBrowser, jsQuery)
+                }.apply { isRepeats = false; start() }
+
+                Timer(11000) {
+                    if (!extracted && fetchState == FetchState.SEARCHING) searchForProblem(cefBrowser, jsQuery)
+                }.apply { isRepeats = false; start() }
+
+                // 최종 폴백: 자동 이동 실패 시 브라우저를 보여주고 안내 메시지
+                Timer(15000) {
+                    if (!extracted && fetchState == FetchState.SEARCHING) {
+                        SwingUtilities.invokeLater { showManualFallback() }
+                    }
                 }.apply { isRepeats = false; start() }
             }
             // 직접 contestProbId로 접근한 경우 (알파벳 ID)
@@ -253,7 +293,7 @@ class SweaFetchDialog(
     }
 
     /**
-     * 문제 목록 페이지에서 contestProbId를 추출하여 상세 페이지로 직접 이동
+     * 문제 목록 페이지에서 contestProbId를 추출하거나 클릭하여 상세 페이지로 이동
      */
     private fun searchForProblem(cefBrowser: CefBrowser?, jsQuery: JBCefJSQuery) {
         if (cefBrowser == null || extracted) return
@@ -263,151 +303,147 @@ class SweaFetchDialog(
         val js = """
             (function() {
                 var problemNum = '$problemId';
+                console.log('SWEA search: looking for problem', problemNum);
 
-                // 전략 1: AngularJS scope에서 문제 리스트 데이터 추출
-                if (typeof angular !== 'undefined') {
+                // 문제번호가 포함된 행(row)를 찾는 헬퍼
+                function findProblemRow() {
+                    // body 텍스트에 문제번호가 없으면 아직 렌더링 안 된 것
+                    if (document.body.textContent.indexOf(problemNum + '.') < 0 &&
+                        document.body.textContent.indexOf(problemNum + ' ') < 0) {
+                        console.log('SWEA search: problem number not in DOM yet');
+                        return null;
+                    }
+
+                    // 모든 클릭 가능 요소(a, [ng-click])에서 문제번호 근처 것 찾기
+                    var clickables = document.querySelectorAll('a, [ng-click]');
+                    for (var i = 0; i < clickables.length; i++) {
+                        var el = clickables[i];
+                        // 가장 가까운 행 컨테이너 찾기 (다양한 HTML 구조 대응)
+                        var row = el.closest('tr, li, [ng-repeat], .list_item, .problem_item') ||
+                                  el.parentElement && el.parentElement.closest('tr, li, [ng-repeat], div') ||
+                                  el.parentElement;
+                        if (!row) continue;
+                        var rowText = row.textContent || '';
+                        if (rowText.indexOf(problemNum + '.') >= 0 || rowText.indexOf(problemNum + ' ') >= 0) {
+                            // ng-click이 있는 요소만 반환 (클릭 가능한 것)
+                            if (el.hasAttribute('ng-click') || el.tagName === 'A') {
+                                return el;
+                            }
+                        }
+                    }
+                    return null;
+                }
+
+                // 전략 1: AngularJS scope에서 contestProbId 직접 추출 (가장 빠름)
+                var targetEl = findProblemRow();
+                if (targetEl && typeof angular !== 'undefined') {
                     try {
-                        var ctrl = document.querySelector('[ng-controller]');
-                        if (ctrl) {
-                            var scope = angular.element(ctrl).scope();
-                            if (scope) {
-                                // scope 내 배열에서 문제 데이터 찾기
-                                var searchInObj = function(obj, depth) {
-                                    if (depth > 3 || !obj) return null;
-                                    if (Array.isArray(obj)) {
-                                        for (var i = 0; i < obj.length; i++) {
-                                            var item = obj[i];
-                                            if (item && typeof item === 'object') {
-                                                // contestProbId가 있고, 문제 번호가 일치하는 항목 찾기
-                                                var id = item.contestProbId || item.problemId || item.probId;
-                                                var num = item.problemNumber || item.probNo || item.no || item.problemNo;
-                                                var title = item.problemTitle || item.title || item.problemName || '';
-                                                if (id && (String(num) === problemNum || title.indexOf(problemNum) === 0)) {
-                                                    return String(id);
-                                                }
-                                            }
-                                        }
-                                    } else if (typeof obj === 'object') {
-                                        for (var key in obj) {
-                                            if (key.charAt(0) === '$' || key === 'this' || key === 'constructor') continue;
-                                            try {
-                                                var found = searchInObj(obj[key], depth + 1);
-                                                if (found) return found;
-                                            } catch(e) {}
-                                        }
-                                    }
-                                    return null;
-                                };
-                                var found = searchInObj(scope, 0);
-                                if (found) {
-                                    var result = 'FOUND:' + found;
-                                    $callbackJs
-                                    return;
+                        var sc = angular.element(targetEl).scope();
+                        if (sc) {
+                            // scope에서 contestProbId를 가진 객체 찾기
+                            var cpId = null;
+                            // ng-repeat item 변수들을 직접 탐색
+                            var commonNames = ['item', 'problem', 'prob', 'p', 'row', 'data'];
+                            for (var ci = 0; ci < commonNames.length; ci++) {
+                                var obj = sc[commonNames[ci]];
+                                if (obj && typeof obj === 'object' && obj.contestProbId) {
+                                    cpId = String(obj.contestProbId);
+                                    break;
                                 }
                             }
-                        }
-                    } catch(e) {}
-                }
-
-                // 전략 2: ng-click 또는 href에서 contestProbId 추출
-                var allElements = document.querySelectorAll('[ng-click], a[href*="contestProbId"]');
-                for (var i = 0; i < allElements.length; i++) {
-                    var el = allElements[i];
-                    var context = el.closest('tr, li, div') || el;
-                    var text = context.textContent || '';
-                    // 이 요소 근처에 문제 번호가 있는지 확인
-                    if (text.indexOf(problemNum + '.') >= 0 || text.match(new RegExp('\\b' + problemNum + '\\b'))) {
-                        var ngClick = el.getAttribute('ng-click') || '';
-                        var href = el.getAttribute('href') || '';
-                        var combined = ngClick + ' ' + href;
-                        var idMatch = combined.match(/contestProbId[=:'"\\s]+([A-Za-z0-9_]+)/);
-                        if (idMatch) {
-                            var result = 'FOUND:' + idMatch[1];
-                            $callbackJs
-                            return;
-                        }
-                    }
-                }
-
-                // 전략 3: 검색 실행 후 재시도를 위해 AngularJS 검색 트리거
-                var inp = document.querySelector('input[placeholder*="번호"], input[placeholder*="키워드"], input[ng-model*="problemTitle"], input[ng-model*="search"]');
-                if (inp) {
-                    if (typeof angular !== 'undefined') {
-                        try {
-                            var scope = angular.element(inp).scope();
-                            var ngModel = inp.getAttribute('ng-model');
-                            if (scope && ngModel) {
-                                scope.${'$'}apply(function() {
-                                    var parts = ngModel.split('.');
-                                    var obj = scope;
-                                    for (var k = 0; k < parts.length - 1; k++) {
-                                        if (obj[parts[k]]) obj = obj[parts[k]];
-                                    }
-                                    obj[parts[parts.length - 1]] = problemNum;
-                                });
+                            // scope 1단계 탐색 (object이면서 contestProbId 속성이 있는 것)
+                            if (!cpId) {
+                                for (var key in sc) {
+                                    if (key.charAt(0) === '$') continue;
+                                    try {
+                                        var v = sc[key];
+                                        if (v && typeof v === 'object' && !Array.isArray(v) && v.contestProbId) {
+                                            cpId = String(v.contestProbId);
+                                            break;
+                                        }
+                                    } catch(e) {}
+                                }
                             }
-                            // 검색 함수 호출
-                            var ctrlScope = angular.element(document.querySelector('[ng-controller]')).scope();
-                            if (ctrlScope) {
-                                var fnNames = ['search', 'fnSearch', 'searchProblem', 'goSearch', 'doSearch', 'fnSelectList', 'selectList'];
-                                for (var j = 0; j < fnNames.length; j++) {
-                                    if (typeof ctrlScope[fnNames[j]] === 'function') {
-                                        ctrlScope.${'$'}apply(function() { ctrlScope[fnNames[j]](); });
-                                        break;
+                            // ng-click 표현식에서 인자 resolve
+                            if (!cpId) {
+                                var ngExpr = targetEl.getAttribute('ng-click') || '';
+                                var exprMatch = ngExpr.match(/\(([^)]+)\)/);
+                                if (exprMatch) {
+                                    var args = exprMatch[1].split(',');
+                                    for (var ai = 0; ai < args.length; ai++) {
+                                        var parts = args[ai].trim().split('.');
+                                        var val = sc;
+                                        for (var pi = 0; pi < parts.length; pi++) {
+                                            if (val != null) val = val[parts[pi]];
+                                        }
+                                        if (val && typeof val === 'string' && val.length >= 8) {
+                                            cpId = val;
+                                            break;
+                                        }
                                     }
                                 }
                             }
-                        } catch(e) {}
-                    }
-                    // 값 직접 설정 + 이벤트
-                    inp.focus();
-                    inp.value = problemNum;
-                    ['input', 'change', 'keyup'].forEach(function(evt) {
-                        inp.dispatchEvent(new Event(evt, {bubbles: true}));
-                    });
-                    // Enter 키
-                    setTimeout(function() {
-                        inp.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true}));
-                        inp.dispatchEvent(new KeyboardEvent('keypress', {key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true}));
-                    }, 300);
-                }
-
-                // 전략 4: 모든 ng-click, onclick, href 속성에서 contestProbId 추출
-                var allWithAction = document.querySelectorAll('[ng-click], [onclick], a[href]');
-                for (var a = 0; a < allWithAction.length; a++) {
-                    var el = allWithAction[a];
-                    var attr = (el.getAttribute('ng-click') || '') + ' ' +
-                               (el.getAttribute('onclick') || '') + ' ' +
-                               (el.getAttribute('href') || '');
-                    var idMatch = attr.match(/contestProbId[=:'"\\s]+([A-Za-z0-9_]{10,30})/);
-                    if (!idMatch) idMatch = attr.match(/['"]([A-Za-z0-9_]{14,25})['"]/);
-                    if (idMatch) {
-                        // 이 요소 또는 근처에 문제 번호가 있는지 확인
-                        var container = el.closest('tr, li, div, section') || el.parentElement;
-                        var nearby = (container ? container.textContent : el.textContent) || '';
-                        if (nearby.indexOf(problemNum + '.') >= 0 || nearby.match(new RegExp('\\b' + problemNum + '\\b'))) {
-                            var result = 'FOUND:' + idMatch[1];
-                            $callbackJs
-                            return;
+                            if (cpId) {
+                                console.log('SWEA search: found contestProbId from scope:', cpId);
+                                var result = 'FOUND:' + cpId;
+                                $callbackJs
+                                return;
+                            }
                         }
-                    }
+                    } catch(e) { console.log('SWEA search scope err:', e); }
                 }
 
-                // 전략 5: 페이지 HTML 전체에서 문제 번호 근처의 contestProbId 패턴 검색
+                // 전략 2: HTML에서 contestProbId 패턴 추출
                 var bodyHtml = document.body.innerHTML;
-                // 문제 번호 주변 500자 범위에서 contestProbId 찾기
                 var numIdx = bodyHtml.indexOf('>' + problemNum + '.');
-                if (numIdx < 0) numIdx = bodyHtml.indexOf(problemNum + '. ');
+                if (numIdx < 0) numIdx = bodyHtml.indexOf(problemNum + '.');
                 if (numIdx >= 0) {
-                    var startIdx = Math.max(0, numIdx - 2000);
-                    var endIdx = Math.min(bodyHtml.length, numIdx + 2000);
-                    var slice = bodyHtml.substring(startIdx, endIdx);
-                    var sliceMatch = slice.match(/contestProbId[=:'"\\s]+([A-Za-z0-9_]{10,30})/);
-                    if (sliceMatch) {
-                        var result = 'FOUND:' + sliceMatch[1];
+                    var slice = bodyHtml.substring(Math.max(0, numIdx - 3000), Math.min(bodyHtml.length, numIdx + 3000));
+                    var m = slice.match(/contestProbId[=:'"\\s]+([A-Za-z0-9_]{10,30})/);
+                    if (m) {
+                        console.log('SWEA search: found contestProbId from HTML:', m[1]);
+                        var result = 'FOUND:' + m[1];
                         $callbackJs
                         return;
                     }
+                }
+
+                // 전략 3: 제목 링크를 직접 클릭하고 URL 변화 감시
+                if (targetEl) {
+                    console.log('SWEA search: clicking element', targetEl.tagName, (targetEl.textContent||'').substring(0,40));
+                    var startUrl = window.location.href;
+
+                    // 네이티브 click() 호출 (AngularJS ng-click 핸들러도 작동)
+                    targetEl.click();
+
+                    // URL 변화 모니터링 (SPA 네비게이션 감지)
+                    var checkCnt = 0;
+                    var monitor = setInterval(function() {
+                        checkCnt++;
+                        var curUrl = window.location.href;
+                        if (curUrl !== startUrl) {
+                            clearInterval(monitor);
+                            var m = curUrl.match(/contestProbId=([A-Za-z0-9_]+)/);
+                            if (m) {
+                                console.log('SWEA search: navigated, id=', m[1]);
+                                var result = 'FOUND:' + m[1];
+                                $callbackJs
+                            }
+                            return;
+                        }
+                        if (checkCnt > 20) {
+                            clearInterval(monitor);
+                            // 최종 폴백: HTML에서 contestProbId 찾아서 직접 이동
+                            var html = document.body.innerHTML;
+                            var p = html.match(/contestProbId[=:'"\\s]+([A-Za-z0-9_]{10,30})/);
+                            if (p) {
+                                console.log('SWEA search fallback:', p[1]);
+                                window.location.href = 'https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=' + p[1];
+                            }
+                        }
+                    }, 500);
+                } else {
+                    console.log('SWEA search: no clickable element found yet');
                 }
             })();
         """.trimIndent()
@@ -434,6 +470,7 @@ class SweaFetchDialog(
                     'div.problem_box > h3'
                 ];
                 result.title = '';
+                result.problemNumber = '';
                 for (var i = 0; i < titleSelectors.length; i++) {
                     var el = document.querySelector(titleSelectors[i]);
                     if (el) {
@@ -441,6 +478,8 @@ class SweaFetchDialog(
                         var badge = clone.querySelector('.badge');
                         if (badge) badge.remove();
                         var text = clone.textContent.trim();
+                        var numMatch = text.match(/^([0-9]+)\.\s*/);
+                        if (numMatch) result.problemNumber = numMatch[1];
                         text = text.replace(/^[0-9]+\.\s*/, '');
                         if (text) {
                             result.title = text;
@@ -450,6 +489,20 @@ class SweaFetchDialog(
                 }
                 if (!result.title) {
                     result.title = document.title || '';
+                }
+                // 문제번호 fallback: document.title 또는 h2/h3에서 추출
+                if (!result.problemNumber) {
+                    var docTitle = document.title || '';
+                    var dtMatch = docTitle.match(/(\d{4,6})\./);
+                    if (dtMatch) result.problemNumber = dtMatch[1];
+                }
+                if (!result.problemNumber) {
+                    var headers = document.querySelectorAll('h2, h3, h4');
+                    for (var hi = 0; hi < headers.length; hi++) {
+                        var hText = (headers[hi].textContent || '').trim();
+                        var hMatch = hText.match(/^(\d{4,6})\.\s/);
+                        if (hMatch) { result.problemNumber = hMatch[1]; break; }
+                    }
                 }
 
                 // Description 추출 - SWEA Problem 탭 콘텐츠
@@ -656,10 +709,11 @@ class SweaFetchDialog(
                     return;
                 }
 
-                // input.txt / output.txt 다운로드 - ng-click에서 다운로드 함수 추출
+                // URL에서 contestProbId 추출하여 result에 포함
                 var cpId = '';
                 var urlMatch = window.location.href.match(/contestProbId=([A-Za-z0-9_]+)/);
                 if (urlMatch) cpId = urlMatch[1];
+                result.contestProbId = cpId;
 
                 // 1단계: 다운로드 링크/버튼의 ng-click, onclick, href 속성 수집
                 var inputDownloadInfo = null;
@@ -673,10 +727,18 @@ class SweaFetchDialog(
                     var ngClick = el.getAttribute('ng-click') || '';
                     var onClick = el.getAttribute('onclick') || '';
 
-                    // "다운로드" 버튼 또는 "input.txt"/"output.txt" 링크
-                    var isDownload = (text === '다운로드' || text.toLowerCase() === 'download');
-                    var isInput = (text.toLowerCase() === 'input.txt' || text.toLowerCase() === 'input');
-                    var isOutput = (text.toLowerCase() === 'output.txt' || text.toLowerCase() === 'output');
+                    // "다운로드" 버튼 또는 input/output 관련 링크
+                    var textLower = text.toLowerCase();
+                    var isDownload = (text === '다운로드' || textLower === 'download');
+                    var isInput = (textLower === 'input.txt' || textLower === 'input' || textLower.match(/sample_input/));
+                    var isOutput = (textLower === 'output.txt' || textLower === 'output' || textLower.match(/sample_output/));
+
+                    // href에서도 input/output 패턴 감지
+                    if (!isInput && !isOutput && !isDownload) {
+                        var hrefLower = href.toLowerCase();
+                        if (hrefLower.match(/sample_input|type=input|fileName=input/i)) isInput = true;
+                        if (hrefLower.match(/sample_output|type=output|fileName=output/i)) isOutput = true;
+                    }
 
                     if (isInput || isOutput || isDownload) {
                         var info = { href: href, ngClick: ngClick, onClick: onClick, text: text };
@@ -685,12 +747,12 @@ class SweaFetchDialog(
                         // 다운로드 버튼인 경우, 부모에서 input/output 판단
                         var isForInput = isInput;
                         var isForOutput = isOutput;
-                        if (isDownload) {
+                        if (isDownload && !isForInput && !isForOutput) {
                             var p = el.parentElement;
                             for (var d = 0; d < 5 && p; d++) {
-                                var pt = p.textContent || '';
-                                if (pt.indexOf('input') >= 0 && pt.indexOf('output') < 0) { isForInput = true; break; }
-                                if (pt.indexOf('output') >= 0 && pt.indexOf('input') < 0) { isForOutput = true; break; }
+                                var pt = (p.textContent || '').toLowerCase();
+                                if ((pt.indexOf('입력') >= 0 || pt.indexOf('input') >= 0) && pt.indexOf('output') < 0 && pt.indexOf('출력') < 0) { isForInput = true; break; }
+                                if ((pt.indexOf('출력') >= 0 || pt.indexOf('output') >= 0) && pt.indexOf('input') < 0 && pt.indexOf('입력') < 0) { isForOutput = true; break; }
                                 p = p.parentElement;
                             }
                         }
@@ -707,24 +769,51 @@ class SweaFetchDialog(
                 var inputText = '';
                 var outputText = '';
 
-                // pre, textarea, 또는 코드 블록에서 데이터 찾기
-                var preEls = document.querySelectorAll('pre, textarea, .CodeMirror, code');
-                if (preEls.length >= 2) {
-                    inputText = preEls[0].textContent.trim();
-                    outputText = preEls[1].textContent.trim();
+                // "입력"/"출력" 헤더가 있는 섹션에서 데이터 추출
+                var allBoxes = document.querySelectorAll('div, section, td');
+                for (var i = 0; i < allBoxes.length; i++) {
+                    var box = allBoxes[i];
+                    var children = box.children;
+                    if (children.length < 1) continue;
+                    var headerText = (children[0].textContent || '').trim();
+                    // "입력" 또는 "출력" 헤더를 가진 박스
+                    if (headerText === '입력' || headerText === '출력') {
+                        // 헤더 제외한 데이터 영역에서 텍스트 추출
+                        var dataText = '';
+                        for (var j = 1; j < children.length; j++) {
+                            var child = children[j];
+                            var ct = (child.textContent || '').trim();
+                            // 파일명(sample_input.txt 등)은 제외
+                            if (ct && !ct.match(/sample_(input|output)/i) && !ct.match(/^\d+_sample/i)
+                                && ct !== '다운로드' && ct !== 'download') {
+                                dataText += (dataText ? '\n' : '') + ct;
+                            }
+                        }
+                        if (headerText === '입력' && dataText && !inputText) inputText = dataText;
+                        if (headerText === '출력' && dataText && !outputText) outputText = dataText;
+                    }
                 }
 
-                // pre가 없으면 input.txt/output.txt 근처의 텍스트 박스에서 추출
+                // fallback: pre, textarea, 코드 블록에서
+                if (!inputText || !outputText) {
+                    var preEls = document.querySelectorAll('pre, textarea, .CodeMirror, code');
+                    if (preEls.length >= 2) {
+                        if (!inputText) inputText = preEls[0].textContent.trim();
+                        if (!outputText) outputText = preEls[1].textContent.trim();
+                    }
+                }
+
+                // fallback: sample 클래스 섹션
                 if (!inputText || !outputText) {
                     var sections = document.querySelectorAll('.problem_sample, .sample_data, [class*="sample"], [class*="test"]');
                     for (var i = 0; i < sections.length; i++) {
                         var sec = sections[i];
                         var secText = sec.textContent || '';
                         if (secText.indexOf('input') >= 0 && !inputText) {
-                            inputText = secText.replace(/input\.txt/gi, '').replace(/다운로드/g, '').replace(/입력/g, '').trim();
+                            inputText = secText.replace(/\d*_?sample_input\.txt/gi, '').replace(/input\.txt/gi, '').replace(/다운로드/g, '').replace(/입력/g, '').trim();
                         }
                         if (secText.indexOf('output') >= 0 && !outputText) {
-                            outputText = secText.replace(/output\.txt/gi, '').replace(/다운로드/g, '').replace(/출력/g, '').trim();
+                            outputText = secText.replace(/\d*_?sample_output\.txt/gi, '').replace(/output\.txt/gi, '').replace(/다운로드/g, '').replace(/출력/g, '').trim();
                         }
                     }
                 }
@@ -882,16 +971,22 @@ class SweaFetchDialog(
             imageUrls = urls
 
 
+            val actualId = json.get("problemNumber")?.asString?.ifBlank { null } ?: problemId
+            // contestProbId: JS에서 URL로 추출한 값 > Kotlin 필드 값 > 빈 문자열
+            val cpId = json.get("contestProbId")?.asString?.ifBlank { null }
+                ?: contestProbId
+                ?: ""
+            if (cpId.isNotBlank()) contestProbId = cpId
             problem = Problem(
                 source = ProblemSource.SWEA,
-                id = problemId,
-                title = title.ifBlank { "SWEA #$problemId" },
+                id = actualId,
+                title = title.ifBlank { "SWEA #$actualId" },
                 description = description,
                 testCases = testCases,
                 timeLimit = timeLimit,
                 memoryLimit = memoryLimit,
                 difficulty = difficulty.ifBlank { "Unrated" },
-                contestProbId = contestProbId ?: ""
+                contestProbId = cpId
             )
         } catch (e: Exception) {
             problem = null

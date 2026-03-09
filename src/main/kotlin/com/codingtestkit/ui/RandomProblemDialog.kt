@@ -4,6 +4,7 @@ import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.SolvedAcApi
+import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -178,11 +179,20 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
             }
         }
     }
-    private val resultTable = JBTable(tableModel)
+    private val resultTable = JBTable(tableModel).apply {
+        emptyText.text = I18n.t("표시할 항목이 없습니다", "No items to display")
+    }
     private val statusLabel = JLabel(I18n.t("조건을 선택하고 '뽑기'를 클릭하세요", "Select filters and click 'Pick'"))
 
     private var results: List<SolvedAcApi.ProblemInfo> = emptyList()
     private var headerCheck = JCheckBox().apply { horizontalAlignment = SwingConstants.CENTER }
+    private var showingTranslated = false
+    private var translatedTitles: Map<Int, String> = emptyMap() // problemId → translated title
+    private val translateButton = JButton("EN").apply {
+        toolTipText = I18n.t("영어로 번역", "Translate to English")
+        preferredSize = Dimension(JBUI.scale(50), preferredSize.height)
+        addActionListener { toggleTranslation() }
+    }
     var selectedProblemIds: List<Int> = emptyList()
         private set
 
@@ -338,10 +348,14 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
 
         panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
 
-        // 상태 라벨
-        statusLabel.foreground = JBColor.GRAY
-        statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
-        panel.add(statusLabel, BorderLayout.SOUTH)
+        // 하단: 상태 라벨 + 번역 버튼
+        val bottomPanel = JPanel(BorderLayout()).apply {
+            statusLabel.foreground = JBColor.GRAY
+            statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
+            add(statusLabel, BorderLayout.CENTER)
+            add(translateButton, BorderLayout.EAST)
+        }
+        panel.add(bottomPanel, BorderLayout.SOUTH)
 
         // 이벤트
         filterModeCombo.addActionListener {
@@ -611,6 +625,53 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
                 }
             }
         }.start()
+    }
+
+    private fun toggleTranslation() {
+        if (results.isEmpty()) return
+        showingTranslated = !showingTranslated
+        if (showingTranslated && translatedTitles.isEmpty()) {
+            translateButton.isEnabled = false
+            translateButton.text = "..."
+            Thread {
+                try {
+                    val titles = results.map { it.title }
+                    val batch = titles.joinToString("\n")
+                    val translated = TranslateService.translate(batch, "ko", "en")
+                    val translatedList = translated.split("\n")
+                    val map = mutableMapOf<Int, String>()
+                    for ((idx, p) in results.withIndex()) {
+                        if (idx < translatedList.size) map[p.problemId] = translatedList[idx].trim()
+                    }
+                    translatedTitles = map
+                    SwingUtilities.invokeLater { applyTranslation(); translateButton.isEnabled = true }
+                } catch (_: Exception) {
+                    SwingUtilities.invokeLater {
+                        showingTranslated = false
+                        translateButton.text = "EN"
+                        translateButton.isEnabled = true
+                        statusLabel.text = I18n.t("번역 실패", "Translation failed")
+                        statusLabel.foreground = JBColor.RED
+                    }
+                }
+            }.start()
+        } else {
+            applyTranslation()
+        }
+    }
+
+    private fun applyTranslation() {
+        translateButton.text = if (showingTranslated) "KO" else "EN"
+        translateButton.toolTipText = if (showingTranslated)
+            I18n.t("한국어 원문 보기", "Show original Korean") else I18n.t("영어로 번역", "Translate to English")
+        for ((idx, p) in results.withIndex()) {
+            if (idx < tableModel.rowCount) {
+                val title = if (showingTranslated) translatedTitles[p.problemId] ?: p.title else p.title
+                tableModel.setValueAt(title, idx, 2)
+                val tags = if (showingTranslated) p.tagsEn.take(3).joinToString(", ") else p.tags.take(3).joinToString(", ")
+                tableModel.setValueAt(tags, idx, 4)
+            }
+        }
     }
 
     private fun buildTierQuery(): String {

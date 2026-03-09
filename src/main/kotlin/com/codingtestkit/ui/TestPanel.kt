@@ -225,11 +225,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val stderr = result.error.trim()
                     val expected = tc.expectedOutput.trim()
 
-                    // stdout 전체를 그대로 비교 (줄 단위 trailing whitespace 무시)
-                    val stdoutNorm = stdout.lines().map { it.trimEnd() }.joinToString("\n").trimEnd()
-                    val expectedNorm = expected.lines().map { it.trimEnd() }.joinToString("\n").trimEnd()
+                    // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
+                    fun normalize(s: String): String = s
+                        .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
+                        .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
+                        .replace(Regex("""\[\s+"""), "[")
+                        .replace(Regex("""\s+]"""), "]")
                     tc.actualOutput = stdout
-                    tc.passed = stdoutNorm == expectedNorm
+                    tc.passed = normalize(stdout) == normalize(expected)
 
                     // stderr가 있으면 디버그 출력으로 표시
                     if (stderr.isNotBlank()) {
@@ -412,7 +415,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         private fun createFieldPanel(label: String, textArea: JTextArea): JPanel {
-            var fieldHeight = JBUI.scale(60)
+            var fieldHeight = JBUI.scale(100)
 
             val scrollPane = JBScrollPane(textArea).apply {
                 preferredSize = Dimension(0, fieldHeight)
@@ -433,10 +436,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             // 하단 드래그 핸들로 높이 조절
             val resizeHandle = JPanel().apply {
-                preferredSize = Dimension(0, JBUI.scale(8))
-                minimumSize = Dimension(0, JBUI.scale(8))
+                preferredSize = Dimension(0, JBUI.scale(5))
+                minimumSize = Dimension(0, JBUI.scale(5))
                 cursor = Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
-                background = JBColor(Color(210, 210, 210), Color(65, 65, 65))
+                background = JBColor(Color(190, 195, 200), Color(75, 78, 82))
             }
 
             var dragStartY = 0
@@ -474,7 +477,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             wrapperPanel: JPanel, textArea: JTextArea,
             label: String, labelColor: JBColor, icon: Icon
         ): JPanel {
-            var panelHeight = JBUI.scale(50)
+            var panelHeight = JBUI.scale(80)
 
             val scrollPane = JBScrollPane(textArea).apply {
                 preferredSize = Dimension(0, panelHeight)
@@ -493,10 +496,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             wrapperPanel.add(scrollPane, BorderLayout.CENTER)
 
             val resizeHandle = JPanel().apply {
-                preferredSize = Dimension(0, JBUI.scale(8))
-                minimumSize = Dimension(0, JBUI.scale(8))
+                preferredSize = Dimension(0, JBUI.scale(5))
+                minimumSize = Dimension(0, JBUI.scale(5))
                 cursor = Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
-                background = JBColor(Color(210, 210, 210), Color(65, 65, 65))
+                background = JBColor(Color(190, 195, 200), Color(75, 78, 82))
             }
 
             var dragStartY = 0

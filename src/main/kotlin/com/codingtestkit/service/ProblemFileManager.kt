@@ -22,7 +22,7 @@ object ProblemFileManager {
     data class CreatedFiles(
         val folder: File,
         val codeFile: File,
-        val markdownFile: File
+        val markdownFile: File?
     )
 
     /**
@@ -43,9 +43,10 @@ object ProblemFileManager {
         val problemDir = File(basePath, "problems/${problem.source.displayName}/$levelFolder/$folderName")
         problemDir.mkdirs()
 
-        // README.md 생성 (문제 설명)
-        val markdownFile = File(problemDir, "README.md")
-        markdownFile.writeText(generateMarkdown(problem))
+        // README.md 생성 (설정에서 켜진 경우만)
+        val markdownFile = if (PluginSettingsService.getInstance().generateReadme) {
+            File(problemDir, "README.md").also { it.writeText(generateMarkdown(problem)) }
+        } else null
 
         // 코드 파일 생성
         val codeFileName = "${problem.source.mainClassName}.${language.extension}"

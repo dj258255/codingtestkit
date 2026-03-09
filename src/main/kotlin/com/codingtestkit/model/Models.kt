@@ -16,17 +16,21 @@ data class Problem(
 
 enum class ProblemSource(
     val displayName: String,
+    val englishName: String,
     val folderName: String,
     val mainClassName: String
 ) {
-    BAEKJOON("백준", "baekjoon", "Main"),
-    PROGRAMMERS("프로그래머스", "programmers", "Solution"),
-    SWEA("SWEA", "swea", "Solution"),
-    LEETCODE("LeetCode", "leetcode", "Solution");
+    BAEKJOON("백준", "Baekjoon", "baekjoon", "Main"),
+    PROGRAMMERS("프로그래머스", "Programmers", "programmers", "Solution"),
+    SWEA("SWEA", "SWEA", "swea", "Solution"),
+    LEETCODE("LeetCode", "LeetCode", "leetcode", "Solution");
+
+    /** 현재 i18n 설정에 따른 표시 이름 */
+    fun localizedName(): String = com.codingtestkit.service.I18n.t(displayName, englishName)
 
     companion object {
         fun fromDisplayName(name: String): ProblemSource {
-            return entries.first { it.displayName == name }
+            return entries.first { it.displayName == name || it.englishName == name }
         }
     }
 }

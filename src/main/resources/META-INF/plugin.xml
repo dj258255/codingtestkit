@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -19,21 +19,28 @@
 
         <h3>Key Features</h3>
         <ul>
-            <li><b>Fetch Problems</b> – Auto-extract problem description and test cases by entering a number</li>
-            <li><b>Search</b> – Search by keyword, tag, difficulty on BOJ (solved.ac) and LeetCode</li>
-            <li><b>Random Picker</b> – Tier/class range, tag chips, solved filter (all/exclude/only), accepted count filter</li>
-            <li><b>Local Test</b> – Run and compare code directly in the IDE (Java, Python, C++, Kotlin)</li>
-            <li><b>Performance</b> – Execution time (ms) and memory usage per test case</li>
-            <li><b>Submit</b> – Submit directly via built-in JCEF browser</li>
-            <li><b>Exam Mode</b> – Disable autocomplete, block paste, detect focus loss</li>
-            <li><b>Timer</b> – Stopwatch (lap records &amp; memo) + circular dial countdown timer</li>
-            <li><b>Templates</b> – Save and load code templates with syntax highlighting</li>
-            <li><b>GitHub Push</b> – One-click login, repo selector, auto-push on accepted</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/fetch.md"><b>Fetch Problems</b></a> – Auto-extract problem description and test cases by entering a number</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/problem-view.md"><b>Problem View &amp; Translation</b></a> – View problems in-IDE with one-click KR↔EN translation</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/test.md"><b>Local Test</b></a> – Run and compare code directly in the IDE with execution time &amp; memory metrics</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>Login &amp; Submit</b></a> – Submit via built-in browser with auto language selection</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>Search</b></a> – Search by keyword, tag, difficulty on BOJ (solved.ac) and LeetCode</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>Random Picker</b></a> – Tier/class range, tag chips, solved filter, accepted count filter</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>Exam Mode</b></a> – Disable autocomplete, block paste, detect focus loss</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/timer.md"><b>Timer</b></a> – Stopwatch (lap records &amp; memo) + circular dial countdown timer</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/templates.md"><b>Templates</b></a> – Save and load code templates with syntax highlighting</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/github.md"><b>GitHub Push</b></a> – One-click login, repo selector, auto-push on accepted</li>
             <li><b>i18n</b> – Korean / English UI</li>
         </ul>
 
         <h3>Supported Languages</h3>
         <p>Java, Python, C++, Kotlin, JavaScript</p>
+
+        <h3>Bug Reports &amp; Feature Requests</h3>
+        <p>Found a bug or have a feature idea? Please let us know!</p>
+        <ul>
+            <li>GitHub Issues: <a href="https://github.com/dj258255/codingtestkit/issues">github.com/dj258255/codingtestkit/issues</a></li>
+            <li>Email: <a href="mailto:dj258255@naver.com">dj258255@naver.com</a></li>
+        </ul>
 
         <p><em>Disclaimer: All problem content is copyrighted by its respective platform (BOJ, Programmers, SWEA, LeetCode). This plugin only fetches and stores problems locally for personal use.</em></p>
 
@@ -53,26 +60,57 @@
 
         <h3>주요 기능</h3>
         <ul>
-            <li><b>문제 가져오기</b> – 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
-            <li><b>문제 검색</b> – 백준(solved.ac), LeetCode에서 키워드·태그·난이도로 검색</li>
-            <li><b>랜덤 뽑기</b> – 티어/클래스 범위, 태그 칩, 풀이 필터(전체/제외/에서만), 정답자 수 필터</li>
-            <li><b>로컬 테스트</b> – Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 및 결과 비교</li>
-            <li><b>실행 시간 &amp; 메모리</b> – 테스트 케이스별 실행 시간(ms)과 메모리 사용량 표시</li>
-            <li><b>코드 제출</b> – JCEF 브라우저로 각 플랫폼에 직접 제출</li>
-            <li><b>시험 모드</b> – 자동완성/검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
-            <li><b>타이머</b> – 스톱워치(랩 기록·메모) + 원형 다이얼 카운트다운 타이머</li>
-            <li><b>코드 템플릿</b> – 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
-            <li><b>GitHub 연동</b> – 원클릭 로그인, 레포 선택, 채점 통과 시 자동 푸시</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/fetch.md"><b>문제 가져오기</b></a> – 번호 입력만으로 문제 설명, 테스트 케이스 자동 추출</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/problem-view.md"><b>문제 보기 &amp; 번역</b></a> – IDE 내에서 문제 확인 + 한/영 원클릭 번역</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/test.md"><b>로컬 테스트</b></a> – Java, Python, C++, Kotlin 코드를 IDE에서 바로 실행 + 실행 시간 &amp; 메모리</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>로그인 &amp; 제출</b></a> – JCEF 브라우저로 직접 제출 + 언어 자동 선택</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>문제 검색</b></a> – 백준(solved.ac), LeetCode에서 키워드·태그·난이도로 검색</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>랜덤 뽑기</b></a> – 티어/클래스 범위, 태그 칩, 풀이 필터, 정답자 수 필터</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>시험 모드</b></a> – 자동완성/검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/timer.md"><b>타이머</b></a> – 스톱워치(랩 기록·메모) + 원형 다이얼 카운트다운 타이머</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/templates.md"><b>코드 템플릿</b></a> – 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/github.md"><b>GitHub 연동</b></a> – 원클릭 로그인, 레포 선택, 채점 통과 시 자동 푸시</li>
             <li><b>다국어</b> – 한국어 / English UI 전환</li>
         </ul>
 
         <h3>지원 언어</h3>
         <p>Java, Python, C++, Kotlin, JavaScript</p>
 
+        <h3>버그 제보 &amp; 기능 제안</h3>
+        <p>버그를 발견하셨거나 원하는 기능이 있으시면 알려주세요!</p>
+        <ul>
+            <li>GitHub Issues: <a href="https://github.com/dj258255/codingtestkit/issues">github.com/dj258255/codingtestkit/issues</a></li>
+            <li>이메일: <a href="mailto:dj258255@naver.com">dj258255@naver.com</a></li>
+        </ul>
+
         <p><em>면책 조항: 모든 문제의 저작권은 해당 플랫폼(백준, 프로그래머스, SWEA, LeetCode)에 있습니다. 이 플러그인은 개인 학습 목적으로 문제를 로컬에 저장할 뿐이며, 문제를 재배포하지 않습니다.</em></p>
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.0.1 (2026-03-09)</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] SWEA image loading</b> – Images now load correctly via local JCEF resource serving with proper Referer headers</li>
+            <li><b>[Fix] SWEA search navigation</b> – Problem search now reliably extracts contestProbId and navigates to detail pages (AngularJS scope variable resolution)</li>
+            <li><b>[Fix] SWEA description display</b> – Removed download links, duplicate sample data, 댓글 section; fixed double line-breaks in &lt;pre&gt; blocks</li>
+            <li><b>[Fix] SWEA text contrast</b> – Removed inline color styles so dark/light theme colors apply correctly</li>
+            <li><b>[Fix] SWEA leading whitespace</b> – Cleaned up empty &lt;br&gt;, &lt;p&gt;, &amp;nbsp; elements at the start of descriptions</li>
+            <li><b>[Improve] Test panel</b> – Increased default input/output field sizes; improved resize handle visibility</li>
+            <li><b>[New] README.md toggle</b> – README.md generation is now off by default; enable it in Settings → File Settings</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[버그 수정] SWEA 이미지 로딩</b> – JCEF 로컬 리소스 서빙 + Referer 헤더 적용으로 이미지가 정상적으로 표시됩니다</li>
+            <li><b>[버그 수정] SWEA 검색 네비게이션</b> – 문제 검색 시 contestProbId 추출 및 상세 페이지 이동이 안정적으로 동작합니다 (AngularJS scope 변수 경로 resolve)</li>
+            <li><b>[버그 수정] SWEA 문제 표시</b> – 다운로드 링크, 중복 샘플 데이터, 댓글 영역 제거; &lt;pre&gt; 블록 이중 개행 수정</li>
+            <li><b>[버그 수정] SWEA 텍스트 색상</b> – 인라인 color 스타일 제거로 다크/라이트 테마 색상이 정상 적용됩니다</li>
+            <li><b>[버그 수정] SWEA 설명 앞 공백</b> – 문제 설명 시작 부분의 빈 줄/공백 요소를 정리했습니다</li>
+            <li><b>[개선] 테스트 패널</b> – 입력/출력 필드 기본 크기 확대; 크기 조절 핸들 가시성 개선</li>
+            <li><b>[신규] README.md 토글</b> – README.md 생성이 기본 OFF로 변경됨; 설정 → 파일 설정에서 활성화 가능</li>
+        </ul>
+
         <h3>v1.0.0 (2026-03-08)</h3>
 
         <b>English</b>
@@ -123,6 +161,7 @@
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.GitHubService"/>
+        <applicationService serviceImplementation="com.codingtestkit.service.PluginSettingsService"/>
         <notificationGroup id="CodingTestKit" displayType="BALLOON"/>
         <daemon.highlightInfoFilter
                 implementation="com.codingtestkit.service.DuplicateClassHighlightFilter"/>
