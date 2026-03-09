@@ -99,6 +99,21 @@ class CodeSubmitDialog(
                 if (frame?.isMain != true) return
                 val url = cefBrowser?.url ?: ""
 
+                // 스크롤 성능 개선
+                cefBrowser?.executeJavaScript("""
+                    (function(){
+                        var s=document.createElement('style');
+                        s.textContent='html,body{scroll-behavior:smooth}*{-webkit-overflow-scrolling:touch}';
+                        document.head.appendChild(s);
+                        var ticking=false;
+                        window.addEventListener('wheel',function(e){
+                            if(ticking)return;
+                            ticking=true;
+                            requestAnimationFrame(function(){ticking=false;});
+                        },{passive:true});
+                    })();
+                """.trimIndent(), url, 0)
+
                 when (source) {
                     ProblemSource.BAEKJOON -> handleBaekjoonLoad(cefBrowser, url)
                     ProblemSource.PROGRAMMERS -> handleProgrammersLoad(cefBrowser, url)
@@ -169,7 +184,8 @@ class CodeSubmitDialog(
         Language.JAVA to "java",
         Language.PYTHON to "python3",
         Language.CPP to "cpp",
-        Language.KOTLIN to "kotlin"
+        Language.KOTLIN to "kotlin",
+        Language.JAVASCRIPT to "javascript"
     )
 
     private fun handleProgrammersLoad(cefBrowser: CefBrowser?, url: String) {

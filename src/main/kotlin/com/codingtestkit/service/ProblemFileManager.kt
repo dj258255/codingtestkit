@@ -284,7 +284,7 @@ object ProblemFileManager {
             }
             if (matchingDir != null) {
                 val codeFile = matchingDir.listFiles()?.firstOrNull {
-                    it.extension in listOf("java", "py", "cpp", "kt")
+                    it.extension in listOf("java", "py", "cpp", "kt", "js")
                 }
                 if (codeFile != null) {
                     return LocalFileSystem.getInstance().refreshAndFindFileByIoFile(codeFile)

@@ -19,6 +19,8 @@ object BaekjoonCrawler {
         val description = doc.select("#problem_description").html()
         val inputDesc = doc.select("#problem_input").html()
         val outputDesc = doc.select("#problem_output").html()
+        val limitDesc = doc.select("#problem_limit").html()
+        val hintDesc = doc.select("#problem_hint").html()
 
         val infoTds = doc.select("#problem-info tbody tr td")
         val timeLimit = infoTds.getOrNull(0)?.text() ?: ""
@@ -49,6 +51,32 @@ object BaekjoonCrawler {
             if (outputDesc.isNotBlank()) {
                 append("<h2>출력</h2>")
                 append(outputDesc)
+            }
+            if (limitDesc.isNotBlank()) {
+                append("<h2>제한</h2>")
+                append(limitDesc)
+            }
+
+            // 예제 입출력 + 예제 설명
+            var si = 1
+            while (true) {
+                val sIn = doc.select("#sample-input-$si")
+                val sOut = doc.select("#sample-output-$si")
+                if (sIn.isEmpty() && sOut.isEmpty()) break
+                append("<h2>예제 입력 $si</h2>")
+                append("<pre>${sIn.text()}</pre>")
+                append("<h2>예제 출력 $si</h2>")
+                append("<pre>${sOut.text()}</pre>")
+                val explain = doc.select("#problem_sample_explain_$si").html()
+                if (explain.isNotBlank()) {
+                    append(explain)
+                }
+                si++
+            }
+
+            if (hintDesc.isNotBlank()) {
+                append("<h2>힌트</h2>")
+                append(hintDesc)
             }
         }
 

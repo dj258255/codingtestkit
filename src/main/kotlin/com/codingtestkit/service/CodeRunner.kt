@@ -33,6 +33,7 @@ object CodeRunner {
                 Language.PYTHON -> runPython(code, testCase.input, tempDir, timeoutSeconds)
                 Language.CPP -> runCpp(code, testCase.input, tempDir, timeoutSeconds)
                 Language.KOTLIN -> runKotlin(code, testCase.input, tempDir, timeoutSeconds)
+                Language.JAVASCRIPT -> runJavaScript(code, testCase.input, tempDir, timeoutSeconds)
             }
         } catch (e: Exception) {
             RunResult(output = "", error = e.message ?: "Unknown error", exitCode = -1)
@@ -66,6 +67,7 @@ object CodeRunner {
             Language.PYTHON -> wrapPython(code, inputValues, parameterNames)
             Language.CPP -> wrapCpp(code, inputValues, parameterNames)
             Language.KOTLIN -> wrapKotlin(code, inputValues, parameterNames)
+            Language.JAVASCRIPT -> wrapJavaScript(code, inputValues, parameterNames)
         }
 
         val tempDir = createTempDir()
@@ -75,6 +77,7 @@ object CodeRunner {
                 Language.PYTHON -> runPython(wrappedCode, "", tempDir, timeoutSeconds)
                 Language.CPP -> runCpp(wrappedCode, "", tempDir, timeoutSeconds)
                 Language.KOTLIN -> runKotlin(wrappedCode, "", tempDir, timeoutSeconds)
+                Language.JAVASCRIPT -> runJavaScript(wrappedCode, "", tempDir, timeoutSeconds)
             }
         } catch (e: Exception) {
             RunResult(output = "", error = e.message ?: "Unknown error", exitCode = -1)
@@ -89,6 +92,7 @@ object CodeRunner {
             Language.PYTHON -> code.contains("if __name__")
             Language.CPP -> code.contains("int main")
             Language.KOTLIN -> code.contains("fun main")
+            Language.JAVASCRIPT -> code.contains("readline") || code.contains("process.stdin")
         }
     }
 
@@ -320,6 +324,17 @@ fun main() {
 """.trimIndent()
     }
 
+    private fun wrapJavaScript(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+        val args = inputValues.joinToString(", ")
+        return """
+$code
+
+const _result = solution($args);
+if (typeof _result === 'string') console.log('"' + _result + '"');
+else console.log(_result);
+""".trimIndent()
+    }
+
     // ─── 도구 경로 자동 감지 ───
 
     private val javaHome: String by lazy { detectJavaHome() }
@@ -328,6 +343,7 @@ fun main() {
     private val pythonPath: String by lazy { detectPython() }
     private val gppPath: String by lazy { findExecutable("g++", "/usr/bin/g++", "/usr/local/bin/g++", "/opt/homebrew/bin/g++") }
     private val kotlincPath: String by lazy { detectKotlinc() }
+    private val nodePath: String by lazy { detectNode() }
 
     private fun detectJavaHome(): String {
         // 1. JAVA_HOME 환경변수
@@ -402,9 +418,34 @@ fun main() {
                     return path
                 }
             }
+
+            // 4. 사용자별 JetBrains 플러그인 디렉토리 (~/Library/Application Support/JetBrains/IntelliJIdea*)
+            val jetbrainsDir = File("${System.getProperty("user.home")}/Library/Application Support/JetBrains")
+            if (jetbrainsDir.exists()) {
+                val kotlinc = jetbrainsDir.listFiles()
+                    ?.filter { it.isDirectory && it.name.startsWith("IntelliJIdea") }
+                    ?.sortedDescending()
+                    ?.map { File(it, "plugins/Kotlin/kotlinc/bin/kotlinc") }
+                    ?.firstOrNull { it.exists() }
+                if (kotlinc != null) return kotlinc.absolutePath
+            }
         } catch (_: Exception) {}
 
         return ""
+    }
+
+    private fun detectNode(): String {
+        // nvm 환경 지원
+        val nvmDir = "${System.getProperty("user.home")}/.nvm/versions/node"
+        if (File(nvmDir).exists()) {
+            val latest = File(nvmDir).listFiles()?.filter { it.isDirectory }
+                ?.sortedDescending()?.firstOrNull()
+            if (latest != null) {
+                val nodeBin = File(latest, "bin/node")
+                if (nodeBin.exists()) return nodeBin.absolutePath
+            }
+        }
+        return findExecutable("node", "/usr/local/bin/node", "/opt/homebrew/bin/node")
     }
 
     private fun findExecutable(vararg candidates: String): String {
@@ -427,6 +468,7 @@ fun main() {
         "javac" to javacPath,
         "java" to javaPath,
         "python" to pythonPath,
+        "node" to nodePath,
         "g++" to gppPath,
         "kotlinc" to kotlincPath
     )
@@ -568,6 +610,15 @@ fun main() {
         }
 
         return executeProcess(listOf(javaPath, "-jar", jarFile.absolutePath), dir, input, timeout)
+    }
+
+    private fun runJavaScript(code: String, input: String, dir: File, timeout: Long): RunResult {
+        if (nodePath.isBlank()) {
+            return RunResult(output = "", error = "Node.js를 찾을 수 없습니다.\nbrew install node 또는 nvm으로 설치하세요.", exitCode = -1)
+        }
+        val sourceFile = File(dir, "solution.js")
+        sourceFile.writeText(code)
+        return executeProcess(listOf(nodePath, sourceFile.absolutePath), dir, input, timeout)
     }
 
     private fun executeProcess(

@@ -194,8 +194,12 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
         isOKActionEnabled = false
     }
 
+    private var doubleClicked = false
+
     override fun doOKAction() {
-        selectedProblemIds = checkedRows.filter { it in results.indices }.map { results[it].problemId }
+        if (!doubleClicked) {
+            selectedProblemIds = checkedRows.filter { it in results.indices }.map { results[it].problemId }
+        }
         super.doOKAction()
     }
 
@@ -350,6 +354,7 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2 && resultTable.selectedRow >= 0) {
                     selectedProblemIds = listOf(results[resultTable.selectedRow].problemId)
+                    doubleClicked = true
                     doOKAction()
                 }
             }
@@ -550,7 +555,12 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
         // 풀이 필터
         val solvedMode = solvedFilterCombo.selectedIndex // 0=전체, 1=제외, 2=에서만
         if (solvedMode > 0) {
-            val handle = AuthService.getInstance().getUsername(ProblemSource.BAEKJOON)
+            val auth = AuthService.getInstance()
+            var handle = auth.getUsername(ProblemSource.BAEKJOON)
+            if (handle.isBlank() && auth.isLoggedIn(ProblemSource.BAEKJOON)) {
+                handle = auth.fetchUsername(ProblemSource.BAEKJOON)
+                if (handle.isNotBlank()) auth.setUsername(ProblemSource.BAEKJOON, handle)
+            }
             if (handle.isBlank()) {
                 statusLabel.text = I18n.t("백준 로그인이 필요합니다.",
                     "BOJ login required.")

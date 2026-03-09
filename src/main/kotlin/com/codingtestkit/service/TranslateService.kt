@@ -13,13 +13,39 @@ object TranslateService {
     fun translate(text: String, sourceLang: String = "auto", targetLang: String = "ko"): String {
         if (text.isBlank()) return text
 
-        // 긴 텍스트는 청크로 나눠서 번역 (API 제한 ~5000자)
+        // <pre> 블록을 번역에서 보호: 분리 → 나머지만 번역 → 재조립
+        val parts = mutableListOf<Pair<String, Boolean>>() // (content, isProtected)
+        var lastEnd = 0
+        for (match in Regex("<pre[^>]*>[\\s\\S]*?</pre>", RegexOption.IGNORE_CASE).findAll(text)) {
+            if (match.range.first > lastEnd) {
+                parts.add(Pair(text.substring(lastEnd, match.range.first), false))
+            }
+            parts.add(Pair(match.value, true))
+            lastEnd = match.range.last + 1
+        }
+        if (lastEnd < text.length) {
+            parts.add(Pair(text.substring(lastEnd), false))
+        }
+
+        return buildString {
+            for ((i, pair) in parts.withIndex()) {
+                val (content, isProtected) = pair
+                if (isProtected) {
+                    append(content)
+                } else {
+                    if (i > 0 && !parts[i - 1].second) Thread.sleep(300)
+                    append(translateText(content, sourceLang, targetLang))
+                }
+            }
+        }
+    }
+
+    private fun translateText(text: String, sourceLang: String, targetLang: String): String {
+        if (text.isBlank()) return text
         val maxLen = 4500
         if (text.length <= maxLen) {
             return translateChunk(text, sourceLang, targetLang)
         }
-
-        // HTML 태그 경계를 기준으로 분할, 청크 간 딜레이로 rate limit 방지
         val chunks = splitHtml(text, maxLen)
         return buildString {
             for ((i, chunk) in chunks.withIndex()) {

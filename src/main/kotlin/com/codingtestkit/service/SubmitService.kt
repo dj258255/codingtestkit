@@ -154,7 +154,8 @@ object SubmitService {
         Language.JAVA to "java",
         Language.PYTHON to "python3",
         Language.CPP to "cpp",
-        Language.KOTLIN to "kotlin"
+        Language.KOTLIN to "kotlin",
+        Language.JAVASCRIPT to "javascript"
     )
 
     private fun submitProgrammers(

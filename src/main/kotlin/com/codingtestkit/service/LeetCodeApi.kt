@@ -104,13 +104,16 @@ object LeetCodeApi {
         query: String = "",
         difficulty: String? = null,
         tags: List<String>? = null,
+        status: String? = null,
         limit: Int = 20,
-        skip: Int = 0
+        skip: Int = 0,
+        cookies: String? = null
     ): SearchResult {
         val filters = mutableMapOf<String, Any?>()
         if (query.isNotBlank()) filters["searchKeywords"] = query
         if (!difficulty.isNullOrBlank()) filters["difficulty"] = difficulty
         if (!tags.isNullOrEmpty()) filters["tags"] = tags
+        if (!status.isNullOrBlank()) filters["status"] = status
 
         val gql = """
             query problemsetQuestionList(${'$'}categorySlug: String, ${'$'}limit: Int, ${'$'}skip: Int, ${'$'}filters: QuestionListFilterInput) {
@@ -143,7 +146,7 @@ object LeetCodeApi {
             "filters" to filters
         )
 
-        val result = graphql(gql, variables)
+        val result = graphql(gql, variables, cookies)
         val list = result.getAsJsonObject("data")
             ?.getAsJsonObject("problemsetQuestionList")
             ?: return SearchResult(emptyList(), 0)
@@ -300,10 +303,10 @@ object LeetCodeApi {
     /** 캐시 초기화 (재로그인 시 호출) */
     fun clearStatsCache() { cachedStats = null }
 
-    private fun graphql(query: String, variables: Map<String, Any?>): com.google.gson.JsonObject {
+    private fun graphql(query: String, variables: Map<String, Any?>, cookies: String? = null): com.google.gson.JsonObject {
         val body = gson.toJson(mapOf("query" to query, "variables" to variables))
 
-        val response = Jsoup.connect(GRAPHQL_URL)
+        val conn = Jsoup.connect(GRAPHQL_URL)
             .method(Connection.Method.POST)
             .header("Content-Type", "application/json")
             .header("Referer", "https://leetcode.com")
@@ -311,8 +314,8 @@ object LeetCodeApi {
             .requestBody(body)
             .ignoreContentType(true)
             .timeout(15000)
-            .execute()
-            .body()
+        if (!cookies.isNullOrBlank()) conn.header("Cookie", cookies)
+        val response = conn.execute().body()
 
         return JsonParser.parseString(response).asJsonObject
     }

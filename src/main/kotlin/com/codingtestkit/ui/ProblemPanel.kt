@@ -13,6 +13,21 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.jcef.JBCefApp
+import com.intellij.ui.jcef.JBCefBrowser
+import org.cef.browser.CefBrowser
+import org.cef.browser.CefFrame
+import org.cef.handler.CefRequestHandlerAdapter
+import org.cef.handler.CefResourceHandler
+import org.cef.handler.CefResourceRequestHandler
+import org.cef.handler.CefResourceRequestHandlerAdapter
+import org.cef.misc.BoolRef
+import org.cef.misc.StringRef
+import org.cef.network.CefRequest
+import org.cef.network.CefResponse
+import org.cef.callback.CefCallback
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -53,9 +68,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         toolTipText = I18n.t("문제를 번역합니다 (한↔영)", "Translate problem (KR↔EN)")
         isEnabled = false
     }
-    private val loginStatusLabel = JLabel("").apply {
-        foreground = JBColor.GRAY
+    private val githubLoginButton = JButton("GitHub", AllIcons.Vcs.Vendors.Github).apply {
+        toolTipText = I18n.t("GitHub 토큰 설정", "GitHub token setup")
         font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
+        iconTextGap = 0
     }
     private val problemDisplay = JEditorPane().apply {
         contentType = "text/html"
@@ -65,6 +81,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 "<p style='text-align:center; margin-top:40px;'>${I18n.t("문제 번호를 입력하고<br>'가져오기'를 클릭하세요", "Enter a problem number and<br>click 'Fetch'")}</p>" +
                 "</body></html>"
     }
+
+    private val useCef = try { JBCefApp.isSupported() } catch (_: Exception) { false }
+    private var cefBrowser: JBCefBrowser? = null
+    private var currentProblemHtml = ""
 
     var onProblemFetched: ((Problem) -> Unit)? = null
     private var currentProblem: Problem? = null
@@ -81,18 +101,23 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
 
-        // Row 1: 플랫폼 + 언어 + 로그인 상태
-        val row1 = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+        // Row 1: 플랫폼 + 언어 + 로그인 | GitHub 로그인
+        val row1 = JPanel(BorderLayout()).apply {
             alignmentX = LEFT_ALIGNMENT
         }
-        row1.add(createLabel(I18n.t("플랫폼", "Platform")))
-        row1.add(sourceCombo)
-        row1.add(Box.createHorizontalStrut(JBUI.scale(4)))
-        row1.add(createLabel(I18n.t("언어", "Lang")))
-        row1.add(languageCombo)
-        row1.add(Box.createHorizontalStrut(JBUI.scale(8)))
-        row1.add(loginButton)
-        row1.add(loginStatusLabel)
+        val row1Left = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
+        row1Left.add(createLabel(I18n.t("플랫폼", "Platform")))
+        row1Left.add(sourceCombo)
+        row1Left.add(Box.createHorizontalStrut(JBUI.scale(4)))
+        row1Left.add(createLabel(I18n.t("언어", "Lang")))
+        row1Left.add(languageCombo)
+        row1Left.add(Box.createHorizontalStrut(JBUI.scale(8)))
+        row1Left.add(loginButton)
+        row1.add(row1Left, BorderLayout.WEST)
+
+        val row1Right = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
+        row1Right.add(githubLoginButton)
+        row1.add(row1Right, BorderLayout.EAST)
         topPanel.add(row1)
         topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
@@ -122,15 +147,71 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         add(topPanel, BorderLayout.NORTH)
 
-        // 문제 표시 영역
-        val scrollPane = JBScrollPane(problemDisplay).apply {
-            border = JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0)
+        // 문제 표시 영역 (JCEF 지원 시 KaTeX LaTeX 렌더링 가능)
+        if (useCef) {
+            cefBrowser = JBCefBrowser()
+
+            // http://localhost/* 요청을 가로채서 JAR 리소스를 서빙
+            val panel = this
+            cefBrowser!!.jbCefClient.addRequestHandler(object : CefRequestHandlerAdapter() {
+                override fun onBeforeBrowse(
+                    browser: CefBrowser, frame: CefFrame, request: CefRequest,
+                    userGesture: Boolean, isRedirect: Boolean
+                ): Boolean {
+                    val url = request.url ?: return false
+                    // localhost 요청만 허용, 외부 링크는 차단
+                    return !url.startsWith("http://localhost/")
+                }
+
+                override fun getResourceRequestHandler(
+                    browser: CefBrowser, frame: CefFrame, request: CefRequest,
+                    isNavigation: Boolean, isDownload: Boolean, requestInitiator: String, disableDefaultHandling: BoolRef
+                ): CefResourceRequestHandler? {
+                    val url = request.url ?: return null
+                    if (!url.startsWith("http://localhost/")) return null
+                    val path = url.removePrefix("http://localhost").substringBefore("?")
+                    return object : CefResourceRequestHandlerAdapter() {
+                        override fun getResourceHandler(browser: CefBrowser, frame: CefFrame, request: CefRequest): CefResourceHandler? {
+                            return when {
+                                path == "/problem.html" -> panel.DynamicHtmlHandler()
+                                path == "/katex.min.css" -> KaTeXResourceHandler("/katex/katex.min.css", "text/css")
+                                path == "/katex.min.js" -> KaTeXResourceHandler("/katex/katex.min.js", "text/javascript")
+                                path == "/auto-render.min.js" -> KaTeXResourceHandler("/katex/auto-render.min.js", "text/javascript")
+                                path.startsWith("/fonts/") && path.endsWith(".woff2") ->
+                                    KaTeXResourceHandler("/katex$path", "font/woff2")
+                                else -> null
+                            }
+                        }
+                    }
+                }
+            }, cefBrowser!!.cefBrowser)
+
+            val cefPanel = JPanel(BorderLayout()).apply {
+                border = JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0)
+                add(cefBrowser!!.component, BorderLayout.CENTER)
+            }
+            add(cefPanel, BorderLayout.CENTER)
+
+            // 초기 플레이스홀더
+            val isDark = !JBColor.isBright()
+            val pc = if (isDark) "#999" else "#888"
+            val bg = if (isDark) "#2b2d30" else "#ffffff"
+            currentProblemHtml = "<!DOCTYPE html><html><head><meta charset='utf-8'></head>" +
+                "<body style='font-family:sans-serif; padding:8px; color:$pc; background:$bg;'>" +
+                "<p style='text-align:center; margin-top:40px;'>${I18n.t("문제 번호를 입력하고<br>'가져오기'를 클릭하세요", "Enter a problem number and<br>click 'Fetch'")}</p>" +
+                "</body></html>"
+            cefBrowser!!.loadURL("http://localhost/problem.html")
+        } else {
+            val scrollPane = JBScrollPane(problemDisplay).apply {
+                border = JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0)
+            }
+            add(scrollPane, BorderLayout.CENTER)
         }
-        add(scrollPane, BorderLayout.CENTER)
 
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
         updateLoginButton()
+        updateGitHubButton()
 
         // 이벤트
         sourceCombo.addActionListener {
@@ -144,6 +225,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         submitButton.addActionListener { submitSolution() }
         githubPushButton.addActionListener { pushToGitHub() }
         translateButton.addActionListener { translateProblem() }
+        githubLoginButton.addActionListener { handleGitHubLogin() }
         problemIdField.addActionListener { fetchProblem() }
         updatePlaceholder()
     }
@@ -207,19 +289,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             loginButton.icon = AllIcons.Actions.Cancel
             val username = auth.getUsername(source)
             if (username.isNotBlank()) {
-                loginStatusLabel.text = "${source.displayName}: $username"
-                loginStatusLabel.foreground = JBColor(java.awt.Color(0, 130, 0), java.awt.Color(80, 200, 80))
-                loginStatusLabel.icon = AllIcons.General.InspectionsOK
-            } else {
-                loginStatusLabel.text = I18n.t("로그인됨", "Logged in")
-                loginStatusLabel.foreground = JBColor(java.awt.Color(0, 130, 0), java.awt.Color(80, 200, 80))
-                loginStatusLabel.icon = AllIcons.General.InspectionsOK
+                loginButton.toolTipText = "${source.displayName}: $username"
             }
         } else {
             loginButton.text = I18n.t("로그인", "Login")
             loginButton.icon = AllIcons.General.User
-            loginStatusLabel.text = ""
-            loginStatusLabel.icon = null
+            loginButton.toolTipText = null
         }
     }
 
@@ -239,9 +314,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             val cookies = dialog.getCookies()
             if (cookies.isNotBlank()) {
                 auth.setCookies(source, cookies)
-                loginStatusLabel.text = I18n.t("유저 정보 가져오는 중...", "Fetching user info...")
-                loginStatusLabel.foreground = JBColor.GRAY
-                loginStatusLabel.icon = AllIcons.Process.Step_1
                 loginButton.text = I18n.t("로그아웃", "Logout")
                 loginButton.icon = AllIcons.Actions.Cancel
 
@@ -257,6 +329,23 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     SwingUtilities.invokeLater { updateLoginButton() }
                 }
             }
+        }
+    }
+
+    private fun handleGitHubLogin() {
+        val dialog = GitHubConfigDialog(project)
+        dialog.show()
+        updateGitHubButton()
+    }
+
+    private fun updateGitHubButton() {
+        val github = GitHubService.getInstance()
+        if (github.token.isNotBlank()) {
+            githubLoginButton.text = "<html>GitHub <font color='#50C878'>✓</font></html>"
+            githubLoginButton.toolTipText = I18n.t("GitHub 연결됨 (클릭하여 재설정)", "GitHub connected (click to reconfigure)")
+        } else {
+            githubLoginButton.text = "GitHub"
+            githubLoginButton.toolTipText = I18n.t("GitHub 토큰 설정", "GitHub token setup")
         }
     }
 
@@ -488,8 +577,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun handleFetchError(e: Exception) {
-        problemDisplay.text = "<html><body style='font-family:sans-serif; padding:10px; color:#cc4444;'>" +
-                "<h3>${I18n.t("오류 발생", "Error")}</h3><p>${e.message}</p></body></html>"
+        setDisplayHtml("<!DOCTYPE html><html><head><meta charset='utf-8'></head>" +
+                "<body style='font-family:sans-serif; padding:10px; color:#cc4444;'>" +
+                "<h3>${I18n.t("오류 발생", "Error")}</h3><p>${e.message}</p></body></html>")
         fetchButton.isEnabled = true
         fetchButton.text = I18n.t("가져오기", "Fetch")
     }
@@ -633,6 +723,102 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
+     * JAR 리소스를 http://localhost/ 로 서빙하는 CEF 리소스 핸들러
+     */
+    private class KaTeXResourceHandler(private val resourcePath: String, private val mimeType: String) : CefResourceHandler {
+        private var stream: InputStream? = null
+        private var responseLength = 0
+
+        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
+            val bytes = ProblemPanel::class.java.getResourceAsStream(resourcePath)?.readBytes()
+            if (bytes != null) {
+                stream = ByteArrayInputStream(bytes)
+                responseLength = bytes.size
+                callback.Continue()
+                return true
+            }
+            return false
+        }
+
+        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
+            response.mimeType = mimeType
+            response.status = 200
+            responseLength.set(this.responseLength)
+        }
+
+        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
+            val s = stream ?: return false
+            val available = s.available()
+            if (available == 0) {
+                bytesRead.set(0)
+                return false
+            }
+            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
+            bytesRead.set(read)
+            return true
+        }
+
+        override fun cancel() {
+            stream?.close()
+            stream = null
+        }
+    }
+
+    /**
+     * 동적 HTML 콘텐츠를 서빙하는 CEF 리소스 핸들러
+     */
+    private inner class DynamicHtmlHandler : CefResourceHandler {
+        private var stream: InputStream? = null
+        private var responseLength = 0
+
+        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
+            val bytes = currentProblemHtml.toByteArray(Charsets.UTF_8)
+            stream = ByteArrayInputStream(bytes)
+            responseLength = bytes.size
+            callback.Continue()
+            return true
+        }
+
+        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
+            response.mimeType = "text/html"
+            response.setHeaderByName("Content-Type", "text/html; charset=utf-8", true)
+            response.status = 200
+            responseLength.set(this.responseLength)
+        }
+
+        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
+            val s = stream ?: return false
+            val available = s.available()
+            if (available == 0) {
+                bytesRead.set(0)
+                return false
+            }
+            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
+            bytesRead.set(read)
+            return true
+        }
+
+        override fun cancel() {
+            stream?.close()
+            stream = null
+        }
+    }
+
+    /**
+     * JCEF 또는 JEditorPane에 HTML을 표시하는 헬퍼
+     * JCEF: http://localhost/problem.html → CefResourceHandler로 동적 HTML 서빙
+     */
+    private fun setDisplayHtml(html: String) {
+        if (useCef && cefBrowser != null) {
+            currentProblemHtml = html
+            cefBrowser!!.loadURL("http://localhost/problem.html?t=${System.currentTimeMillis()}")
+        } else {
+            problemDisplay.text = html
+            problemDisplay.caretPosition = 0
+        }
+    }
+
+    /**
      * @param overrideLang 번역 시 예제 헤더 등을 타겟 언어로 강제 ("ko" or "en"), null이면 UI 언어 사용
      */
     private fun displayProblem(problem: Problem, overrideLang: String? = null) {
@@ -660,22 +846,81 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             else -> problem.source.displayName
         }
 
+        val isDark = !JBColor.isBright()
+
         val html = buildString {
-            append("<html><head><style>")
-            append("table { border-collapse:collapse; margin:8px 0; }")
-            append("th, td { padding:6px 12px; border:1px solid #555; font-family:monospace; }")
-            append("th { background:#3c3f41; color:#bbb; font-weight:bold; }")
-            append("img { max-width:100%; }")
-            append("</style></head>")
-            append("<body style='font-family:-apple-system,sans-serif; padding:10px; line-height:1.6;'>")
-            append("<h2 style='margin:0 0 8px 0;'>${problem.title}</h2>")
+            append("<!DOCTYPE html>")
+            append("<html><head>")
+            append("<meta charset='utf-8'>")
+
+            if (useCef) {
+                // JCEF: 로컬 KaTeX (CefRequestHandler가 JAR에서 서빙) + 테마 기반 CSS
+                append("<link rel='stylesheet' href='katex.min.css'>")
+                append("<style>")
+                if (isDark) {
+                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.6; color: #bbb; background: #2b2d30; }")
+                    append("h2 { color: #e0e0e0; margin: 0 0 8px 0; }")
+                    append("table { border-collapse: collapse; margin: 8px 0; }")
+                    append("th, td { padding: 6px 12px; border: 1px solid #555; font-family: monospace; }")
+                    append("th { background: #3c3f41; color: #bbb; font-weight: bold; }")
+                    append("img { max-width: 100%; }")
+                    append("hr { border: none; border-top: 1px solid #444; margin: 8px 0; }")
+                    append("pre { background: #1e1e1e; color: #a9b7c6; padding: 10px; border: 1px solid #555; font-family: monospace; border-radius: 4px; white-space: pre-wrap; }")
+                    append("code { background: #1e1e1e; color: #a9b7c6; padding: 2px 5px; border-radius: 3px; }")
+                    append("a { color: #589df6; pointer-events: none; cursor: default; text-decoration: none; }")
+                    append(".bg-red, td.bg-red { background-color: rgba(255, 100, 100, 0.3); }")
+                    append(".bg-green, td.bg-green { background-color: rgba(100, 200, 100, 0.3); }")
+                    append(".bg-blue, td.bg-blue { background-color: rgba(100, 150, 255, 0.3); }")
+                    append(".bg-yellow, td.bg-yellow { background-color: rgba(255, 220, 100, 0.3); }")
+                    append(".katex { color: #e0e0e0; }")
+                } else {
+                    append("body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; line-height: 1.6; color: #333; background: #fff; }")
+                    append("h2 { color: #222; margin: 0 0 8px 0; }")
+                    append("table { border-collapse: collapse; margin: 8px 0; }")
+                    append("th, td { padding: 6px 12px; border: 1px solid #ccc; font-family: monospace; }")
+                    append("th { background: #f0f0f0; color: #333; font-weight: bold; }")
+                    append("img { max-width: 100%; }")
+                    append("hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }")
+                    append("pre { background: #f5f5f5; color: #333; padding: 10px; border: 1px solid #ddd; font-family: monospace; border-radius: 4px; white-space: pre-wrap; }")
+                    append("code { background: #f5f5f5; color: #333; padding: 2px 5px; border-radius: 3px; }")
+                    append("a { color: #0366d6; pointer-events: none; cursor: default; text-decoration: none; }")
+                    append(".bg-red, td.bg-red { background-color: rgba(255, 200, 200, 0.6); }")
+                    append(".bg-green, td.bg-green { background-color: rgba(200, 255, 200, 0.6); }")
+                    append(".bg-blue, td.bg-blue { background-color: rgba(200, 220, 255, 0.6); }")
+                    append(".bg-yellow, td.bg-yellow { background-color: rgba(255, 245, 200, 0.6); }")
+                }
+                append("</style>")
+            } else {
+                // JEditorPane: 기본 CSS
+                append("<style>")
+                append("table { border-collapse:collapse; margin:8px 0; }")
+                append("th, td { padding:6px 12px; border:1px solid #555; font-family:monospace; }")
+                append("th { background:#3c3f41; color:#bbb; font-weight:bold; }")
+                append("img { max-width:100%; }")
+                append("</style>")
+            }
+
+            append("</head>")
+
+            if (useCef) {
+                append("<body>")
+            } else {
+                append("<body style='font-family:-apple-system,sans-serif; padding:10px; line-height:1.6;'>")
+            }
+
+            if (useCef) {
+                append("<h2>${problem.title}</h2>")
+            } else {
+                append("<h2 style='margin:0 0 8px 0;'>${problem.title}</h2>")
+            }
             append("<div style='color:#888; font-size:12px; margin-bottom:12px;'>")
             append("$sourceName #${problem.id}")
             if (problem.timeLimit.isNotBlank()) {
                 append(" &nbsp;|&nbsp; ${t("시간", "Time")}: ${problem.timeLimit} &nbsp;|&nbsp; ${t("메모리", "Memory")}: ${problem.memoryLimit}")
             }
             append("</div>")
-            append("<hr style='border:none; border-top:1px solid #444; margin:8px 0;'>")
+            if (useCef) append("<hr>") else append("<hr style='border:none; border-top:1px solid #444; margin:8px 0;'>")
+
             // SWEA: 이미지 로컬 경로 변환 (img_X.png → file:///절대경로/img_X.png)
             var desc = problem.description
             if (problem.source == ProblemSource.SWEA && currentProblemFolder != null) {
@@ -685,44 +930,100 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     "src=\"file://${localFile.absolutePath}\""
                 }
             }
-            // 이미지를 <p>로 감싸서 전후 여백 확보 (JEditorPane은 CSS margin on img 미지원)
-            desc = desc.replace(Regex("""(<img\b[^>]*?/?>)""", RegexOption.IGNORE_CASE)) { m ->
-                "<p>${m.groupValues[1]}</p>"
+
+            if (useCef) {
+                // Kotlin에서 LaTeX 구분자를 미리 찾아 <span> 마커로 변환
+                // → JCEF에서 katex.render()로 각각 렌더링 (auto-render 대신)
+
+                // 이중 백슬래시 → 단일 백슬래시 정규화 (일부 BOJ 문제)
+                desc = desc.replace("\\\\(", "\\(")
+                    .replace("\\\\)", "\\)")
+                    .replace("\\\\[", "\\[")
+                    .replace("\\\\]", "\\]")
+
+                // \[...\] → display math
+                desc = desc.replace(Regex("""\\\[(.+?)\\\]""", RegexOption.DOT_MATCHES_ALL)) { m ->
+                    val expr = m.groupValues[1].replace("'", "&#39;")
+                    "<span class='ktx-d' data-expr='$expr'></span>"
+                }
+                // \(...\) → inline math
+                desc = desc.replace(Regex("""\\\((.+?)\\\)""")) { m ->
+                    val expr = m.groupValues[1].replace("'", "&#39;")
+                    "<span class='ktx' data-expr='$expr'></span>"
+                }
+                // $$...$$ → display math
+                desc = desc.replace(Regex("""\$\$(.+?)\$\$""", RegexOption.DOT_MATCHES_ALL)) { m ->
+                    val expr = m.groupValues[1].replace("'", "&#39;")
+                    "<span class='ktx-d' data-expr='$expr'></span>"
+                }
+                // $...$ → inline math ($$나 개행 포함 않음)
+                desc = desc.replace(Regex("""\$([^$\n]+?)\$""")) { m ->
+                    val expr = m.groupValues[1].replace("'", "&#39;")
+                    "<span class='ktx' data-expr='$expr'></span>"
+                }
+            } else {
+                // JEditorPane: 이미지를 <p>로 감싸고 LaTeX → italic 변환
+                desc = desc.replace(Regex("""(<img\b[^>]*?/?>)""", RegexOption.IGNORE_CASE)) { m ->
+                    "<p>${m.groupValues[1]}</p>"
+                }
+                desc = desc.replace(Regex("""\$([^$]+)\$""")) { m ->
+                    "<i>${m.groupValues[1]}</i>"
+                }
             }
             append(desc)
 
-            // 예제 입출력 표시 (프로그래머스는 설명 HTML에 이미 테이블 포함)
-            if (problem.testCases.isNotEmpty() && problem.source != ProblemSource.PROGRAMMERS) {
-                    for ((i, tc) in problem.testCases.withIndex()) {
-                        val preStyle = "background:#2b2b2b; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace;"
-                        if (problem.source == ProblemSource.SWEA) {
-                            // SWEA: 미리보기만 표시 (10줄/5줄)
-                            val inputPreview = truncatePreview(tc.input, 10)
-                            val outputPreview = truncatePreview(tc.expectedOutput, 5)
-                            val inputHtml = inputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            val outputHtml = outputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
-                            append("<div style='$preStyle'>$inputHtml</div>")
-                            append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>input.txt</code> 참고", "See <code>input.txt</code> for full data")}</div>")
-                            append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
-                            append("<div style='$preStyle'>$outputHtml</div>")
-                            append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>output.txt</code> 참고", "See <code>output.txt</code> for full data")}</div>")
-                        } else {
-                            val inputHtml = tc.input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            val outputHtml = tc.expectedOutput.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                            append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
-                            append("<div style='$preStyle'>$inputHtml</div>")
-                            append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
-                            append("<div style='$preStyle'>$outputHtml</div>")
-                        }
+            // 예제 입출력 표시 (백준/프로그래머스는 description에 이미 포함)
+            if (problem.testCases.isNotEmpty()
+                && problem.source != ProblemSource.PROGRAMMERS
+                && problem.source != ProblemSource.BAEKJOON) {
+                for ((i, tc) in problem.testCases.withIndex()) {
+                    val preStyle = if (useCef) {
+                        if (isDark) "background:#1e1e1e; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace; white-space:pre-wrap; border-radius:4px;"
+                        else "background:#f5f5f5; color:#333; padding:10px; border:1px solid #ddd; font-family:monospace; white-space:pre-wrap; border-radius:4px;"
+                    } else {
+                        "background:#2b2b2b; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace;"
                     }
+                    if (problem.source == ProblemSource.SWEA) {
+                        val inputPreview = truncatePreview(tc.input, 10)
+                        val outputPreview = truncatePreview(tc.expectedOutput, 5)
+                        val inputHtml = inputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val outputHtml = outputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
+                        append("<div style='$preStyle'>$inputHtml</div>")
+                        append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>input.txt</code> 참고", "See <code>input.txt</code> for full data")}</div>")
+                        append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
+                        append("<div style='$preStyle'>$outputHtml</div>")
+                        append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>output.txt</code> 참고", "See <code>output.txt</code> for full data")}</div>")
+                    } else {
+                        val inputHtml = tc.input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val outputHtml = tc.expectedOutput.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
+                        append("<div style='$preStyle'>$inputHtml</div>")
+                        append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
+                        append("<div style='$preStyle'>$outputHtml</div>")
+                    }
+                }
+            }
+
+            if (useCef) {
+                // KaTeX: Kotlin에서 미리 추출한 <span class='ktx'> 마커를 katex.render()로 렌더링
+                append("<script src='katex.min.js'></script>")
+                append("<script>")
+                append("if(typeof katex!=='undefined'){")
+                append("  document.querySelectorAll('.ktx').forEach(function(el){")
+                append("    try{katex.render(el.getAttribute('data-expr'),el,{throwOnError:false});}catch(e){}")
+                append("  });")
+                append("  document.querySelectorAll('.ktx-d').forEach(function(el){")
+                append("    try{katex.render(el.getAttribute('data-expr'),el,{displayMode:true,throwOnError:false});}catch(e){}")
+                append("  });")
+                append("}")
+                append("</script>")
             }
 
             append("</body></html>")
         }
         originalHtml = html
-        problemDisplay.text = html
-        problemDisplay.caretPosition = 0
+        setDisplayHtml(html)
     }
 
     private fun translateProblem() {
@@ -733,8 +1034,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (isTranslated) {
             isTranslated = false
             translateButton.text = I18n.t("번역", "Translate")
-            problemDisplay.text = html
-            problemDisplay.caretPosition = 0
+            setDisplayHtml(html)
             return
         }
 
@@ -742,8 +1042,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (translatedHtml != null) {
             isTranslated = true
             translateButton.text = I18n.t("원문", "Original")
-            problemDisplay.text = translatedHtml
-            problemDisplay.caretPosition = 0
+            setDisplayHtml(translatedHtml!!)
             return
         }
 

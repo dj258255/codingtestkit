@@ -1,5 +1,7 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.model.ProblemSource
+import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.SolvedAcApi
 import com.intellij.openapi.project.Project
@@ -40,6 +42,26 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
         }
     }
     private val searchButton = JButton(I18n.t("검색", "Search"))
+    private val solvedFilterCombo = ComboBox(arrayOf(
+        I18n.t("전체", "All"),
+        I18n.t("내가 푼 문제 제외", "Exclude my solved"),
+        I18n.t("내가 푼 문제만", "Only my solved")
+    )).apply {
+        renderer = object : DefaultListCellRenderer() {
+            override fun getListCellRendererComponent(
+                list: JList<*>?, value: Any?, index: Int,
+                isSelected: Boolean, cellHasFocus: Boolean
+            ): Component {
+                val c = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+                border = JBUI.Borders.empty(4, 8)
+                font = font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
+                return c
+            }
+        }
+        val loggedIn = AuthService.getInstance().isLoggedIn(ProblemSource.BAEKJOON)
+        isEnabled = loggedIn
+        if (!loggedIn) toolTipText = I18n.t("백준 로그인이 필요합니다", "BOJ login required")
+    }
 
     // 자동완성
     private val suggestionPopup = JPopupMenu()
@@ -77,6 +99,7 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
 
         val rightPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
         rightPanel.add(sortCombo)
+        rightPanel.add(solvedFilterCombo)
         rightPanel.add(searchButton)
         searchPanel.add(rightPanel, BorderLayout.EAST)
 
@@ -186,12 +209,15 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
     }
 
     private fun doSearch() {
-        val query = searchField.text.trim()
-        if (query.isBlank()) return
+        val baseQuery = searchField.text.trim()
+        val solvedMode = solvedFilterCombo.selectedIndex // 0=전체, 1=제외, 2=만
+
+        if (baseQuery.isBlank() && solvedMode == 0) return
 
         suggestionPopup.isVisible = false
         searchButton.isEnabled = false
         statusLabel.text = I18n.t("검색 중...", "Searching...")
+        statusLabel.foreground = JBColor.GRAY
         tableModel.rowCount = 0
         isOKActionEnabled = false
 
@@ -200,6 +226,29 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
 
         Thread {
             try {
+                // 풀이 필터: 로그인된 BOJ 핸들로 solved_by 쿼리 자동 추가
+                var query = baseQuery
+                if (solvedMode > 0) {
+                    val auth = AuthService.getInstance()
+                    var handle = auth.getUsername(ProblemSource.BAEKJOON)
+                    if (handle.isBlank() && auth.isLoggedIn(ProblemSource.BAEKJOON)) {
+                        handle = auth.fetchUsername(ProblemSource.BAEKJOON)
+                        if (handle.isNotBlank()) auth.setUsername(ProblemSource.BAEKJOON, handle)
+                    }
+                    if (handle.isBlank()) {
+                        SwingUtilities.invokeLater {
+                            statusLabel.text = I18n.t("백준 로그인이 필요합니다.", "BOJ login required.")
+                            statusLabel.foreground = JBColor.RED
+                            searchButton.isEnabled = true
+                        }
+                        return@Thread
+                    }
+                    query = if (solvedMode == 1) "$query -solved_by:$handle" else "$query solved_by:$handle"
+                }
+                if (query.isBlank()) {
+                    SwingUtilities.invokeLater { searchButton.isEnabled = true }
+                    return@Thread
+                }
                 val result = SolvedAcApi.searchProblems(query, sort)
                 results = result.problems
                 SwingUtilities.invokeLater {

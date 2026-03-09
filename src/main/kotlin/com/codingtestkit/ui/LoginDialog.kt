@@ -69,7 +69,17 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         // 페이지 로드 완료 시마다 로그인 여부 확인
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(cefBrowser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
-                if (frame?.isMain != true || extracted) return
+                if (frame?.isMain != true) return
+
+                // 스크롤 성능 개선
+                cefBrowser?.executeJavaScript(
+                    "(function(){var s=document.createElement('style');" +
+                    "s.textContent='html,body{scroll-behavior:smooth}*{-webkit-overflow-scrolling:touch}';" +
+                    "document.head.appendChild(s);})();",
+                    cefBrowser.url, 0
+                )
+
+                if (extracted) return
                 val url = cefBrowser?.url ?: ""
 
                 if (isLoggedInUrl(url)) {

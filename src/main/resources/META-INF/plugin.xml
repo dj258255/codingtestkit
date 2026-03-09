@@ -33,7 +33,9 @@
         </ul>
 
         <h3>Supported Languages</h3>
-        <p>Java, Python, C++, Kotlin</p>
+        <p>Java, Python, C++, Kotlin, JavaScript</p>
+
+        <p><em>Disclaimer: All problem content is copyrighted by its respective platform (BOJ, Programmers, SWEA, LeetCode). This plugin only fetches and stores problems locally for personal use.</em></p>
 
         <hr/>
 
@@ -65,7 +67,9 @@
         </ul>
 
         <h3>지원 언어</h3>
-        <p>Java, Python, C++, Kotlin</p>
+        <p>Java, Python, C++, Kotlin, JavaScript</p>
+
+        <p><em>면책 조항: 모든 문제의 저작권은 해당 플랫폼(백준, 프로그래머스, SWEA, LeetCode)에 있습니다. 이 플러그인은 개인 학습 목적으로 문제를 로컬에 저장할 뿐이며, 문제를 재배포하지 않습니다.</em></p>
     ]]></description>
 
     <change-notes><![CDATA[
@@ -75,7 +79,7 @@
         <ul>
             <li>Initial release</li>
             <li>Fetch problems from BOJ, Programmers, SWEA, LeetCode</li>
-            <li>Local test execution for Java, Python, C++, Kotlin</li>
+            <li>Local test execution for Java, Python, C++, Kotlin, JavaScript</li>
             <li>Per-case execution time and memory usage</li>
             <li>JCEF browser-based login and code submission</li>
             <li>BOJ (solved.ac) and LeetCode problem search &amp; random picker</li>
@@ -93,7 +97,7 @@
         <ul>
             <li>첫 정식 릴리스</li>
             <li>백준, 프로그래머스, SWEA, LeetCode 문제 가져오기 지원</li>
-            <li>Java, Python, C++, Kotlin 로컬 테스트 실행</li>
+            <li>Java, Python, C++, Kotlin, JavaScript 로컬 테스트 실행</li>
             <li>테스트 케이스별 실행 시간(ms) 및 메모리 사용량 표시</li>
             <li>JCEF 브라우저 기반 로그인 및 코드 제출</li>
             <li>백준(solved.ac), LeetCode 문제 검색 및 랜덤 뽑기</li>

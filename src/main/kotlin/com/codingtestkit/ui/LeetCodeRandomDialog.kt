@@ -158,8 +158,12 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         isOKActionEnabled = false
     }
 
+    private var doubleClicked = false
+
     override fun doOKAction() {
-        selectedProblemSlugs = checkedRows.filter { it in results.indices }.map { results[it].titleSlug }
+        if (!doubleClicked) {
+            selectedProblemSlugs = checkedRows.filter { it in results.indices }.map { results[it].titleSlug }
+        }
         super.doOKAction()
     }
 
@@ -283,6 +287,7 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2 && resultTable.selectedRow >= 0) {
                     selectedProblemSlugs = listOf(results[resultTable.selectedRow].titleSlug)
+                    doubleClicked = true
                     doOKAction()
                 }
             }
@@ -440,6 +445,13 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
             try { minAcceptedField.text.trim().toInt().coerceAtLeast(0) } catch (_: Exception) { 1000 }
         } else 0
         val solvedMode = solvedFilterCombo.selectedIndex // 0=전체, 1=제외, 2=에서만
+        if (solvedMode > 0 && AuthService.getInstance().getCookies(ProblemSource.LEETCODE).isBlank()) {
+            statusLabel.text = I18n.t("LeetCode 로그인이 필요합니다.",
+                "LeetCode login required.")
+            statusLabel.foreground = JBColor.RED
+            searchButton.isEnabled = true
+            return
+        }
 
         // LeetCode API는 difficulty를 하나만 받으므로 각 난이도별로 요청
         Thread {

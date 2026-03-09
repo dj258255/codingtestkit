@@ -22,6 +22,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private val testPanel = TestPanel(project)
     private val templatePanel = TemplatePanel(project).also { Disposer.register(this, it) }
     private val timerPanel = TimerPanel()
+    private val referencePanel = ReferencePanel()
     private val settingsPanel = SettingsPanel(project)
     private var lastLoadedFolder: String? = null
 
@@ -33,6 +34,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         tabbedPane.addTab(I18n.t("테스트", "Tests"), AllIcons.Actions.Execute, testPanel)
         tabbedPane.addTab(I18n.t("템플릿", "Templates"), AllIcons.Actions.Copy, templatePanel)
         tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Vcs.History, timerPanel)
+        tabbedPane.addTab(I18n.t("레퍼런스", "Reference"), AllIcons.Actions.Preview, referencePanel)
         tabbedPane.addTab(I18n.t("설정", "Settings"), AllIcons.General.Settings, settingsPanel)
 
         add(tabbedPane, BorderLayout.CENTER)

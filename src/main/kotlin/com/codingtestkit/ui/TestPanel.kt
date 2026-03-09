@@ -224,33 +224,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val stdout = result.output.trim()
                     val stderr = result.error.trim()
                     val expected = tc.expectedOutput.trim()
-                    val expectedLines = expected.lines()
 
-                    // 줄 단위 trim 비교 (trailing whitespace 무시)
+                    // stdout 전체를 그대로 비교 (줄 단위 trailing whitespace 무시)
                     val stdoutNorm = stdout.lines().map { it.trimEnd() }.joinToString("\n").trimEnd()
                     val expectedNorm = expected.lines().map { it.trimEnd() }.joinToString("\n").trimEnd()
-                    if (stdoutNorm == expectedNorm) {
-                        tc.actualOutput = stdout
-                        tc.passed = true
-                    } else {
-                        val actualLines = stdout.lines()
-                        if (actualLines.size > expectedLines.size &&
-                            actualLines.takeLast(expectedLines.size).map { it.trim() } == expectedLines.map { it.trim() }) {
-                            val debugLines = actualLines.dropLast(expectedLines.size)
-                            val answerLines = actualLines.takeLast(expectedLines.size)
-                            tc.actualOutput = answerLines.joinToString("\n")
-                            tc.passed = true
-                            // 디버그 출력을 별도 표시
-                            SwingUtilities.invokeLater {
-                                if (i < cards.size) cards[i].setDebugOutput(debugLines.joinToString("\n"))
-                            }
-                        } else {
-                            tc.actualOutput = stdout
-                            tc.passed = false
-                        }
-                    }
+                    tc.actualOutput = stdout
+                    tc.passed = stdoutNorm == expectedNorm
 
-                    // stderr 디버그 출력
+                    // stderr가 있으면 디버그 출력으로 표시
                     if (stderr.isNotBlank()) {
                         SwingUtilities.invokeLater {
                             if (i < cards.size) cards[i].setStderrOutput(stderr)
@@ -323,6 +304,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             lineWrap = true
             background = JBColor(Color(245, 245, 245), Color(43, 43, 43))
         }
+        private val defaultActualFg = JBColor.foreground()
+        private val errorFg = JBColor(Color(218, 54, 51), Color(230, 80, 80))
+
         private val debugArea = JTextArea("", 2, 20).apply {
             font = Font("JetBrains Mono", Font.ITALIC, JBUI.scale(11))
             border = JBUI.Borders.empty(4)
@@ -397,20 +381,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
             contentPanel.add(createFieldPanel(I18n.t("실제 출력", "Actual"), actualArea))
 
-            // 디버그 출력 (조건부 표시)
+            // 디버그 출력 (stderr, 조건부 표시)
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            debugPanel.add(JLabel(I18n.t("디버그 출력", "Debug Output")).apply {
-                font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
-                foreground = JBColor(Color(150, 120, 50), Color(200, 180, 100))
-                icon = AllIcons.General.Information
-                border = JBUI.Borders.empty(2, 0, 2, 0)
-            }, BorderLayout.NORTH)
-            debugPanel.add(JBScrollPane(debugArea).apply {
-                preferredSize = Dimension(0, JBUI.scale(50))
-            }, BorderLayout.CENTER)
-            debugPanel.alignmentX = LEFT_ALIGNMENT
-            debugPanel.maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(80))
-            contentPanel.add(debugPanel)
+            contentPanel.add(createResizableOutputPanel(
+                debugPanel, debugArea,
+                I18n.t("디버그 출력", "Debug Output"),
+                JBColor(Color(150, 120, 50), Color(200, 180, 100)),
+                AllIcons.General.Information
+            ))
 
             add(contentPanel, BorderLayout.CENTER)
 
@@ -492,6 +470,62 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             return fieldPanel
         }
 
+        private fun createResizableOutputPanel(
+            wrapperPanel: JPanel, textArea: JTextArea,
+            label: String, labelColor: JBColor, icon: Icon
+        ): JPanel {
+            var panelHeight = JBUI.scale(50)
+
+            val scrollPane = JBScrollPane(textArea).apply {
+                preferredSize = Dimension(0, panelHeight)
+                minimumSize = Dimension(0, JBUI.scale(30))
+            }
+
+            wrapperPanel.removeAll()
+            wrapperPanel.layout = BorderLayout(0, 0)
+
+            wrapperPanel.add(JLabel(label).apply {
+                font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
+                foreground = labelColor
+                this.icon = icon
+                border = JBUI.Borders.empty(2, 0, 2, 0)
+            }, BorderLayout.NORTH)
+            wrapperPanel.add(scrollPane, BorderLayout.CENTER)
+
+            val resizeHandle = JPanel().apply {
+                preferredSize = Dimension(0, JBUI.scale(8))
+                minimumSize = Dimension(0, JBUI.scale(8))
+                cursor = Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
+                background = JBColor(Color(210, 210, 210), Color(65, 65, 65))
+            }
+
+            var dragStartY = 0
+            var dragStartHeight = 0
+            resizeHandle.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mousePressed(e: java.awt.event.MouseEvent) {
+                    dragStartY = e.yOnScreen
+                    dragStartHeight = panelHeight
+                }
+            })
+            resizeHandle.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+                override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                    val delta = e.yOnScreen - dragStartY
+                    panelHeight = (dragStartHeight + delta).coerceIn(JBUI.scale(30), JBUI.scale(500))
+                    scrollPane.preferredSize = Dimension(scrollPane.width, panelHeight)
+                    wrapperPanel.revalidate()
+                    contentPanel.revalidate()
+                    maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+                    this@TestCaseCard.revalidate()
+                    cardListPanel.revalidate()
+                    cardListPanel.repaint()
+                }
+            })
+
+            wrapperPanel.add(resizeHandle, BorderLayout.SOUTH)
+            wrapperPanel.alignmentX = LEFT_ALIGNMENT
+            return wrapperPanel
+        }
+
         fun toggle() {
             isExpanded = !isExpanded
             contentPanel.isVisible = isExpanded
@@ -531,12 +565,20 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             statusIcon.icon = AllIcons.Process.Step_1
             titleLabel.text = "#$number ${I18n.t("실행 중...", "Running...")}"
             actualArea.text = ""
+            actualArea.foreground = defaultActualFg
             debugPanel.isVisible = false
             debugArea.text = ""
         }
 
         fun setResult(tc: TestCase, timeMs: Long = 0, memKB: Long = 0) {
             actualArea.text = tc.actualOutput
+            // 에러일 때 실제 출력을 빨간색으로 표시
+            val isError = tc.passed == false && tc.actualOutput.let {
+                it.contains("에러") || it.contains("Error") || it.contains("Exception")
+                    || it.contains("컴파일") || it.contains("시간 초과") || it.contains("Traceback")
+                    || it.startsWith("error:") || it.contains("runtime error", ignoreCase = true)
+            }
+            actualArea.foreground = if (isError) errorFg else defaultActualFg
             val timeStr = buildString {
                 if (timeMs > 0 || memKB > 0) {
                     append(" (")

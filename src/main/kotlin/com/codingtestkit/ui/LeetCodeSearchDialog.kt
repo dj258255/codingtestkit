@@ -1,5 +1,7 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.AuthService
+import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.LeetCodeApi
 import com.intellij.openapi.project.Project
@@ -53,10 +55,16 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         renderer = comboRenderer()
     }
 
+    private val solvedFilterCombo = ComboBox(arrayOf(
+        I18n.t("전체", "All"),
+        I18n.t("내가 푼 문제만", "Only solved"),
+        I18n.t("안 푼 문제만", "Not solved")
+    )).apply { renderer = comboRenderer() }
+
     private val searchButton = JButton(I18n.t("검색", "Search"))
 
     private val tableModel = object : DefaultTableModel(
-        arrayOf("#", I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"),
+        arrayOf(I18n.t("상태", ""), "#", I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"),
             I18n.t("정답률", "AC Rate"), I18n.t("태그", "Tags")), 0
     ) {
         override fun isCellEditable(row: Int, column: Int) = false
@@ -65,6 +73,7 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
     private val statusLabel = JLabel(I18n.t("키워드를 입력하고 검색하세요", "Enter a keyword and search"))
 
     private var results: List<LeetCodeApi.LeetCodeProblemInfo> = emptyList()
+    private var problemStats: Map<String, LeetCodeApi.ProblemStat> = emptyMap()
     var selectedProblemSlug: String? = null
         private set
 
@@ -88,6 +97,7 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         val filterPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
         filterPanel.add(difficultyCombo)
         filterPanel.add(tagCombo)
+        filterPanel.add(solvedFilterCombo)
         filterPanel.add(searchButton)
         searchPanel.add(filterPanel, BorderLayout.EAST)
 
@@ -96,11 +106,21 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         // 결과 테이블
         resultTable.selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
         resultTable.rowHeight = JBUI.scale(24)
-        resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(50)
-        resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(260)
-        resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(70)
+        resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(30)
+        resultTable.columnModel.getColumn(0).maxWidth = JBUI.scale(30)
+        resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(50)
+        resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(240)
         resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(70)
-        resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(200)
+        resultTable.columnModel.getColumn(4).preferredWidth = JBUI.scale(70)
+        resultTable.columnModel.getColumn(5).preferredWidth = JBUI.scale(190)
+
+        // 백그라운드에서 풀이 상태 로드
+        Thread {
+            try {
+                val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
+                problemStats = LeetCodeApi.fetchAllProblemStats(cookies.ifBlank { null })
+            } catch (_: Exception) { }
+        }.start()
 
         panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
 
@@ -156,15 +176,34 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         val tagKey = tagEntries[tagCombo.selectedIndex].first.ifBlank { null }
         val tags = if (tagKey != null) listOf(tagKey) else null
 
+        val statusValues = arrayOf(null, "AC", "NOT_STARTED")
+        val statusFilter = statusValues[solvedFilterCombo.selectedIndex]
+        val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE).ifBlank { null }
+
+        if (statusFilter != null && cookies == null) {
+            statusLabel.text = I18n.t("LeetCode 로그인이 필요합니다.", "LeetCode login required.")
+            statusLabel.foreground = JBColor.RED
+            searchButton.isEnabled = true
+            return
+        }
+
         Thread {
             try {
                 val result = LeetCodeApi.searchProblems(
-                    query = query, difficulty = difficulty, tags = tags, limit = 50
+                    query = query, difficulty = difficulty, tags = tags,
+                    status = statusFilter, limit = 50, cookies = cookies
                 )
                 results = result.problems
                 SwingUtilities.invokeLater {
                     for (p in results) {
+                        val stat = problemStats[p.frontendId]
+                        val statusMark = when (stat?.status) {
+                            "ac" -> "\u2713"      // ✓
+                            "notac" -> "\u2717"    // ✗
+                            else -> ""
+                        }
                         tableModel.addRow(arrayOf(
+                            statusMark,
                             p.frontendId,
                             p.title,
                             p.difficulty,

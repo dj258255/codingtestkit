@@ -54,7 +54,8 @@ enum class Language(
     JAVA("Java", "java", 93, 0),
     PYTHON("Python", "py", 28, 5),
     CPP("C++", "cpp", 84, 1),
-    KOTLIN("Kotlin", "kt", 69, -1);
+    KOTLIN("Kotlin", "kt", 69, -1),
+    JAVASCRIPT("JavaScript", "js", 17, -1);
 
     fun defaultCode(source: ProblemSource): String {
         return when (this) {
@@ -161,6 +162,25 @@ enum class Language(
                     |    }
                     |}
                 """.trimMargin()
+                ProblemSource.LEETCODE -> ""
+            }
+            JAVASCRIPT -> when (source) {
+                ProblemSource.BAEKJOON -> """
+                    |const readline = require('readline');
+                    |const rl = readline.createInterface({ input: process.stdin });
+                    |const lines = [];
+                    |rl.on('line', (line) => lines.push(line));
+                    |rl.on('close', () => {
+                    |
+                    |});
+                """.trimMargin()
+                ProblemSource.PROGRAMMERS -> """
+                    |function solution() {
+                    |    var answer = 0;
+                    |    return answer;
+                    |}
+                """.trimMargin()
+                ProblemSource.SWEA -> ""
                 ProblemSource.LEETCODE -> ""
             }
         }
