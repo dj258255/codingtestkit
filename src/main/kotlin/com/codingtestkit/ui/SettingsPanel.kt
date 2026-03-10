@@ -309,6 +309,8 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun setCodeVisionOff(off: Boolean) {
         com.intellij.codeInsight.codeVision.settings.CodeVisionSettings.getInstance().codeVisionEnabled = !off
         codeVisionToggle.isSelected = off
+        // 열린 에디터에 즉시 반영
+        com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.getInstance(project).restart()
     }
 
     private var originalPasteHandler: EditorActionHandler? = null
