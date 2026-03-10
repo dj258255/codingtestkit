@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefJSQuery
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.callback.CefCookieVisitor
@@ -22,6 +23,7 @@ import javax.swing.*
 class LoginDialog(project: Project, private val source: ProblemSource) : DialogWrapper(project) {
 
     private var cookies = ""
+    private var username = ""
     private var extracted = false
     private val statusLabel = JLabel(I18n.t("로그인하면 자동으로 완료됩니다...", "Login will complete automatically...")).apply {
         foreground = Color.GRAY
@@ -53,6 +55,13 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
         val loginUrl = AuthService.getInstance().getLoginUrl(source)
         val browser = JBCefBrowser(loginUrl)
+
+        // JS → Java 브릿지: 유저네임 추출용
+        val usernameQuery = JBCefJSQuery.create(browser)
+        usernameQuery.addHandler { result ->
+            username = result.trim()
+            null
+        }
 
         // 상단 안내
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT))
@@ -91,12 +100,37 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                         statusLabel.text = I18n.t("로그인 감지! 쿠키 추출 중...", "Login detected! Extracting cookies...")
                         statusLabel.foreground = Color(0, 120, 0)
                     }
-                    extractCookiesAndClose(browser)
+                    // DOM에서 유저네임 추출 시도 (결과는 usernameQuery 핸들러로 전달됨)
+                    val js = getUsernameJS()
+                    if (js.isNotBlank()) {
+                        cefBrowser?.executeJavaScript(
+                            "setTimeout(function(){var __u=(function(){try{return ($js).trim();}catch(e){return '';}})(); ${usernameQuery.inject("__u")}},300);",
+                            cefBrowser.url, 0
+                        )
+                    }
+                    // 쿠키 추출은 약간 딜레이 후 시작 (유저네임 추출 완료 대기)
+                    javax.swing.Timer(500) {
+                        extractCookiesAndClose(browser)
+                    }.apply { isRepeats = false; start() }
                 }
             }
         }, browser.cefBrowser)
 
         return panel
+    }
+
+    /**
+     * 플랫폼별 유저네임 추출 JS 표현식
+     */
+    private fun getUsernameJS(): String = when (source) {
+        ProblemSource.BAEKJOON ->
+            "(document.querySelector('a.username')||document.querySelector('a[href*=\"/user/\"]')||{}).textContent||''"
+        ProblemSource.LEETCODE ->
+            "(document.querySelector('a[href*=\"/u/\"]')||{}).textContent||''"
+        ProblemSource.PROGRAMMERS ->
+            "(document.querySelector('.header-user-name')||document.querySelector('[class*=user] [class*=name]')||{}).textContent||''"
+        ProblemSource.SWEA ->
+            "(document.querySelector('.user_name')||document.querySelector('#userName')||{}).textContent||''"
     }
 
     private fun isLoggedInUrl(url: String): Boolean {
@@ -231,4 +265,5 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
     }
 
     fun getCookies(): String = cookies
+    fun getUsername(): String = username
 }

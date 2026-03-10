@@ -259,7 +259,7 @@ class TimerPanel : JPanel(BorderLayout()) {
             }
             topPanel.add(timeLabel.apply { alignmentX = CENTER_ALIGNMENT })
 
-            val buttonPanel = JPanel(FlowLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
+            val buttonPanel = JPanel(WrapLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
             buttonPanel.add(startButton)
             buttonPanel.add(stopButton)
             buttonPanel.add(resetButton)
@@ -389,8 +389,8 @@ class TimerPanel : JPanel(BorderLayout()) {
         }
 
         // 표시 요소 래퍼
-        private val circularWrapper = JPanel(FlowLayout(FlowLayout.CENTER, 0, 0))
-        private val digitalWrapper = JPanel(FlowLayout(FlowLayout.CENTER, 0, 0))
+        private val circularWrapper = JPanel(WrapLayout(FlowLayout.CENTER, 0, 0))
+        private val digitalWrapper = JPanel(WrapLayout(FlowLayout.CENTER, 0, 0))
         private val progressWrapper = JPanel(BorderLayout())
 
         private val hourField = createTimeField("0")
@@ -409,7 +409,7 @@ class TimerPanel : JPanel(BorderLayout()) {
             }
 
             // 표시 모드 체크박스
-            val modePanel = JPanel(FlowLayout(FlowLayout.CENTER, JBUI.scale(8), 0))
+            val modePanel = JPanel(WrapLayout(FlowLayout.CENTER, JBUI.scale(8), 0))
             modePanel.add(showCircular)
             modePanel.add(showDigital)
             modePanel.add(showProgress)
@@ -431,7 +431,7 @@ class TimerPanel : JPanel(BorderLayout()) {
             topPanel.add(Box.createVerticalStrut(JBUI.scale(6)))
 
             // 시간 입력
-            val setPanel = JPanel(FlowLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
+            val setPanel = JPanel(WrapLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
             setPanel.add(hourField)
             setPanel.add(createUnitLabel(I18n.t("시", "h")))
             setPanel.add(minField)
@@ -441,7 +441,7 @@ class TimerPanel : JPanel(BorderLayout()) {
             topPanel.add(setPanel)
 
             // 프리셋 버튼
-            val presetPanel = JPanel(FlowLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
+            val presetPanel = JPanel(WrapLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
             val presets = listOf(
                 I18n.t("30분", "30min") to Triple(0, 30, 0),
                 I18n.t("1시간", "1hr") to Triple(1, 0, 0),
@@ -461,7 +461,7 @@ class TimerPanel : JPanel(BorderLayout()) {
             topPanel.add(Box.createVerticalStrut(JBUI.scale(2)))
 
             // 컨트롤 버튼
-            val buttonPanel = JPanel(FlowLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
+            val buttonPanel = JPanel(WrapLayout(FlowLayout.CENTER, JBUI.scale(4), 0))
             buttonPanel.add(startButton)
             buttonPanel.add(stopButton)
             buttonPanel.add(resetButton)

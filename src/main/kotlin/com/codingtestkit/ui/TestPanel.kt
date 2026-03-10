@@ -25,6 +25,8 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val addButton = JButton(AllIcons.General.Add).apply {
         toolTipText = I18n.t("테스트 케이스 추가", "Add test case")
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
+        horizontalAlignment = SwingConstants.CENTER
+        margin = JBUI.emptyInsets()
     }
     private val statusLabel = JLabel("").apply {
         border = JBUI.Borders.empty(0, 4)
@@ -55,25 +57,16 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
 
         // Row 1: 언어 + 실행 버튼 + 추가/삭제
-        val buttonRow = JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
+        val buttonRow = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(32))
         }
-
-        val leftControls = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
-        leftControls.add(JLabel(I18n.t("언어:", "Lang:")).apply {
+        buttonRow.add(JLabel(I18n.t("언어:", "Lang:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         })
-        leftControls.add(languageCombo)
-        leftControls.add(Box.createHorizontalStrut(JBUI.scale(4)))
-        leftControls.add(runButton)
-
-        val rightControls = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0))
-        rightControls.add(addButton)
-
-        buttonRow.add(leftControls, BorderLayout.WEST)
-        buttonRow.add(rightControls, BorderLayout.EAST)
+        buttonRow.add(languageCombo)
+        buttonRow.add(runButton)
+        buttonRow.add(addButton)
         topPanel.add(buttonRow)
 
         // Row 2: 정보 + 상태

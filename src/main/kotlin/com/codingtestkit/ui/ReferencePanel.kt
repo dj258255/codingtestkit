@@ -165,6 +165,26 @@ class ReferencePanel : JPanel(BorderLayout()) {
         add(topBox, BorderLayout.NORTH)
         add(cefBrowser!!.component, BorderLayout.CENTER)
 
+        // JCEF 리사이즈 동기화
+        // 1) 직접 리사이즈 시
+        addComponentListener(object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent) {
+                SwingUtilities.invokeLater {
+                    cefBrowser?.component?.revalidate()
+                    cefBrowser?.component?.repaint()
+                }
+            }
+        })
+        // 2) 다른 탭에서 돌아왔을 때 (탭 숨김 중 리사이즈된 경우)
+        addHierarchyListener { e ->
+            if ((e.changeFlags and java.awt.event.HierarchyEvent.SHOWING_CHANGED.toLong()) != 0L && isShowing) {
+                SwingUtilities.invokeLater {
+                    cefBrowser?.component?.revalidate()
+                    cefBrowser?.component?.repaint()
+                }
+            }
+        }
+
         // 스크롤 성능 개선
         cefBrowser!!.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(browser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {

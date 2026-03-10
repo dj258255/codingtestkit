@@ -32,13 +32,14 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.Color
 import java.awt.Font
 import javax.swing.*
 
 class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private val sourceCombo = ComboBox(ProblemSource.entries.map { it.localizedName() }.toTypedArray()).apply {
-        preferredSize = Dimension(JBUI.scale(100), preferredSize.height)
+        preferredSize = Dimension(JBUI.scale(88), preferredSize.height)
         renderer = createComboRenderer()
     }
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray()).apply {
@@ -101,43 +102,32 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
 
-        // Row 1: 플랫폼 + 언어 + 로그인 | GitHub 로그인
-        val row1 = JPanel(BorderLayout()).apply {
+        // Row 1: 플랫폼 + 언어 + 로그인 + GitHub (WrapLayout으로 반응형)
+        val row1 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
         }
-        val row1Left = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
-        row1Left.add(createLabel(I18n.t("플랫폼", "Platform")))
-        row1Left.add(sourceCombo)
-        row1Left.add(Box.createHorizontalStrut(JBUI.scale(4)))
-        row1Left.add(createLabel(I18n.t("언어", "Lang")))
-        row1Left.add(languageCombo)
-        row1Left.add(Box.createHorizontalStrut(JBUI.scale(8)))
-        row1Left.add(loginButton)
-        row1.add(row1Left, BorderLayout.WEST)
-
-        val row1Right = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
-        row1Right.add(githubLoginButton)
-        row1.add(row1Right, BorderLayout.EAST)
+        row1.add(createLabel(I18n.t("플랫폼", "Platform")))
+        row1.add(sourceCombo)
+        row1.add(createLabel(I18n.t("언어", "Lang")))
+        row1.add(languageCombo)
+        row1.add(loginButton)
+        row1.add(githubLoginButton)
         topPanel.add(row1)
-        topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
-        // Row 2: 문제번호 입력 + 가져오기
-        val row2 = JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
+        // Row 2: 문제번호 입력 + 가져오기 (WrapLayout으로 반응형)
+        val row2 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(32))
         }
-        row2.add(createLabel(I18n.t(" 번호 ", " ID ")), BorderLayout.WEST)
-        row2.add(problemIdField, BorderLayout.CENTER)
-        val fetchPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(2), 0))
-        fetchPanel.add(fetchButton)
-        fetchPanel.add(randomButton)
-        fetchPanel.add(searchButton2)
-        row2.add(fetchPanel, BorderLayout.EAST)
+        problemIdField.preferredSize = Dimension(JBUI.scale(150), problemIdField.preferredSize.height)
+        row2.add(createLabel(I18n.t("번호", "ID")))
+        row2.add(problemIdField)
+        row2.add(fetchButton)
+        row2.add(randomButton)
+        row2.add(searchButton2)
         topPanel.add(row2)
-        topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
         // Row 3: 제출 + GitHub
-        val row3 = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+        val row3 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
         }
         row3.add(submitButton)
@@ -199,6 +189,26 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 add(cefBrowser!!.component, BorderLayout.CENTER)
             }
             add(cefPanel, BorderLayout.CENTER)
+
+            // JCEF 리사이즈 동기화
+            // 1) 직접 리사이즈 시
+            cefPanel.addComponentListener(object : java.awt.event.ComponentAdapter() {
+                override fun componentResized(e: java.awt.event.ComponentEvent) {
+                    SwingUtilities.invokeLater {
+                        cefBrowser?.component?.revalidate()
+                        cefBrowser?.component?.repaint()
+                    }
+                }
+            })
+            // 2) 다른 탭에서 돌아왔을 때 (탭 숨김 중 리사이즈된 경우)
+            cefPanel.addHierarchyListener { e ->
+                if ((e.changeFlags and java.awt.event.HierarchyEvent.SHOWING_CHANGED.toLong()) != 0L && cefPanel.isShowing) {
+                    SwingUtilities.invokeLater {
+                        cefBrowser?.component?.revalidate()
+                        cefBrowser?.component?.repaint()
+                    }
+                }
+            }
 
             // 초기 플레이스홀더
             val isDark = !JBColor.isBright()
@@ -337,16 +347,21 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 loginButton.text = I18n.t("로그아웃", "Logout")
                 loginButton.icon = AllIcons.Actions.Cancel
 
-                // 백그라운드에서 유저네임 가져오기 (최대 2회 시도)
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    var username = auth.fetchUsername(source)
-                    if (username.isBlank()) {
-                        // 첫 시도 실패 시 1초 후 재시도 (쿠키 반영 지연 대비)
-                        Thread.sleep(1500)
-                        username = auth.fetchUsername(source)
+                // JCEF에서 추출한 유저네임 우선 사용, 없으면 백그라운드에서 재시도
+                val dialogUsername = dialog.getUsername()
+                if (dialogUsername.isNotBlank()) {
+                    auth.setUsername(source, dialogUsername)
+                    updateLoginButton()
+                } else {
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        var username = auth.fetchUsername(source)
+                        if (username.isBlank()) {
+                            Thread.sleep(1500)
+                            username = auth.fetchUsername(source)
+                        }
+                        auth.setUsername(source, username)
+                        SwingUtilities.invokeLater { updateLoginButton() }
                     }
-                    auth.setUsername(source, username)
-                    SwingUtilities.invokeLater { updateLoginButton() }
                 }
             }
         }
@@ -360,11 +375,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private fun updateGitHubButton() {
         val github = GitHubService.getInstance()
+        githubLoginButton.icon = AllIcons.Vcs.Vendors.Github
         if (github.token.isNotBlank()) {
-            githubLoginButton.text = "<html>GitHub <font color='#50C878'>✓</font></html>"
+            githubLoginButton.text = "GitHub ✓"
+            githubLoginButton.foreground = JBColor(Color(80, 200, 120), Color(80, 200, 120))
             githubLoginButton.toolTipText = I18n.t("GitHub 연결됨 (클릭하여 재설정)", "GitHub connected (click to reconfigure)")
         } else {
             githubLoginButton.text = "GitHub"
+            githubLoginButton.foreground = null
             githubLoginButton.toolTipText = I18n.t("GitHub 토큰 설정", "GitHub token setup")
         }
     }
@@ -1021,7 +1039,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     append("table { border-collapse: collapse; margin: 8px 0; }")
                     append("th, td { padding: 6px 12px; border: 1px solid #444; font-family: monospace; }")
                     append("th { background: #2b2d30; color: #ccc; font-weight: bold; }")
-                    append("img { max-width: 100%; }")
+                    append("img { max-width: 100%; height: auto; }")
                     append("hr { border: none; border-top: 1px solid #3c3f41; margin: 12px 0; }")
                     append("pre { background: #1a1a1a; color: #c5c8c6; padding: 12px; border: 1px solid #3c3f41; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
                     append("code { background: #2b2d30; color: #c5c8c6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")
@@ -1040,7 +1058,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     append("table { border-collapse: collapse; margin: 8px 0; }")
                     append("th, td { padding: 6px 12px; border: 1px solid #d0d0d0; font-family: monospace; }")
                     append("th { background: #f0f0f0; color: #333; font-weight: bold; }")
-                    append("img { max-width: 100%; }")
+                    append("img { max-width: 100%; height: auto; }")
                     append("hr { border: none; border-top: 1px solid #e0e0e0; margin: 12px 0; }")
                     append("pre { background: #f6f8fa; color: #24292e; padding: 12px; border: 1px solid #e1e4e8; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
                     append("code { background: #f0f2f5; color: #24292e; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")
@@ -1059,7 +1077,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 append("table { border-collapse:collapse; margin:8px 0; }")
                 append("th, td { padding:6px 12px; border:1px solid #555; font-family:monospace; }")
                 append("th { background:#3c3f41; color:#bbb; font-weight:bold; }")
-                append("img { max-width:100%; }")
+                append("img { max-width:100%; height:auto; }")
                 append("</style>")
             }
 

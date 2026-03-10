@@ -31,9 +31,8 @@ class SettingsPanel(private val project: Project) : JPanel() {
         border = JBUI.Borders.empty(10, 12)
 
         // 제목
-        val titlePanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+        val titlePanel = WrapPanel(FlowLayout.LEFT, 0, 0).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(28))
         }
         titlePanel.add(JLabel(I18n.t("⚙ 알고리즘 풀이 설정", "⚙ Algorithm Practice Settings")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(16f).toFloat())
@@ -43,7 +42,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
 
         // 언어 설정
         val langSection = createSection(I18n.t("언어 설정", "Language"))
-        val langPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0)).apply {
+        val langPanel = WrapPanel(FlowLayout.LEFT, JBUI.scale(6), 0).apply {
             alignmentX = LEFT_ALIGNMENT
         }
         val langCombo = ComboBox(I18n.Lang.entries.map { it.displayName }.toTypedArray()).apply {
@@ -123,7 +122,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
         toggleSection.add(Box.createVerticalStrut(JBUI.scale(8)))
 
         // 프리셋 버튼
-        val presetPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(8), 0)).apply {
+        val presetPanel = WrapPanel(FlowLayout.LEFT, JBUI.scale(8), JBUI.scale(2)).apply {
             alignmentX = LEFT_ALIGNMENT
         }
         val examModeBtn = JButton(I18n.t("  시험 모드  ", "  Exam Mode  "), AllIcons.General.Warning).apply {
@@ -241,12 +240,12 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun createHelpLine(icon: Icon, text: String): JPanel {
         return JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(20))
             val iconLabel = JLabel(icon).apply {
                 preferredSize = Dimension(JBUI.scale(16), JBUI.scale(16))
+                verticalAlignment = SwingConstants.TOP
             }
             add(iconLabel, BorderLayout.WEST)
-            add(JLabel(text).apply {
+            add(JLabel("<html>$text</html>").apply {
                 font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
                 foreground = JBColor.GRAY
             }, BorderLayout.CENTER)
@@ -254,19 +253,21 @@ class SettingsPanel(private val project: Project) : JPanel() {
     }
 
     private fun createPathLine(name: String, path: String, found: Boolean): JPanel {
-        return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+        val pathText = path.ifBlank { I18n.t("찾을 수 없음", "Not found") }
+        val pathColor = if (found) "#888888" else "#e06060"
+        // Insert zero-width spaces after path separators so HTML JLabel can wrap
+        val wrappablePath = pathText.replace("/", "/\u200B").replace("\\", "\\\u200B")
+        return object : JPanel(BorderLayout(JBUI.scale(4), 0)) {
+            override fun getMaximumSize(): Dimension = Dimension(Int.MAX_VALUE, preferredSize.height)
+        }.apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(20))
             add(JLabel(if (found) AllIcons.General.InspectionsOK else AllIcons.General.Error).apply {
                 preferredSize = Dimension(JBUI.scale(16), JBUI.scale(16))
-            })
-            add(JLabel(name).apply {
-                font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
-            })
-            add(JLabel(path.ifBlank { I18n.t("찾을 수 없음", "Not found") }).apply {
+                verticalAlignment = SwingConstants.TOP
+            }, BorderLayout.WEST)
+            add(JLabel("<html><b>$name</b> <span style='color:$pathColor'>$wrappablePath</span></html>").apply {
                 font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
-                foreground = if (found) JBColor.GRAY else JBColor(Color(200, 80, 80), Color(230, 100, 100))
-            })
+            }, BorderLayout.CENTER)
         }
     }
 

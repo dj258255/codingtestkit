@@ -15,6 +15,18 @@ object BaekjoonCrawler {
             .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .get()
 
+        // 이미지: 상대 경로 → 절대 경로, 고정 크기 속성 제거 (반응형)
+        doc.select("img[src]").forEach { img ->
+            val src = img.attr("src")
+            if (src.startsWith("/")) {
+                img.attr("src", "https://www.acmicpc.net$src")
+            } else if (!src.startsWith("http")) {
+                img.attr("src", "https://www.acmicpc.net/$src")
+            }
+            img.removeAttr("width")
+            img.removeAttr("height")
+        }
+
         val title = doc.select("#problem_title").text()
         val description = doc.select("#problem_description").html()
         val inputDesc = doc.select("#problem_input").html()

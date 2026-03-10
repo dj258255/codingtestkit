@@ -40,6 +40,8 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private val deleteButton = JButton(AllIcons.General.Remove).apply {
         toolTipText = I18n.t("선택한 템플릿 삭제", "Delete selected template")
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
+        horizontalAlignment = SwingConstants.CENTER
+        margin = JBUI.emptyInsets()
     }
     private var previewEditor: EditorEx? = null
     private val previewPanel = JPanel(BorderLayout())
@@ -52,43 +54,30 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
 
-        // Row 1: 이름 + 언어
-        val row1 = JPanel(BorderLayout(JBUI.scale(4), 0)).apply {
+        // Row 1: 이름 + 언어 (WrapLayout으로 반응형)
+        val row1 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(32))
         }
-
-        val namePanel = JPanel(BorderLayout(JBUI.scale(4), 0))
-        namePanel.add(JLabel(I18n.t("이름:", "Name:")).apply {
-            font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
-            foreground = JBColor.GRAY
-        }, BorderLayout.WEST)
-        namePanel.add(nameField, BorderLayout.CENTER)
-
-        val langPanel = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0))
-        langPanel.add(JLabel(I18n.t("언어:", "Lang:")).apply {
+        row1.add(JLabel(I18n.t("이름:", "Name:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         })
-        langPanel.add(languageCombo)
-
-        row1.add(namePanel, BorderLayout.CENTER)
-        row1.add(langPanel, BorderLayout.EAST)
+        nameField.preferredSize = Dimension(JBUI.scale(120), nameField.preferredSize.height)
+        row1.add(nameField)
+        row1.add(JLabel(I18n.t("언어:", "Lang:")).apply {
+            font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
+            foreground = JBColor.GRAY
+        })
+        row1.add(languageCombo)
         topPanel.add(row1)
-        topPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
         // Row 2: 저장 / 불러오기 / 삭제 버튼
-        val row2 = JPanel(BorderLayout()).apply {
+        val row2 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(32))
         }
-
-        val actionButtons = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
-        actionButtons.add(saveButton)
-        actionButtons.add(loadButton)
-
-        row2.add(actionButtons, BorderLayout.WEST)
-        row2.add(deleteButton, BorderLayout.EAST)
+        row2.add(saveButton)
+        row2.add(loadButton)
+        row2.add(deleteButton)
         topPanel.add(row2)
 
         add(topPanel, BorderLayout.NORTH)
