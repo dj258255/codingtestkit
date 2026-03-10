@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -121,6 +121,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.0.3 (2026-03-10)</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] Code Vision toggle</b> – Now applies immediately to open editors (DaemonCodeAnalyzer restart)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] Code Vision 토글</b> – 열린 에디터에 즉시 반영되도록 수정 (DaemonCodeAnalyzer restart)</li>
+        </ul>
+
         <h3>v1.0.2 (2026-03-10)</h3>
 
         <b>English</b>
