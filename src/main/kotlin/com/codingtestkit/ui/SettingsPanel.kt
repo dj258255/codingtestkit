@@ -4,19 +4,11 @@ import com.codingtestkit.service.I18n
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.icons.AllIcons
 import com.intellij.ide.PowerSaveMode
-import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.actionSystem.IdeActions
-import com.intellij.openapi.editor.Caret
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.actionSystem.EditorActionHandler
-import com.intellij.openapi.editor.actionSystem.EditorActionManager
-import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import java.awt.*
-import java.awt.datatransfer.DataFlavor
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import javax.swing.*
@@ -309,11 +301,23 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun setCodeVisionOff(off: Boolean) {
         com.intellij.codeInsight.codeVision.settings.CodeVisionSettings.getInstance().codeVisionEnabled = !off
         codeVisionToggle.isSelected = off
-        // 열린 에디터에 즉시 반영
-        com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.getInstance(project).restart()
+        // 열린 에디터를 닫았다 다시 열어 Code Vision 즉시 반영
+        SwingUtilities.invokeLater {
+            val fem = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+            val openFiles = fem.openFiles.toList()
+            val selectedFile = fem.selectedFiles.firstOrNull()
+            for (file in openFiles) {
+                fem.closeFile(file)
+            }
+            // 선택된 파일을 마지막에 열어서 포커스 유지
+            for (file in openFiles) {
+                if (file != selectedFile) fem.openFile(file)
+            }
+            if (selectedFile != null) {
+                fem.openFile(selectedFile, true)
+            }
+        }
     }
-
-    private var originalPasteHandler: EditorActionHandler? = null
 
     private fun togglePasteBlock() {
         setPasteBlock(pasteBlockToggle.isSelected)
@@ -322,40 +326,6 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun setPasteBlock(enabled: Boolean) {
         pasteBlockToggle.isSelected = enabled
         ExamModeState.pasteBlockEnabled = enabled
-
-        // 최초 활성화 시 paste handler 설치 (이후에는 flag로만 제어)
-        if (enabled && originalPasteHandler == null) {
-            val manager = EditorActionManager.getInstance()
-            originalPasteHandler = manager.getActionHandler(IdeActions.ACTION_EDITOR_PASTE)
-            val original = originalPasteHandler!!
-            manager.setActionHandler(IdeActions.ACTION_EDITOR_PASTE, object : EditorActionHandler() {
-                override fun doExecute(editor: Editor, caret: Caret?, dataContext: DataContext) {
-                    if (ExamModeState.pasteBlockEnabled) {
-                        // IntelliJ 내부 클립보드와 시스템 클립보드 비교
-                        val internalText = try {
-                            CopyPasteManager.getInstance().contents
-                                ?.getTransferData(DataFlavor.stringFlavor) as? String
-                        } catch (_: Exception) { null }
-
-                        val systemText = try {
-                            Toolkit.getDefaultToolkit().systemClipboard
-                                .getData(DataFlavor.stringFlavor) as? String
-                        } catch (_: Exception) { null }
-
-                        if (internalText != systemText) {
-                            // 외부에서 복사된 내용 → 차단
-                            Toolkit.getDefaultToolkit().beep()
-                            return
-                        }
-                    }
-                    original.execute(editor, caret, dataContext)
-                }
-
-                override fun isEnabledForCaret(editor: Editor, caret: Caret, dataContext: DataContext): Boolean {
-                    return original.isEnabled(editor, caret, dataContext)
-                }
-            })
-        }
     }
 
     private fun toggleFocusAlert() {

@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -121,16 +121,20 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>v1.0.3 (2026-03-10)</h3>
+        <h3>v1.0.4 (2026-03-10)</h3>
 
         <b>English</b>
         <ul>
-            <li><b>[Fix] Code Vision toggle</b> – Now applies immediately to open editors (DaemonCodeAnalyzer restart)</li>
+            <li><b>[Fix] Code Vision toggle</b> – Now applies immediately to open editors by refreshing all tabs</li>
+            <li><b>[Fix] Code Vision tab focus</b> – Previously active tab is correctly restored after toggle</li>
+            <li><b>[Fix] Deprecated API</b> – Replaced EditorActionManager.setActionHandler with editorActionHandler extension point registration</li>
         </ul>
 
         <b>한국어</b>
         <ul>
-            <li><b>[수정] Code Vision 토글</b> – 열린 에디터에 즉시 반영되도록 수정 (DaemonCodeAnalyzer restart)</li>
+            <li><b>[수정] Code Vision 토글</b> – 열린 에디터 탭을 새로고침하여 즉시 반영</li>
+            <li><b>[수정] Code Vision 탭 포커스</b> – 토글 후 이전에 열려있던 탭이 정상적으로 유지</li>
+            <li><b>[수정] Deprecated API</b> – EditorActionManager.setActionHandler를 editorActionHandler 확장 포인트 등록 방식으로 교체</li>
         </ul>
 
         <h3>v1.0.2 (2026-03-10)</h3>
@@ -229,6 +233,8 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <editorActionHandler action="EditorPaste"
+                             implementationClass="com.codingtestkit.service.PasteBlockHandler"/>
         <toolWindow id="CodingTestKit"
                     secondary="true"
                     icon="/icons/ctk-toolwindow.svg"
