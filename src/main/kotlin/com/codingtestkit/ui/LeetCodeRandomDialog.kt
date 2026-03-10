@@ -250,19 +250,19 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         // 결과 테이블
         resultTable.rowHeight = JBUI.scale(24)
         resultTable.tableHeader.preferredSize = Dimension(0, JBUI.scale(28))
-        // 체크박스 열 렌더러 (배경색 통일)
+        // 체크박스 열 렌더러
+        val checkRendererBox = JCheckBox().apply { horizontalAlignment = SwingConstants.CENTER }
         resultTable.columnModel.getColumn(0).cellRenderer = object : javax.swing.table.TableCellRenderer {
             override fun getTableCellRendererComponent(
                 table: JTable, value: Any?, isSelected: Boolean, hasFocus: Boolean, row: Int, column: Int
             ): Component {
-                return JCheckBox().apply {
-                    this.isSelected = value == true
-                    horizontalAlignment = SwingConstants.CENTER
-                    isOpaque = false
-                }
+                checkRendererBox.isSelected = value == true
+                checkRendererBox.background = if (isSelected) table.selectionBackground else table.background
+                checkRendererBox.isOpaque = true
+                return checkRendererBox
             }
         }
-        resultTable.columnModel.getColumn(0).apply { preferredWidth = JBUI.scale(30); maxWidth = JBUI.scale(30); minWidth = JBUI.scale(30) }
+        resultTable.columnModel.getColumn(0).apply { preferredWidth = JBUI.scale(36); maxWidth = JBUI.scale(36); minWidth = JBUI.scale(36) }
         resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(45)
         resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(240)
         resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(65)
@@ -274,12 +274,10 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
             javax.swing.table.TableCellRenderer { table, _, _, _, _, _ ->
                 val defaultRenderer = table.tableHeader.defaultRenderer
                 val headerComp = defaultRenderer.getTableCellRendererComponent(table, "", false, false, -1, 0) as JComponent
-                JPanel(BorderLayout()).apply {
-                    background = headerComp.background
-                    border = headerComp.border
-                    add(headerCheck, BorderLayout.CENTER)
-                    headerCheck.isOpaque = false
-                }
+                headerCheck.background = headerComp.background
+                headerCheck.border = headerComp.border
+                headerCheck.isOpaque = true
+                headerCheck
             }
         resultTable.tableHeader.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {

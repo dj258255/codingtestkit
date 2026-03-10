@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -121,6 +121,22 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.0.5 (2026-03-10)</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] Random dialog checkboxes</b> – Header &amp; body checkboxes now visible in dark theme (BOJ &amp; LeetCode)</li>
+            <li><b>[Improve] Test case header preview</b> – Now shows both input and expected output (truncated to 20 chars each)</li>
+            <li><b>[Improve] Auto-clear problem</b> – Problem description and test cases clear automatically when code file is closed</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] 랜덤 다이얼로그 체크박스</b> – 다크 테마에서 헤더 및 바디 체크박스가 보이지 않던 문제 수정 (백준 &amp; LeetCode)</li>
+            <li><b>[개선] 테스트 케이스 헤더 미리보기</b> – 입력과 예상 출력을 함께 표시 (각 20자로 요약)</li>
+            <li><b>[개선] 문제 설명 자동 초기화</b> – 코드 파일을 닫으면 문제 설명과 테스트 케이스가 자동으로 초기화</li>
+        </ul>
+
         <h3>v1.0.4 (2026-03-10)</h3>
 
         <b>English</b>

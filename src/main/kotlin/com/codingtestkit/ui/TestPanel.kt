@@ -349,9 +349,15 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 foreground = JBColor.GRAY
                 font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
             }
-            val inputPreview = testCase.input.lines().firstOrNull()?.take(30) ?: ""
-            if (inputPreview.isNotBlank()) {
-                summaryLabel.text = "${I18n.t("입력", "Input")}: $inputPreview..."
+            val inputFirst = testCase.input.lines().firstOrNull()?.trim() ?: ""
+            val outputFirst = testCase.expectedOutput.lines().firstOrNull()?.trim() ?: ""
+            val inPreview = if (inputFirst.length > 20) inputFirst.take(20) + "…" else inputFirst
+            val outPreview = if (outputFirst.length > 20) outputFirst.take(20) + "…" else outputFirst
+            val parts = mutableListOf<String>()
+            if (inPreview.isNotBlank()) parts.add("${I18n.t("입력", "In")}: $inPreview")
+            if (outPreview.isNotBlank()) parts.add("${I18n.t("출력", "Out")}: $outPreview")
+            if (parts.isNotEmpty()) {
+                summaryLabel.text = parts.joinToString("  |  ")
             }
             headerPanel.add(summaryLabel, BorderLayout.CENTER)
 

@@ -55,8 +55,25 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                     override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
                         detectAndLoadProblem(file, basePath)
                     }
+                    override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+                        // 파일 닫은 후 현재 선택된 파일 기준으로 판단
+                        val selected = source.selectedFiles.firstOrNull()
+                        if (selected == null || !selected.path.contains("/problems/")) {
+                            lastLoadedFolder = null
+                            problemPanel.clearProblem()
+                            testPanel.setTestCases(emptyList())
+                        } else {
+                            detectAndLoadProblem(selected, basePath)
+                        }
+                    }
                     override fun selectionChanged(event: FileEditorManagerEvent) {
-                        val file = event.newFile ?: return
+                        val file = event.newFile
+                        if (file == null) {
+                            lastLoadedFolder = null
+                            problemPanel.clearProblem()
+                            testPanel.setTestCases(emptyList())
+                            return
+                        }
                         detectAndLoadProblem(file, basePath)
                     }
                 }

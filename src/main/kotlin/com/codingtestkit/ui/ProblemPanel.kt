@@ -607,6 +607,21 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
+     * 문제 설명 초기화 (파일 닫힘 등)
+     */
+    fun clearProblem() {
+        currentProblem = null
+        currentProblemFolder = null
+        isTranslated = false
+        translatedHtml = null
+        translateButton.text = I18n.t("번역", "Translate")
+        translateButton.isEnabled = false
+        submitButton.isEnabled = false
+        githubPushButton.isEnabled = false
+        setDisplayHtml("")
+    }
+
+    /**
      * 기존 문제 폴더에서 문제를 로드 (파일 열 때 자동 인식용)
      */
     fun loadExistingProblem(problem: Problem, folder: java.io.File) {
