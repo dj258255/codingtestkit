@@ -25,6 +25,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
 
     private val autoCompleteToggle = JCheckBox(I18n.t("자동완성 끄기 (Auto Complete OFF)", "Auto Complete OFF"))
     private val inspectionToggle = JCheckBox(I18n.t("코드 검사 끄기 (Inspections OFF)", "Inspections OFF"))
+    private val codeVisionToggle = JCheckBox(I18n.t("사용 위치 힌트 끄기 (Code Vision OFF)", "Code Vision OFF"))
     private val pasteBlockToggle = JCheckBox(I18n.t("외부 붙여넣기 차단 (Paste Block)", "Paste Block"))
     private val focusAlertToggle = JCheckBox(I18n.t("포커스 이탈 감지 (Focus Alert)", "Focus Alert"))
     private val readmeToggle = JCheckBox(I18n.t("README.md 생성", "Generate README.md"))
@@ -97,7 +98,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
 
         // 토글 섹션
         val toggleSection = createSection(I18n.t("코딩 환경", "Coding Environment"))
-        val toggles = listOf(autoCompleteToggle, inspectionToggle, pasteBlockToggle, focusAlertToggle)
+        val toggles = listOf(autoCompleteToggle, inspectionToggle, codeVisionToggle, pasteBlockToggle, focusAlertToggle)
         for (toggle in toggles) {
             toggle.alignmentX = LEFT_ALIGNMENT
             toggle.isOpaque = false
@@ -111,6 +112,12 @@ class SettingsPanel(private val project: Project) : JPanel() {
         inspectionToggle.isSelected = PowerSaveMode.isEnabled()
         inspectionToggle.addActionListener { toggleInspections() }
         toggleSection.add(inspectionToggle)
+        toggleSection.add(Box.createVerticalStrut(JBUI.scale(4)))
+
+        codeVisionToggle.toolTipText = I18n.t("에디터에 표시되는 'N개 사용 위치' 힌트를 숨깁니다", "Hide 'N usages' hints shown in the editor")
+        codeVisionToggle.isSelected = !com.intellij.codeInsight.codeVision.settings.CodeVisionSettings.getInstance().codeVisionEnabled
+        codeVisionToggle.addActionListener { toggleCodeVision() }
+        toggleSection.add(codeVisionToggle)
         toggleSection.add(Box.createVerticalStrut(JBUI.scale(4)))
 
         pasteBlockToggle.toolTipText = I18n.t("외부 프로그램에서 복사한 텍스트 붙여넣기를 차단합니다", "Block pasting text copied from external programs")
@@ -128,12 +135,12 @@ class SettingsPanel(private val project: Project) : JPanel() {
             alignmentX = LEFT_ALIGNMENT
         }
         val examModeBtn = JButton(I18n.t("  시험 모드  ", "  Exam Mode  "), AllIcons.General.Warning).apply {
-            toolTipText = I18n.t("4가지 제한을 모두 활성화합니다", "Enable all 4 restrictions")
+            toolTipText = I18n.t("5가지 제한을 모두 활성화합니다", "Enable all 5 restrictions")
             putClientProperty("JButton.buttonType", "roundRect")
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(12f).toFloat())
         }
         val normalModeBtn = JButton(I18n.t("  일반 모드  ", "  Normal Mode  "), AllIcons.General.InspectionsOK).apply {
-            toolTipText = I18n.t("4가지 제한을 모두 해제합니다", "Disable all 4 restrictions")
+            toolTipText = I18n.t("5가지 제한을 모두 해제합니다", "Disable all 5 restrictions")
             putClientProperty("JButton.buttonType", "roundRect")
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(12f).toFloat())
         }
@@ -141,12 +148,14 @@ class SettingsPanel(private val project: Project) : JPanel() {
         examModeBtn.addActionListener {
             setAutoCompleteOff(true)
             setInspectionsOff(true)
+            setCodeVisionOff(true)
             setPasteBlock(true)
             setFocusAlert(true)
         }
         normalModeBtn.addActionListener {
             setAutoCompleteOff(false)
             setInspectionsOff(false)
+            setCodeVisionOff(false)
             setPasteBlock(false)
             setFocusAlert(false)
         }
@@ -185,6 +194,10 @@ class SettingsPanel(private val project: Project) : JPanel() {
                 "Inspections OFF: Enables power save mode to stop background code analysis")))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
+            I18n.t("사용 위치 힌트 끄기: 에디터의 'N개 사용 위치' 등 Code Vision 힌트를 숨깁니다",
+                "Code Vision OFF: Hides 'N usages' and other Code Vision hints in the editor")))
+        helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
+        helpSection.add(createHelpLine(AllIcons.General.Information,
             I18n.t("붙여넣기 차단: IDE 외부에서 복사한 텍스트의 붙여넣기를 차단합니다",
                 "Paste Block: Blocks pasting text copied from outside the IDE")))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
@@ -193,8 +206,8 @@ class SettingsPanel(private val project: Project) : JPanel() {
                 "Focus Alert: Shows a warning when you leave the IDE window")))
         helpSection.add(Box.createVerticalStrut(JBUI.scale(2)))
         helpSection.add(createHelpLine(AllIcons.General.Information,
-            I18n.t("4가지를 모두 켜면 실제 코딩 테스트와 동일한 환경에서 연습할 수 있습니다",
-                "Enable all 4 to practice in an environment identical to real coding tests")))
+            I18n.t("5가지를 모두 켜면 실제 코딩 테스트와 동일한 환경에서 연습할 수 있습니다",
+                "Enable all 5 to practice in an environment identical to real coding tests")))
         add(helpSection)
         add(Box.createVerticalStrut(JBUI.scale(8)))
 
@@ -273,6 +286,10 @@ class SettingsPanel(private val project: Project) : JPanel() {
         setInspectionsOff(inspectionToggle.isSelected)
     }
 
+    private fun toggleCodeVision() {
+        setCodeVisionOff(codeVisionToggle.isSelected)
+    }
+
     /** checked = 자동완성 끄기 활성 */
     private fun setAutoCompleteOff(off: Boolean) {
         val settings = CodeInsightSettings.getInstance()
@@ -286,6 +303,12 @@ class SettingsPanel(private val project: Project) : JPanel() {
     private fun setInspectionsOff(off: Boolean) {
         PowerSaveMode.setEnabled(off)
         inspectionToggle.isSelected = off
+    }
+
+    /** checked = Code Vision 끄기 활성 */
+    private fun setCodeVisionOff(off: Boolean) {
+        com.intellij.codeInsight.codeVision.settings.CodeVisionSettings.getInstance().codeVisionEnabled = !off
+        codeVisionToggle.isSelected = off
     }
 
     private var originalPasteHandler: EditorActionHandler? = null

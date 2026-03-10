@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://plugins.jetbrains.com/plugin/30574-codingtestkit"><img src="https://img.shields.io/jetbrains/plugin/v/30574-codingtestkit?label=Marketplace&logo=jetbrains" alt="JetBrains Plugin"/></a>
+</p>
+
+<p align="center">
   <a href="#english"><b>English</b></a> &nbsp;|&nbsp; <a href="#한국어"><b>한국어</b></a>
 </p>
 
@@ -345,7 +349,7 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 ## Installation
 
 ### JetBrains Marketplace
-1. IntelliJ IDEA > Settings > Plugins > Marketplace
+1. **[Install from Marketplace](https://plugins.jetbrains.com/plugin/30574-codingtestkit)** — or open IntelliJ IDEA > Settings > Plugins > Marketplace
 2. Search "CodingTestKit" and install
 
 ### Manual Install
@@ -687,7 +691,7 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 ## 설치 방법
 
 ### JetBrains Marketplace
-1. IntelliJ IDEA > Settings > Plugins > Marketplace
+1. **[Marketplace에서 설치](https://plugins.jetbrains.com/plugin/30574-codingtestkit)** — 또는 IntelliJ IDEA > Settings > Plugins > Marketplace
 2. "CodingTestKit" 검색 후 설치
 
 ### 수동 설치

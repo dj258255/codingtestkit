@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -25,7 +25,7 @@
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>Login &amp; Submit</b></a> – Submit via built-in browser with auto language selection</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>Search</b></a> – Search by keyword, tag, difficulty on BOJ (solved.ac) and LeetCode</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>Random Picker</b></a> – Tier/class range, tag chips, solved filter, accepted count filter</li>
-            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>Exam Mode</b></a> – Disable autocomplete, block paste, detect focus loss</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>Exam Mode</b></a> – Disable autocomplete, hide code vision, block paste, detect focus loss</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/timer.md"><b>Timer</b></a> – Stopwatch (lap records &amp; memo) + circular dial countdown timer</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/templates.md"><b>Templates</b></a> – Save and load code templates with syntax highlighting</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/github.md"><b>GitHub Push</b></a> – One-click login, repo selector, auto-push on accepted</li>
@@ -34,6 +34,23 @@
 
         <h3>Supported Languages</h3>
         <p>Java, Python, C++, Kotlin, JavaScript</p>
+
+        <h3>Getting Started</h3>
+        <ol>
+            <li>Open <b>CodingTestKit</b> from the right sidebar</li>
+            <li>Select a platform (BOJ / Programmers / SWEA / LeetCode) and language</li>
+            <li>Enter a problem number and click <b>Fetch</b></li>
+            <li>Write your solution in the auto-generated code file</li>
+            <li>Click <b>Run All</b> to test against all test cases</li>
+            <li>Click <b>Submit</b> to submit via the built-in browser</li>
+        </ol>
+        <p><b>Optional:</b></p>
+        <ul>
+            <li><b>Login</b> – Click login for each platform to enable submission and solved filters</li>
+            <li><b>GitHub</b> – Settings → GitHub Integration → Login to auto-push accepted solutions</li>
+            <li><b>Exam Mode</b> – Settings → Exam Mode to simulate real test conditions</li>
+            <li><b>Timer</b> – Use the Timer tab for stopwatch or countdown</li>
+        </ul>
 
         <h3>Bug Reports &amp; Feature Requests</h3>
         <p>Found a bug or have a feature idea? Please let us know!</p>
@@ -66,7 +83,7 @@
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>로그인 &amp; 제출</b></a> – JCEF 브라우저로 직접 제출 + 언어 자동 선택</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>문제 검색</b></a> – 백준(solved.ac), LeetCode에서 키워드·태그·난이도로 검색</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>랜덤 뽑기</b></a> – 티어/클래스 범위, 태그 칩, 풀이 필터, 정답자 수 필터</li>
-            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>시험 모드</b></a> – 자동완성/검사 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>시험 모드</b></a> – 자동완성/검사/사용위치 힌트 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/timer.md"><b>타이머</b></a> – 스톱워치(랩 기록·메모) + 원형 다이얼 카운트다운 타이머</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/templates.md"><b>코드 템플릿</b></a> – 자주 쓰는 코드 템플릿 저장 및 불러오기</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/github.md"><b>GitHub 연동</b></a> – 원클릭 로그인, 레포 선택, 채점 통과 시 자동 푸시</li>
@@ -75,6 +92,23 @@
 
         <h3>지원 언어</h3>
         <p>Java, Python, C++, Kotlin, JavaScript</p>
+
+        <h3>시작하기</h3>
+        <ol>
+            <li>우측 사이드바에서 <b>CodingTestKit</b> 열기</li>
+            <li>플랫폼 (백준 / 프로그래머스 / SWEA / LeetCode)과 언어 선택</li>
+            <li>문제 번호 입력 후 <b>가져오기</b> 클릭</li>
+            <li>자동 생성된 코드 파일에 풀이 작성</li>
+            <li><b>전체 실행</b>으로 테스트 케이스 확인</li>
+            <li><b>제출</b> 버튼으로 내장 브라우저에서 제출</li>
+        </ol>
+        <p><b>추가 설정:</b></p>
+        <ul>
+            <li><b>로그인</b> – 각 플랫폼 로그인 → 제출 및 풀이 필터 사용 가능</li>
+            <li><b>GitHub</b> – 설정 → GitHub 연동 → 로그인하면 채점 통과 시 자동 푸시</li>
+            <li><b>시험 모드</b> – 설정 → 시험 모드로 실전 환경 재현</li>
+            <li><b>타이머</b> – 타이머 탭에서 스톱워치/카운트다운 사용</li>
+        </ul>
 
         <h3>버그 제보 &amp; 기능 제안</h3>
         <p>버그를 발견하셨거나 원하는 기능이 있으시면 알려주세요!</p>
@@ -87,6 +121,36 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.0.2 (2026-03-10)</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] Code Vision toggle</b> – Hide "N usages" hints in the editor via Settings or Exam Mode</li>
+            <li><b>[New] Getting Started section</b> – Added quick start guide to plugin description</li>
+            <li><b>[Improve] i18n</b> – Full internationalization for all dialogs (CodeSubmit, Login, Search, Random)</li>
+            <li><b>[Improve] Tag translation</b> – BOJ tags use tagsEn from solved.ac; LeetCode tags translate via built-in map</li>
+            <li><b>[Improve] BOJ section headings</b> – Section titles (Problem, Input, Output, etc.) follow UI language setting</li>
+            <li><b>[Improve] GitHub push</b> – Added confirmation dialog before pushing</li>
+            <li><b>[Fix] Translate button</b> – Now enabled when loading existing problems</li>
+            <li><b>[Fix] Kotlin reference</b> – Fixed devdocs.io URL for Kotlin documentation</li>
+            <li><b>[Improve] Exam Mode</b> – Now includes 5 restrictions (added Code Vision OFF)</li>
+            <li><b>[Improve] README</b> – Added 5 animated GIF demos</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] Code Vision 토글</b> – 에디터의 'N개 사용 위치' 힌트를 설정 또는 시험 모드에서 끄기</li>
+            <li><b>[신규] 시작하기 섹션</b> – 플러그인 설명에 빠른 시작 가이드 추가</li>
+            <li><b>[개선] i18n</b> – 모든 다이얼로그 다국어 적용 (코드 제출, 로그인, 검색, 랜덤)</li>
+            <li><b>[개선] 태그 번역</b> – 백준 태그는 solved.ac의 tagsEn 활용; LeetCode 태그는 내장 번역 맵 사용</li>
+            <li><b>[개선] 백준 섹션 제목</b> – 문제/입력/출력 등 섹션 제목이 UI 언어 설정을 따름</li>
+            <li><b>[개선] GitHub 푸시</b> – 푸시 전 확인 다이얼로그 추가</li>
+            <li><b>[수정] 번역 버튼</b> – 기존 문제 로드 시에도 활성화</li>
+            <li><b>[수정] Kotlin 레퍼런스</b> – devdocs.io Kotlin 문서 URL 수정</li>
+            <li><b>[개선] 시험 모드</b> – 5가지 제한으로 확장 (Code Vision OFF 추가)</li>
+            <li><b>[개선] README</b> – 애니메이션 GIF 데모 5개 추가</li>
+        </ul>
+
         <h3>v1.0.1 (2026-03-09)</h3>
 
         <b>English</b>
