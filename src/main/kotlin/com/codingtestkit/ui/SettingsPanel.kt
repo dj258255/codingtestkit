@@ -68,12 +68,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
             alignmentX = LEFT_ALIGNMENT
             isOpaque = false
         }
-        langNotePanel.add(JLabel("* 변경 후 도구 창을 다시 열어야 적용됩니다").apply {
-            font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
-            foreground = JBColor.GRAY
-            alignmentX = LEFT_ALIGNMENT
-        })
-        langNotePanel.add(JLabel("* Reopen tool window to apply changes").apply {
+        langNotePanel.add(JLabel(I18n.t("* 변경 후 도구 창을 다시 열어야 적용됩니다", "* Reopen tool window to apply changes")).apply {
             font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
             foreground = JBColor.GRAY
             alignmentX = LEFT_ALIGNMENT

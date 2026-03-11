@@ -21,15 +21,15 @@ object SubmitService {
         cookies: String
     ): SubmitResult {
         if (cookies.isBlank()) {
-            return SubmitResult(false, "로그인이 필요합니다.")
+            return SubmitResult(false, I18n.t("로그인이 필요합니다.", "Login required."))
         }
 
         return when (source) {
             ProblemSource.BAEKJOON -> submitBaekjoon(problemId, code, language, cookies)
             ProblemSource.PROGRAMMERS -> submitProgrammers(problemId, code, language, cookies)
             ProblemSource.SWEA -> submitSwea(problemId, code, language, cookies)
-            ProblemSource.LEETCODE -> SubmitResult(false, "LeetCode 제출은 브라우저에서 직접 해주세요.")
-            ProblemSource.CODEFORCES -> SubmitResult(false, "Codeforces 제출은 브라우저에서 직접 해주세요.")
+            ProblemSource.LEETCODE -> SubmitResult(false, I18n.t("LeetCode 제출은 브라우저에서 직접 해주세요.", "Please submit on LeetCode website."))
+            ProblemSource.CODEFORCES -> SubmitResult(false, I18n.t("Codeforces 제출은 브라우저에서 직접 해주세요.", "Please submit on Codeforces website."))
         }
     }
 
@@ -73,7 +73,7 @@ object SubmitService {
 
             // 로그인 페이지로 리다이렉트된 경우
             if (finalUrl.contains("/login") || finalUrl.contains("/signin")) {
-                return SubmitResult(false, "로그인 세션이 만료되었습니다. 다시 로그인해주세요.")
+                return SubmitResult(false, I18n.t("로그인 세션이 만료되었습니다. 다시 로그인해주세요.", "Login session expired. Please log in again."))
             }
 
             // CSRF 키 찾기
@@ -140,12 +140,12 @@ object SubmitService {
 
             val resultUrl = response.url().toString()
             return if (resultUrl.contains("status") || response.statusCode() in 200..399) {
-                SubmitResult(true, "제출 완료!\n결과: $resultUrl", resultUrl)
+                SubmitResult(true, I18n.t("제출 완료!\n결과: $resultUrl", "Submitted!\nResult: $resultUrl"), resultUrl)
             } else {
-                SubmitResult(false, "제출 실패: HTTP ${response.statusCode()}")
+                SubmitResult(false, I18n.t("제출 실패", "Submit failed") + ": HTTP ${response.statusCode()}")
             }
         } catch (e: Exception) {
-            return SubmitResult(false, "제출 오류: ${e.message}")
+            return SubmitResult(false, I18n.t("제출 오류", "Submit error") + ": ${e.message}")
         }
     }
 
@@ -167,7 +167,10 @@ object SubmitService {
     ): SubmitResult {
         try {
             val langCode = programmersLangMap[language]
-                ?: return SubmitResult(false, "프로그래머스에서 ${language.displayName}을 지원하지 않습니다.")
+                ?: return SubmitResult(false, I18n.t(
+                    "프로그래머스에서 ${language.displayName}을 지원하지 않습니다.",
+                    "${language.displayName} is not supported on Programmers."
+                ))
 
             // 프로그래머스 제출 API
             val submitUrl = "https://school.programmers.co.kr/learn/courses/30/lessons/$lessonId/submit"
@@ -185,13 +188,15 @@ object SubmitService {
                 .execute()
 
             return if (response.statusCode() in 200..399) {
-                SubmitResult(true, "프로그래머스 제출 완료!\n채점 결과는 사이트에서 확인하세요.",
-                    "https://school.programmers.co.kr/learn/courses/30/lessons/$lessonId")
+                SubmitResult(true, I18n.t(
+                    "프로그래머스 제출 완료!\n채점 결과는 사이트에서 확인하세요.",
+                    "Submitted to Programmers!\nCheck the results on the website."
+                ), "https://school.programmers.co.kr/learn/courses/30/lessons/$lessonId")
             } else {
-                SubmitResult(false, "제출 실패: HTTP ${response.statusCode()}\n사이트에서 직접 제출해주세요.")
+                SubmitResult(false, I18n.t("제출 실패", "Submit failed") + ": HTTP ${response.statusCode()}")
             }
         } catch (e: Exception) {
-            return SubmitResult(false, "프로그래머스 제출 오류: ${e.message}\n사이트에서 직접 제출해주세요.")
+            return SubmitResult(false, I18n.t("프로그래머스 제출 오류", "Programmers submit error") + ": ${e.message}")
         }
     }
 
@@ -204,7 +209,10 @@ object SubmitService {
         cookies: String
     ): SubmitResult {
         if (language.sweaId < 0) {
-            return SubmitResult(false, "SWEA에서 ${language.displayName}은 지원하지 않습니다.")
+            return SubmitResult(false, I18n.t(
+                "SWEA에서 ${language.displayName}은 지원하지 않습니다.",
+                "${language.displayName} is not supported on SWEA."
+            ))
         }
 
         try {
@@ -223,12 +231,12 @@ object SubmitService {
                 .execute()
 
             return if (response.statusCode() in 200..399) {
-                SubmitResult(true, "SWEA 제출 완료!")
+                SubmitResult(true, I18n.t("SWEA 제출 완료!", "Submitted to SWEA!"))
             } else {
-                SubmitResult(false, "제출 실패: HTTP ${response.statusCode()}")
+                SubmitResult(false, I18n.t("제출 실패", "Submit failed") + ": HTTP ${response.statusCode()}")
             }
         } catch (e: Exception) {
-            return SubmitResult(false, "SWEA 제출 오류: ${e.message}")
+            return SubmitResult(false, I18n.t("SWEA 제출 오류", "SWEA submit error") + ": ${e.message}")
         }
     }
 }

@@ -35,12 +35,14 @@ object ProblemFileManager {
         language: Language,
         templateCode: String? = null
     ): CreatedFiles {
-        val basePath = project.basePath ?: throw IllegalStateException("프로젝트 경로를 찾을 수 없습니다.")
+        val basePath = project.basePath ?: throw IllegalStateException(
+            I18n.t("프로젝트 경로를 찾을 수 없습니다.", "Project path not found.")
+        )
 
         // 폴더 생성: problems/백준/Gold V/1000. A+B/
         val levelFolder = problem.difficulty.ifBlank { "Unrated" }
         val folderName = sanitizeFolderName("${problem.id}. ${problem.title}")
-        val problemDir = File(basePath, "problems/${problem.source.displayName}/$levelFolder/$folderName")
+        val problemDir = File(basePath, "problems/${problem.source.localizedName()}/$levelFolder/$folderName")
         problemDir.mkdirs()
 
         // README.md 생성 (설정에서 켜진 경우만)
@@ -125,12 +127,12 @@ object ProblemFileManager {
     private fun generateMarkdown(problem: Problem): String {
         val sb = StringBuilder()
 
-        sb.appendLine("# [${problem.source.displayName} #${problem.id}] ${problem.title}")
+        sb.appendLine("# [${problem.source.localizedName()} #${problem.id}] ${problem.title}")
         sb.appendLine()
 
         if (problem.timeLimit.isNotBlank()) {
-            sb.appendLine("- **시간 제한**: ${problem.timeLimit}")
-            sb.appendLine("- **메모리 제한**: ${problem.memoryLimit}")
+            sb.appendLine("- **${I18n.t("시간 제한", "Time Limit")}**: ${problem.timeLimit}")
+            sb.appendLine("- **${I18n.t("메모리 제한", "Memory Limit")}**: ${problem.memoryLimit}")
             sb.appendLine()
         }
 
@@ -145,11 +147,11 @@ object ProblemFileManager {
             sb.appendLine()
             sb.appendLine("---")
             sb.appendLine()
-            sb.appendLine("## 예제")
+            sb.appendLine("## ${I18n.t("예제", "Examples")}")
             sb.appendLine()
 
             for ((i, tc) in problem.testCases.withIndex()) {
-                sb.appendLine("### 예제 ${i + 1}")
+                sb.appendLine("### ${I18n.t("예제", "Example")} ${i + 1}")
                 if (problem.source == ProblemSource.PROGRAMMERS && problem.parameterNames.isNotEmpty()) {
                     val inputs = tc.input.split("\n")
                     for ((j, param) in problem.parameterNames.withIndex()) {
@@ -160,20 +162,20 @@ object ProblemFileManager {
                     // SWEA: 테스트 데이터가 길 수 있으므로 미리보기만 표시
                     val inputPreview = truncatePreview(tc.input, 10)
                     val outputPreview = truncatePreview(tc.expectedOutput, 5)
-                    sb.appendLine("**입력:** (전체 데이터는 `input.txt` 참고)")
+                    sb.appendLine("**${I18n.t("입력", "Input")}:** (${I18n.t("전체 데이터는", "See full data in")} `input.txt` ${I18n.t("참고", "")})")
                     sb.appendLine("```")
                     sb.appendLine(inputPreview)
                     sb.appendLine("```")
-                    sb.appendLine("**출력:** (전체 데이터는 `output.txt` 참고)")
+                    sb.appendLine("**${I18n.t("출력", "Output")}:** (${I18n.t("전체 데이터는", "See full data in")} `output.txt` ${I18n.t("참고", "")})")
                     sb.appendLine("```")
                     sb.appendLine(outputPreview)
                     sb.appendLine("```")
                 } else {
-                    sb.appendLine("**입력:**")
+                    sb.appendLine("**${I18n.t("입력", "Input")}:**")
                     sb.appendLine("```")
                     sb.appendLine(tc.input)
                     sb.appendLine("```")
-                    sb.appendLine("**출력:**")
+                    sb.appendLine("**${I18n.t("출력", "Output")}:**")
                     sb.appendLine("```")
                     sb.appendLine(tc.expectedOutput)
                     sb.appendLine("```")
@@ -274,21 +276,26 @@ object ProblemFileManager {
      */
     fun findCodeFile(project: Project, source: ProblemSource, problemId: String): VirtualFile? {
         val basePath = project.basePath ?: return null
-        val problemsDir = File(basePath, "problems/${source.displayName}")
-        if (!problemsDir.exists()) return null
 
-        // 난이도 폴더 안에서 "번호. " 패턴으로 시작하는 폴더 찾기
-        for (levelDir in problemsDir.listFiles().orEmpty()) {
-            if (!levelDir.isDirectory) continue
-            val matchingDir = levelDir.listFiles()?.firstOrNull {
-                it.isDirectory && it.name.startsWith("$problemId.")
-            }
-            if (matchingDir != null) {
-                val codeFile = matchingDir.listFiles()?.firstOrNull {
-                    it.extension in listOf("java", "py", "cpp", "kt", "js")
+        // 현재 언어 폴더명 + 반대 언어 폴더명 모두 탐색 (호환성)
+        val candidates = listOf(source.localizedName(), source.displayName, source.englishName).distinct()
+        for (name in candidates) {
+            val problemsDir = File(basePath, "problems/$name")
+            if (!problemsDir.exists()) continue
+
+            // 난이도 폴더 안에서 "번호. " 패턴으로 시작하는 폴더 찾기
+            for (levelDir in problemsDir.listFiles().orEmpty()) {
+                if (!levelDir.isDirectory) continue
+                val matchingDir = levelDir.listFiles()?.firstOrNull {
+                    it.isDirectory && it.name.startsWith("$problemId.")
                 }
-                if (codeFile != null) {
-                    return LocalFileSystem.getInstance().refreshAndFindFileByIoFile(codeFile)
+                if (matchingDir != null) {
+                    val codeFile = matchingDir.listFiles()?.firstOrNull {
+                        it.extension in listOf("java", "py", "cpp", "kt", "js")
+                    }
+                    if (codeFile != null) {
+                        return LocalFileSystem.getInstance().refreshAndFindFileByIoFile(codeFile)
+                    }
                 }
             }
         }

@@ -594,7 +594,10 @@ else console.log(_result);
 
     private fun runJava(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (javacPath.isBlank() || javaPath.isBlank()) {
-            return RunResult(output = "", error = "JDK를 찾을 수 없습니다.\nJAVA_HOME을 설정하거나 JDK를 설치하세요.", exitCode = -1)
+            return RunResult(output = "", error = I18n.t(
+                "JDK를 찾을 수 없습니다.\nJAVA_HOME을 설정하거나 JDK를 설치하세요.",
+                "JDK not found.\nPlease set JAVA_HOME or install JDK."
+            ), exitCode = -1)
         }
 
         // SEPARATOR로 분리된 경우 (프로그래머스 래퍼)
@@ -611,7 +614,7 @@ else console.log(_result);
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
-                return RunResult(output = "", error = "컴파일 에러:\n${compile.error}", exitCode = compile.exitCode)
+                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
             return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
@@ -631,7 +634,7 @@ else console.log(_result);
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
-                return RunResult(output = "", error = "컴파일 에러:\n${compile.error}", exitCode = compile.exitCode)
+                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
             return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
@@ -641,7 +644,7 @@ else console.log(_result);
 
         val compile = executeProcess(listOf(javacPath, sourceFile.absolutePath), dir, "", timeout)
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = "컴파일 에러:\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
         return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, className), dir, input, timeout)
@@ -678,7 +681,10 @@ else console.log(_result);
 
     private fun runPython(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (pythonPath.isBlank()) {
-            return RunResult(output = "", error = "Python을 찾을 수 없습니다.\npython3를 설치하세요.", exitCode = -1)
+            return RunResult(output = "", error = I18n.t(
+                "Python을 찾을 수 없습니다.\npython3를 설치하세요.",
+                "Python not found.\nPlease install python3."
+            ), exitCode = -1)
         }
         val sourceFile = File(dir, "solution.py")
         sourceFile.writeText(code)
@@ -687,7 +693,10 @@ else console.log(_result);
 
     private fun runCpp(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (gppPath.isBlank()) {
-            return RunResult(output = "", error = "g++를 찾을 수 없습니다.\nXcode Command Line Tools를 설치하세요:\nxcode-select --install", exitCode = -1)
+            return RunResult(output = "", error = I18n.t(
+                "g++를 찾을 수 없습니다.\nXcode Command Line Tools를 설치하세요:\nxcode-select --install",
+                "g++ not found.\nPlease install Xcode Command Line Tools:\nxcode-select --install"
+            ), exitCode = -1)
         }
         val sourceFile = File(dir, "solution.cpp")
         val outputFile = File(dir, "solution")
@@ -698,7 +707,7 @@ else console.log(_result);
             dir, "", timeout
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = "컴파일 에러:\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
         return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
@@ -706,7 +715,10 @@ else console.log(_result);
 
     private fun runKotlin(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (kotlincPath.isBlank()) {
-            return RunResult(output = "", error = "kotlinc를 찾을 수 없습니다.\nbrew install kotlin 으로 설치하세요.", exitCode = -1)
+            return RunResult(output = "", error = I18n.t(
+                "kotlinc를 찾을 수 없습니다.\nbrew install kotlin 으로 설치하세요.",
+                "kotlinc not found.\nPlease install via: brew install kotlin"
+            ), exitCode = -1)
         }
         val sourceFile = File(dir, "Solution.kt")
         sourceFile.writeText(code)
@@ -717,7 +729,7 @@ else console.log(_result);
             dir, "", timeout * 2
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = "컴파일 에러:\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
         return executeProcess(listOf(javaPath, "-jar", jarFile.absolutePath), dir, input, timeout)
@@ -725,7 +737,10 @@ else console.log(_result);
 
     private fun runJavaScript(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (nodePath.isBlank()) {
-            return RunResult(output = "", error = "Node.js를 찾을 수 없습니다.\nbrew install node 또는 nvm으로 설치하세요.", exitCode = -1)
+            return RunResult(output = "", error = I18n.t(
+                "Node.js를 찾을 수 없습니다.\nbrew install node 또는 nvm으로 설치하세요.",
+                "Node.js not found.\nPlease install via: brew install node"
+            ), exitCode = -1)
         }
         val sourceFile = File(dir, "solution.js")
         sourceFile.writeText(code)
@@ -788,7 +803,7 @@ else console.log(_result);
 
         if (!completed) {
             process.destroyForcibly()
-            return RunResult(output = "", error = "시간 초과 (${timeout}초)", exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
+            return RunResult(output = "", error = I18n.t("시간 초과 (${timeout}초)", "Time Limit Exceeded (${timeout}s)"), exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
         val output = process.inputStream.bufferedReader().readText().trimEnd()

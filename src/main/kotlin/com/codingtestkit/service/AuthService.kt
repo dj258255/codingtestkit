@@ -181,11 +181,26 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     }
 
     fun getCookieHelpText(source: ProblemSource): String = when (source) {
-        ProblemSource.BAEKJOON -> "acmicpc.net에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: OnlineJudge (세션 쿠키)"
-        ProblemSource.PROGRAMMERS -> "school.programmers.co.kr에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: _programmers_session_production"
-        ProblemSource.SWEA -> "swexpertacademy.com에서 로그인 후 쿠키를 복사하세요."
-        ProblemSource.LEETCODE -> "leetcode.com에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: LEETCODE_SESSION, csrftoken"
-        ProblemSource.CODEFORCES -> "codeforces.com에서 로그인 후 쿠키를 복사하세요."
+        ProblemSource.BAEKJOON -> I18n.t(
+            "acmicpc.net에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: OnlineJudge (세션 쿠키)",
+            "Log in at acmicpc.net and copy cookies.\nRequired: OnlineJudge (session cookie)"
+        )
+        ProblemSource.PROGRAMMERS -> I18n.t(
+            "school.programmers.co.kr에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: _programmers_session_production",
+            "Log in at school.programmers.co.kr and copy cookies.\nRequired: _programmers_session_production"
+        )
+        ProblemSource.SWEA -> I18n.t(
+            "swexpertacademy.com에서 로그인 후 쿠키를 복사하세요.",
+            "Log in at swexpertacademy.com and copy cookies."
+        )
+        ProblemSource.LEETCODE -> I18n.t(
+            "leetcode.com에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: LEETCODE_SESSION, csrftoken",
+            "Log in at leetcode.com and copy cookies.\nRequired: LEETCODE_SESSION, csrftoken"
+        )
+        ProblemSource.CODEFORCES -> I18n.t(
+            "codeforces.com에서 로그인 후 쿠키를 복사하세요.",
+            "Log in at codeforces.com and copy cookies."
+        )
     }
 
     companion object {

@@ -10,7 +10,6 @@ object SolvedAcApi {
     data class ProblemInfo(
         val problemId: Int,
         val title: String,
-        val titleEn: String,
         val level: Int,
         val tags: List<String>,
         val tagsEn: List<String>,
@@ -105,12 +104,10 @@ object SolvedAcApi {
         } ?: emptyList()
 
         val titleKo = obj.get("titleKo")?.asString ?: ""
-        val titleEn = obj.get("titleEn")?.asString ?: ""
 
         return ProblemInfo(
             problemId = obj.get("problemId").asInt,
             title = stripLatex(titleKo),
-            titleEn = stripLatex(titleEn),
             level = obj.get("level")?.asInt ?: 0,
             tags = tagsKo,
             tagsEn = tagsEn,

@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -121,6 +121,30 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.0.8</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Improve] Full i18n coverage</b> – All user-facing strings now support Korean/English based on plugin language setting</li>
+            <li><b>[Improve] Localized folder names</b> – Problem folders use localized platform names (e.g. 백준 / Baekjoon) based on language setting</li>
+            <li><b>[Improve] GitHub push i18n</b> – Folder paths, commit messages, and README labels are fully localized</li>
+            <li><b>[Improve] Error messages i18n</b> – Compile errors, timeout, missing runtime, submit results, cookie help text all localized</li>
+            <li><b>[Improve] SWEA dialog i18n</b> – All status messages, button labels, and dialog title localized</li>
+            <li><b>[Fix] Settings panel</b> – Language change note now shows single localized message instead of both languages</li>
+            <li><b>[Improve] Backward compatibility</b> – File search checks both Korean and English folder names when locating existing problems</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[개선] i18n 전면 적용</b> – 모든 사용자 표시 문자열이 플러그인 언어 설정에 따라 한국어/영어 지원</li>
+            <li><b>[개선] 폴더명 현지화</b> – 문제 폴더가 언어 설정에 따라 플랫폼명 표시 (예: 백준 / Baekjoon)</li>
+            <li><b>[개선] GitHub 푸시 i18n</b> – 폴더 경로, 커밋 메시지, README 라벨 완전 현지화</li>
+            <li><b>[개선] 에러 메시지 i18n</b> – 컴파일 에러, 시간 초과, 런타임 미설치, 제출 결과, 쿠키 도움말 등 현지화</li>
+            <li><b>[개선] SWEA 다이얼로그 i18n</b> – 상태 메시지, 버튼 텍스트, 대화상자 제목 현지화</li>
+            <li><b>[수정] 설정 패널</b> – 언어 변경 안내가 두 줄(한/영)에서 현재 언어 한 줄로 표시</li>
+            <li><b>[개선] 하위 호환성</b> – 기존 파일 검색 시 한국어/영어 폴더명 모두 탐색</li>
+        </ul>
+
         <h3>v1.0.7</h3>
 
         <b>English</b>

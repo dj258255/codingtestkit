@@ -63,7 +63,7 @@ class MySolvedDialog(
         private set
 
     init {
-        val platformName = source.displayName
+        val platformName = source.localizedName()
         title = I18n.t("$platformName 풀이 기록 — $username", "$platformName Solved — $username")
         setOKButtonText(I18n.t("가져오기", "Fetch"))
         setCancelButtonText(I18n.t("닫기", "Close"))

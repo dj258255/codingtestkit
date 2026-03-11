@@ -201,7 +201,7 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
     }
 
     private fun buildFolderPath(problem: Problem): String {
-        val platform = problem.source.displayName
+        val platform = problem.source.localizedName()
         val difficulty = problem.difficulty.ifBlank { "Unrated" }
         val title = "${problem.id}. ${sanitizeFileName(problem.title)}"
         return "$platform/$difficulty/$title"
@@ -212,7 +212,7 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
     }
 
     private fun buildCommitMessage(problem: Problem, language: com.codingtestkit.model.Language): String {
-        return "[${problem.source.displayName} #${problem.id}] ${problem.title} (${language.displayName})"
+        return "[${problem.source.localizedName()} #${problem.id}] ${problem.title} (${language.displayName})"
     }
 
     private fun buildReadme(problem: Problem, language: com.codingtestkit.model.Language): String {
@@ -222,12 +222,12 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
             appendLine()
             appendLine("| | |")
             appendLine("|---|---|")
-            appendLine("| **Platform** | ${problem.source.displayName} |")
-            appendLine("| **Problem** | [#${problem.id}]($link) |")
-            if (problem.difficulty.isNotBlank()) appendLine("| **Difficulty** | ${problem.difficulty} |")
-            if (problem.timeLimit.isNotBlank()) appendLine("| **Time Limit** | ${problem.timeLimit} |")
-            if (problem.memoryLimit.isNotBlank()) appendLine("| **Memory Limit** | ${problem.memoryLimit} |")
-            appendLine("| **Language** | ${language.displayName} |")
+            appendLine("| **${I18n.t("플랫폼", "Platform")}** | ${problem.source.localizedName()} |")
+            appendLine("| **${I18n.t("문제", "Problem")}** | [#${problem.id}]($link) |")
+            if (problem.difficulty.isNotBlank()) appendLine("| **${I18n.t("난이도", "Difficulty")}** | ${problem.difficulty} |")
+            if (problem.timeLimit.isNotBlank()) appendLine("| **${I18n.t("시간 제한", "Time Limit")}** | ${problem.timeLimit} |")
+            if (problem.memoryLimit.isNotBlank()) appendLine("| **${I18n.t("메모리 제한", "Memory Limit")}** | ${problem.memoryLimit} |")
+            appendLine("| **${I18n.t("언어", "Language")}** | ${language.displayName} |")
             appendLine()
             appendLine("---")
             appendLine()

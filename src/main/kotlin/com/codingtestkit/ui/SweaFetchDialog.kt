@@ -3,6 +3,7 @@ package com.codingtestkit.ui
 import com.codingtestkit.model.Problem
 import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.model.TestCase
+import com.codingtestkit.service.I18n
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -42,7 +43,7 @@ class SweaFetchDialog(
     private var extracted = false
     private var fetchState: FetchState
     private var contestProbId: String? = null
-    private val statusLabel = JLabel("SWEA 문제 페이지 로딩 중...").apply {
+    private val statusLabel = JLabel(I18n.t("SWEA 문제 페이지 로딩 중...", "Loading SWEA problem page...")).apply {
         foreground = Color.GRAY
     }
     private var browserPanel: JPanel? = null
@@ -57,19 +58,19 @@ class SweaFetchDialog(
         } else {
             FetchState.LOADING_LIST
         }
-        title = "SWEA 문제 가져오기"
+        title = I18n.t("SWEA 문제 가져오기", "Fetch SWEA Problem")
         setSize(500, 150)
         init()
     }
 
     override fun createActions(): Array<Action> {
-        myCancelAction.putValue(Action.NAME, "취소")
+        myCancelAction.putValue(Action.NAME, I18n.t("취소", "Cancel"))
         return arrayOf(cancelAction)
     }
 
     override fun createCenterPanel(): JComponent {
         if (!JBCefApp.isSupported()) {
-            return JLabel("<html>JCEF를 사용할 수 없어 SWEA 문제를 가져올 수 없습니다.</html>")
+            return JLabel("<html>${I18n.t("JCEF를 사용할 수 없어 SWEA 문제를 가져올 수 없습니다.", "Cannot fetch SWEA problems: JCEF is not available.")}</html>")
         }
         return createBrowserPanel()
     }
@@ -100,22 +101,22 @@ class SweaFetchDialog(
         val loadingPanel = JPanel(BorderLayout(8, 8)).apply {
             border = BorderFactory.createEmptyBorder(15, 15, 15, 15)
         }
-        loadingPanel.add(JLabel("<html><b>SWEA 문제 #$problemId</b>를 가져오고 있습니다...</html>"), BorderLayout.NORTH)
+        loadingPanel.add(JLabel("<html><b>${I18n.t("SWEA 문제 #$problemId", "SWEA Problem #$problemId")}</b> ${I18n.t("를 가져오고 있습니다...", "is being fetched...")}</html>"), BorderLayout.NORTH)
         loadingPanel.add(statusLabel, BorderLayout.CENTER)
 
         // 브라우저 보기 토글 버튼
-        val bBtn = JButton("브라우저 보기")
+        val bBtn = JButton(I18n.t("브라우저 보기", "Show Browser"))
         showBrowserBtn = bBtn
         bBtn.addActionListener {
             if (bWrapper.isVisible) {
                 bWrapper.isVisible = false
                 panel.preferredSize = Dimension(480, 100)
-                bBtn.text = "브라우저 보기"
+                bBtn.text = I18n.t("브라우저 보기", "Show Browser")
                 setSize(500, 150)
             } else {
                 bWrapper.isVisible = true
                 panel.preferredSize = Dimension(880, 650)
-                bBtn.text = "브라우저 숨기기"
+                bBtn.text = I18n.t("브라우저 숨기기", "Hide Browser")
                 setSize(900, 700)
             }
             panel.revalidate()
@@ -150,7 +151,7 @@ class SweaFetchDialog(
      * 자동 이동 실패 시: 브라우저를 표시하고 수동 클릭 안내
      */
     private fun showManualFallback() {
-        statusLabel.text = "자동 이동에 실패했습니다. 브라우저에서 문제를 직접 클릭해주세요."
+        statusLabel.text = I18n.t("자동 이동에 실패했습니다. 브라우저에서 문제를 직접 클릭해주세요.", "Auto-navigation failed. Please click the problem in the browser.")
         statusLabel.foreground = Color(200, 120, 0)
         // 브라우저 자동 표시
         val bw = browserWrapper ?: return
@@ -158,7 +159,7 @@ class SweaFetchDialog(
         if (!bw.isVisible) {
             bw.isVisible = true
             bp.preferredSize = Dimension(880, 650)
-            showBrowserBtn?.text = "브라우저 숨기기"
+            showBrowserBtn?.text = I18n.t("브라우저 숨기기", "Hide Browser")
             setSize(900, 700)
             bp.revalidate()
         }
@@ -178,7 +179,7 @@ class SweaFetchDialog(
                 }
                 fetchState = FetchState.EXTRACTING
                 SwingUtilities.invokeLater {
-                    statusLabel.text = "문제 상세 페이지 로딩 완료, 콘텐츠 추출 중..."
+                    statusLabel.text = I18n.t("문제 상세 페이지 로딩 완료, 콘텐츠 추출 중...", "Detail page loaded, extracting content...")
                     statusLabel.foreground = Color(0, 120, 0)
                 }
                 Timer(5000) {
@@ -197,7 +198,7 @@ class SweaFetchDialog(
             url.contains("problemList") || fetchState == FetchState.LOADING_LIST -> {
                 fetchState = FetchState.SEARCHING
                 SwingUtilities.invokeLater {
-                    statusLabel.text = "문제 목록에서 #$problemId 검색 중..."
+                    statusLabel.text = I18n.t("문제 목록에서 #$problemId 검색 중...", "Searching for #$problemId in problem list...")
                 }
                 // 검색 결과 렌더링 대기 후 여러 번 시도 (AngularJS 비동기 렌더링 고려)
                 Timer(2000) {
@@ -227,7 +228,7 @@ class SweaFetchDialog(
             fetchState == FetchState.LOADING_DETAIL -> {
                 fetchState = FetchState.EXTRACTING
                 SwingUtilities.invokeLater {
-                    statusLabel.text = "문제 상세 페이지 로딩 완료, 콘텐츠 추출 중..."
+                    statusLabel.text = I18n.t("문제 상세 페이지 로딩 완료, 콘텐츠 추출 중...", "Detail page loaded, extracting content...")
                     statusLabel.foreground = Color(0, 120, 0)
                 }
                 Timer(5000) {
@@ -254,14 +255,14 @@ class SweaFetchDialog(
                     contestProbId = foundId
                     fetchState = FetchState.LOADING_DETAIL
                     SwingUtilities.invokeLater {
-                        statusLabel.text = "문제를 찾았습니다! 상세 페이지로 이동 중..."
+                        statusLabel.text = I18n.t("문제를 찾았습니다! 상세 페이지로 이동 중...", "Problem found! Navigating to detail page...")
                         statusLabel.foreground = Color(0, 120, 0)
                     }
                     val detailUrl = "https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=$foundId"
                     browser.cefBrowser.executeJavaScript("window.location.href='$detailUrl';", "", 0)
                 } else {
                     SwingUtilities.invokeLater {
-                        statusLabel.text = "문제 #$problemId 를 찾을 수 없습니다. 직접 문제를 찾아주세요."
+                        statusLabel.text = I18n.t("문제 #$problemId 를 찾을 수 없습니다. 직접 문제를 찾아주세요.", "Problem #$problemId not found. Please find it manually.")
                         statusLabel.foreground = Color.RED
                     }
                 }
@@ -269,7 +270,7 @@ class SweaFetchDialog(
             // 검색 결과: 못 찾음
             result == "NOT_FOUND" -> {
                 SwingUtilities.invokeLater {
-                    statusLabel.text = "문제 #$problemId 를 찾을 수 없습니다. 로그인 후 직접 문제를 찾아주세요."
+                    statusLabel.text = I18n.t("문제 #$problemId 를 찾을 수 없습니다. 로그인 후 직접 문제를 찾아주세요.", "Problem #$problemId not found. Please log in and find it manually.")
                     statusLabel.foreground = Color.RED
                 }
             }
@@ -283,7 +284,7 @@ class SweaFetchDialog(
                             doOKAction()
                         } else {
                             extracted = false
-                            statusLabel.text = "콘텐츠가 아직 로드되지 않았습니다. 잠시만 기다려주세요..."
+                            statusLabel.text = I18n.t("콘텐츠가 아직 로드되지 않았습니다. 잠시만 기다려주세요...", "Content not loaded yet. Please wait...")
                             statusLabel.foreground = Color.ORANGE
                         }
                     }
