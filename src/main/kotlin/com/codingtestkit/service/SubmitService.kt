@@ -29,6 +29,7 @@ object SubmitService {
             ProblemSource.PROGRAMMERS -> submitProgrammers(problemId, code, language, cookies)
             ProblemSource.SWEA -> submitSwea(problemId, code, language, cookies)
             ProblemSource.LEETCODE -> SubmitResult(false, "LeetCode 제출은 브라우저에서 직접 해주세요.")
+            ProblemSource.CODEFORCES -> SubmitResult(false, "Codeforces 제출은 브라우저에서 직접 해주세요.")
         }
     }
 

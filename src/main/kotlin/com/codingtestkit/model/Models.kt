@@ -23,7 +23,8 @@ enum class ProblemSource(
     BAEKJOON("백준", "Baekjoon", "baekjoon", "Main"),
     PROGRAMMERS("프로그래머스", "Programmers", "programmers", "Solution"),
     SWEA("SWEA", "SWEA", "swea", "Solution"),
-    LEETCODE("LeetCode", "LeetCode", "leetcode", "Solution");
+    LEETCODE("LeetCode", "LeetCode", "leetcode", "Solution"),
+    CODEFORCES("Codeforces", "Codeforces", "codeforces", "Main");
 
     /** 현재 i18n 설정에 따른 표시 이름 */
     fun localizedName(): String = com.codingtestkit.service.I18n.t(displayName, englishName)
@@ -96,6 +97,16 @@ enum class Language(
                     |}
                 """.trimMargin()
                 ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |import java.util.Scanner;
+                    |
+                    |public class Main {
+                    |    public static void main(String[] args) {
+                    |        Scanner sc = new Scanner(System.in);
+                    |
+                    |    }
+                    |}
+                """.trimMargin()
             }
             PYTHON -> when (source) {
                 ProblemSource.BAEKJOON -> ""
@@ -110,6 +121,7 @@ enum class Language(
                     |    print(f"#{tc}")
                 """.trimMargin()
                 ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> ""
             }
             CPP -> when (source) {
                 ProblemSource.BAEKJOON -> """
@@ -145,6 +157,15 @@ enum class Language(
                     |}
                 """.trimMargin()
                 ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |#include <iostream>
+                    |using namespace std;
+                    |
+                    |int main() {
+                    |
+                    |    return 0;
+                    |}
+                """.trimMargin()
             }
             KOTLIN -> when (source) {
                 ProblemSource.BAEKJOON -> """
@@ -167,6 +188,11 @@ enum class Language(
                     |}
                 """.trimMargin()
                 ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |fun main() {
+                    |
+                    |}
+                """.trimMargin()
             }
             JAVASCRIPT -> when (source) {
                 ProblemSource.BAEKJOON -> """
@@ -186,6 +212,15 @@ enum class Language(
                 """.trimMargin()
                 ProblemSource.SWEA -> ""
                 ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |const readline = require('readline');
+                    |const rl = readline.createInterface({ input: process.stdin });
+                    |const lines = [];
+                    |rl.on('line', (line) => lines.push(line));
+                    |rl.on('close', () => {
+                    |
+                    |});
+                """.trimMargin()
             }
         }
     }

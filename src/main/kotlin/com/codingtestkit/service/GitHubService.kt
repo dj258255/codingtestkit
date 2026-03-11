@@ -240,6 +240,7 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
         com.codingtestkit.model.ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/${problem.id}"
         com.codingtestkit.model.ProblemSource.SWEA -> "https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=${problem.id}"
         com.codingtestkit.model.ProblemSource.LEETCODE -> "https://leetcode.com/problems/${problem.id}/"
+        com.codingtestkit.model.ProblemSource.CODEFORCES -> "https://codeforces.com/problemset/problem/${problem.contestProbId.ifBlank { problem.id }}"
     }
 
     data class PushResult(val success: Boolean, val message: String)

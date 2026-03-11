@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
@@ -57,7 +58,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         val browser = JBCefBrowser(loginUrl)
 
         // JS → Java 브릿지: 유저네임 추출용
-        val usernameQuery = JBCefJSQuery.create(browser)
+        val usernameQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
         usernameQuery.addHandler { result ->
             username = result.trim()
             null
@@ -131,6 +132,8 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
             "(document.querySelector('.header-user-name')||document.querySelector('[class*=user] [class*=name]')||{}).textContent||''"
         ProblemSource.SWEA ->
             "(document.querySelector('.user_name')||document.querySelector('#userName')||{}).textContent||''"
+        ProblemSource.CODEFORCES ->
+            "(document.querySelector('a[href*=\"/profile/\"]')||{}).textContent||''"
     }
 
     private fun isLoggedInUrl(url: String): Boolean {
@@ -143,6 +146,8 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                     !url.contains("login") && !url.contains("signUp")
             ProblemSource.LEETCODE -> url.contains("leetcode.com") &&
                     !url.contains("/accounts/login") && !url.contains("/accounts/signup")
+            ProblemSource.CODEFORCES -> url.contains("codeforces.com") &&
+                    !url.contains("/enter") && !url.contains("/register")
         }
     }
 
@@ -262,6 +267,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         ProblemSource.PROGRAMMERS -> "school.programmers.co.kr"
         ProblemSource.SWEA -> "swexpertacademy.com"
         ProblemSource.LEETCODE -> "leetcode.com"
+        ProblemSource.CODEFORCES -> "codeforces.com"
     }
 
     fun getCookies(): String = cookies

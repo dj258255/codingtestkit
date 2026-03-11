@@ -217,12 +217,6 @@ object ProgrammersCrawler {
         return Pair(paramNames, testCases)
     }
 
-    private fun stripSurroundingQuotes(value: String): String {
-        return if (value.startsWith("\"") && value.endsWith("\"") && value.length >= 2) {
-            value.substring(1, value.length - 1)
-        } else value
-    }
-
     /**
      * 초기 코드 (solution 함수 시그니처) 추출
      */

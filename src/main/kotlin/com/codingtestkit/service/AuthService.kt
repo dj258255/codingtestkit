@@ -17,10 +17,12 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         var programmersCookies: String = "",
         var swexpertCookies: String = "",
         var leetcodeCookies: String = "",
+        var codeforcesCookies: String = "",
         var baekjoonUsername: String = "",
         var programmersUsername: String = "",
         var swexpertUsername: String = "",
-        var leetcodeUsername: String = ""
+        var leetcodeUsername: String = "",
+        var codeforcesUsername: String = ""
     )
 
     private var authState = AuthState()
@@ -33,6 +35,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         ProblemSource.PROGRAMMERS -> authState.programmersCookies
         ProblemSource.SWEA -> authState.swexpertCookies
         ProblemSource.LEETCODE -> authState.leetcodeCookies
+        ProblemSource.CODEFORCES -> authState.codeforcesCookies
     }
 
     fun setCookies(source: ProblemSource, cookies: String) {
@@ -41,6 +44,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
             ProblemSource.PROGRAMMERS -> authState.programmersCookies = cookies
             ProblemSource.SWEA -> authState.swexpertCookies = cookies
             ProblemSource.LEETCODE -> authState.leetcodeCookies = cookies
+            ProblemSource.CODEFORCES -> authState.codeforcesCookies = cookies
         }
     }
 
@@ -49,6 +53,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         ProblemSource.PROGRAMMERS -> authState.programmersUsername
         ProblemSource.SWEA -> authState.swexpertUsername
         ProblemSource.LEETCODE -> authState.leetcodeUsername
+        ProblemSource.CODEFORCES -> authState.codeforcesUsername
     }
 
     fun setUsername(source: ProblemSource, username: String) {
@@ -57,6 +62,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
             ProblemSource.PROGRAMMERS -> authState.programmersUsername = username
             ProblemSource.SWEA -> authState.swexpertUsername = username
             ProblemSource.LEETCODE -> authState.leetcodeUsername = username
+            ProblemSource.CODEFORCES -> authState.codeforcesUsername = username
         }
     }
 
@@ -95,6 +101,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
                 ProblemSource.PROGRAMMERS -> fetchProgrammersUsername(cookies)
                 ProblemSource.SWEA -> fetchSwexpertUsername(cookies)
                 ProblemSource.LEETCODE -> fetchLeetCodeUsername(cookies)
+                ProblemSource.CODEFORCES -> fetchCodeforcesUsername(cookies)
             }
         } catch (_: Exception) {
             ""
@@ -156,11 +163,21 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
             ?.get("username")?.asString ?: ""
     }
 
+    private fun fetchCodeforcesUsername(cookies: String): String {
+        val doc = Jsoup.connect("https://codeforces.com/")
+            .userAgent("Mozilla/5.0")
+            .header("Cookie", cookies)
+            .timeout(5000)
+            .get()
+        return doc.select("a[href^=/profile/]").first()?.text()?.trim() ?: ""
+    }
+
     fun getLoginUrl(source: ProblemSource): String = when (source) {
         ProblemSource.BAEKJOON -> "https://www.acmicpc.net/login"
         ProblemSource.PROGRAMMERS -> "https://programmers.co.kr/account/sign_in?referer=https://school.programmers.co.kr/"
         ProblemSource.SWEA -> "https://swexpertacademy.com/main/identity/anonymous/loginPage.do"
         ProblemSource.LEETCODE -> "https://leetcode.com/accounts/login/"
+        ProblemSource.CODEFORCES -> "https://codeforces.com/enter"
     }
 
     fun getCookieHelpText(source: ProblemSource): String = when (source) {
@@ -168,6 +185,7 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         ProblemSource.PROGRAMMERS -> "school.programmers.co.kr에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: _programmers_session_production"
         ProblemSource.SWEA -> "swexpertacademy.com에서 로그인 후 쿠키를 복사하세요."
         ProblemSource.LEETCODE -> "leetcode.com에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: LEETCODE_SESSION, csrftoken"
+        ProblemSource.CODEFORCES -> "codeforces.com에서 로그인 후 쿠키를 복사하세요."
     }
 
     companion object {

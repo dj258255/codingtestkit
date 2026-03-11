@@ -58,6 +58,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val searchButton2 = JButton(I18n.t("검색", "Search"), AllIcons.Actions.Search).apply {
         toolTipText = I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
     }
+    private val mySolvedButton = JButton(I18n.t("내 풀이", "My Solved"), AllIcons.Actions.ListFiles).apply {
+        toolTipText = I18n.t("내가 풀었던 문제 기록", "My solved problems history")
+    }
     private val loginButton = JButton(I18n.t("로그인", "Login"), AllIcons.General.User)
     private val submitButton = JButton(I18n.t("제출", "Submit"), AllIcons.Actions.Upload).apply {
         toolTipText = I18n.t("현재 에디터의 코드를 제출합니다", "Submit code from current editor")
@@ -124,6 +127,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         row2.add(fetchButton)
         row2.add(randomButton)
         row2.add(searchButton2)
+        row2.add(mySolvedButton)
         topPanel.add(row2)
 
         // Row 3: 제출 + GitHub
@@ -251,6 +255,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         fetchButton.addActionListener { fetchProblem() }
         randomButton.addActionListener { openRandomDialog() }
         searchButton2.addActionListener { openSearchDialog() }
+        mySolvedButton.addActionListener { openMySolvedDialog() }
         loginButton.addActionListener { handleLogin() }
         submitButton.addActionListener { submitSolution() }
         githubPushButton.addActionListener { pushToGitHub() }
@@ -271,21 +276,31 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     I18n.t("SWEA: 문제 번호 또는 URL을 입력하세요", "SWEA: Enter problem number or URL")
             ProblemSource.LEETCODE -> I18n.t("예: 1 또는 two-sum", "e.g. 1 or two-sum") to
                     I18n.t("LeetCode: 문제 번호, slug, 또는 URL 입력", "LeetCode: Enter number, slug, or URL")
+            ProblemSource.CODEFORCES -> I18n.t("예: 1234A", "e.g. 1234A") to
+                    I18n.t("Codeforces: 콘테스트번호+문제번호 (예: 1234A) 또는 URL", "Codeforces: contestId+letter (e.g. 1234A) or URL")
         }
         problemIdField.putClientProperty("JTextField.placeholderText", placeholder)
         problemIdField.toolTipText = tooltip
 
         // 프로그래머스/SWEA는 검색·랜덤 미지원
-        val hasSearchRandom = source == ProblemSource.BAEKJOON || source == ProblemSource.LEETCODE
+        val hasSearchRandom = source == ProblemSource.BAEKJOON || source == ProblemSource.LEETCODE || source == ProblemSource.CODEFORCES
         randomButton.isVisible = hasSearchRandom
         searchButton2.isVisible = hasSearchRandom
 
+        // 내 풀이 버튼: 백준, Codeforces, LeetCode만 지원
+        mySolvedButton.isVisible = SolvedProblemsService.isSupported(source)
+
         if (hasSearchRandom) {
-            val isLeetCode = source == ProblemSource.LEETCODE
-            randomButton.toolTipText = if (isLeetCode) I18n.t("LeetCode에서 랜덤 문제를 뽑습니다", "Pick random problems from LeetCode")
-                else I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
-            searchButton2.toolTipText = if (isLeetCode) I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
-                else I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
+            randomButton.toolTipText = when (source) {
+                ProblemSource.LEETCODE -> I18n.t("LeetCode에서 랜덤 문제를 뽑습니다", "Pick random problems from LeetCode")
+                ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 랜덤 문제를 뽑습니다", "Pick random problems from Codeforces")
+                else -> I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
+            }
+            searchButton2.toolTipText = when (source) {
+                ProblemSource.LEETCODE -> I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
+                ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 문제를 검색합니다", "Search problems on Codeforces")
+                else -> I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
+            }
         }
     }
 
@@ -389,41 +404,83 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private fun openSearchDialog() {
         val source = getSelectedSource()
-        if (source == ProblemSource.LEETCODE) {
-            val dialog = LeetCodeSearchDialog(project)
-            if (dialog.showAndGet()) {
-                val slug = dialog.selectedProblemSlug ?: return
-                problemIdField.text = slug
-                fetchProblem()
+        when (source) {
+            ProblemSource.LEETCODE -> {
+                val dialog = LeetCodeSearchDialog(project)
+                if (dialog.showAndGet()) {
+                    val slug = dialog.selectedProblemSlug ?: return
+                    problemIdField.text = slug
+                    fetchProblem()
+                }
             }
-        } else {
-            val dialog = ProblemSearchDialog(project)
-            if (dialog.showAndGet()) {
-                val problemId = dialog.selectedProblemId ?: return
-                problemIdField.text = problemId.toString()
-                sourceCombo.selectedIndex = 0 // 백준
-                fetchProblem()
+            ProblemSource.CODEFORCES -> {
+                val dialog = CodeforcesSearchDialog(project)
+                if (dialog.showAndGet()) {
+                    val id = dialog.selectedProblemId ?: return
+                    problemIdField.text = id
+                    fetchProblem()
+                }
+            }
+            else -> {
+                val dialog = ProblemSearchDialog(project)
+                if (dialog.showAndGet()) {
+                    val problemId = dialog.selectedProblemId ?: return
+                    problemIdField.text = problemId.toString()
+                    sourceCombo.selectedIndex = 0 // 백준
+                    fetchProblem()
+                }
             }
         }
     }
 
     private fun openRandomDialog() {
         val source = getSelectedSource()
-        if (source == ProblemSource.LEETCODE) {
-            val dialog = LeetCodeRandomDialog(project)
-            if (dialog.showAndGet()) {
-                val slugs = dialog.selectedProblemSlugs
-                if (slugs.isEmpty()) return
-                fetchMultipleProblems(slugs)
+        when (source) {
+            ProblemSource.LEETCODE -> {
+                val dialog = LeetCodeRandomDialog(project)
+                if (dialog.showAndGet()) {
+                    val slugs = dialog.selectedProblemSlugs
+                    if (slugs.isEmpty()) return
+                    fetchMultipleProblems(slugs)
+                }
             }
-        } else {
-            val dialog = RandomProblemDialog(project)
-            if (dialog.showAndGet()) {
-                val ids = dialog.selectedProblemIds
-                if (ids.isEmpty()) return
-                sourceCombo.selectedIndex = 0 // 백준
-                fetchMultipleProblems(ids.map { it.toString() })
+            ProblemSource.CODEFORCES -> {
+                val dialog = CodeforcesRandomDialog(project)
+                if (dialog.showAndGet()) {
+                    val ids = dialog.selectedProblemIds
+                    if (ids.isEmpty()) return
+                    fetchMultipleProblems(ids)
+                }
             }
+            else -> {
+                val dialog = RandomProblemDialog(project)
+                if (dialog.showAndGet()) {
+                    val ids = dialog.selectedProblemIds
+                    if (ids.isEmpty()) return
+                    sourceCombo.selectedIndex = 0 // 백준
+                    fetchMultipleProblems(ids.map { it.toString() })
+                }
+            }
+        }
+    }
+
+    private fun openMySolvedDialog() {
+        val source = getSelectedSource()
+        val auth = AuthService.getInstance()
+        val username = auth.getUsername(source)
+        if (username.isBlank()) {
+            Messages.showWarningDialog(
+                project,
+                I18n.t("먼저 로그인해주세요.", "Please log in first."),
+                I18n.t("로그인 필요", "Login Required")
+            )
+            return
+        }
+        val dialog = MySolvedDialog(project, source)
+        if (dialog.showAndGet()) {
+            val id = dialog.selectedProblemId ?: return
+            problemIdField.text = id
+            fetchProblem()
         }
     }
 
@@ -491,6 +548,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     ProblemSource.BAEKJOON -> BaekjoonCrawler.fetchProblem(id)
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
                     ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
+                    ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id)
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 
@@ -713,7 +771,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         // JCEF 브라우저로 제출 (코드 자동 입력, 사용자가 직접 제출 확인)
         // SWEA: contestProbId, LeetCode: titleSlug (contestProbId에 저장됨)
         val submitId = when {
-            (source == ProblemSource.SWEA || source == ProblemSource.LEETCODE)
+            (source == ProblemSource.SWEA || source == ProblemSource.LEETCODE || source == ProblemSource.CODEFORCES)
                 && problem.contestProbId.isNotBlank() -> problem.contestProbId
             // LeetCode: slug가 없으면 title에서 생성 (예: "Two Sum" → "two-sum")
             source == ProblemSource.LEETCODE -> problem.title.lowercase()
@@ -835,6 +893,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         // LeetCode: https://leetcode.com/problems/two-sum/description/
         val lcMatch = Regex("leetcode\\.com/problems/([\\w-]+)").find(text)
         if (lcMatch != null) return ProblemSource.LEETCODE to lcMatch.groupValues[1]
+
+        // Codeforces: https://codeforces.com/problemset/problem/1234/A or /contest/1234/problem/A
+        val cfMatch = Regex("codeforces\\.com/(?:problemset/problem|contest)/(\\d+)/(?:problem/)?([A-Za-z]\\d?)").find(text)
+        if (cfMatch != null) return ProblemSource.CODEFORCES to "${cfMatch.groupValues[1]}${cfMatch.groupValues[2]}"
 
         return null
     }
@@ -1010,12 +1072,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 ProblemSource.PROGRAMMERS -> "Programmers"
                 ProblemSource.SWEA -> "SWEA"
                 ProblemSource.LEETCODE -> "LeetCode"
+                ProblemSource.CODEFORCES -> "Codeforces"
             }
             "ko" -> when (problem.source) {
                 ProblemSource.BAEKJOON -> "백준"
                 ProblemSource.PROGRAMMERS -> "프로그래머스"
                 ProblemSource.SWEA -> "SWEA"
                 ProblemSource.LEETCODE -> "LeetCode"
+                ProblemSource.CODEFORCES -> "Codeforces"
             }
             else -> problem.source.localizedName()
         }
@@ -1251,9 +1315,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             // 예제 입출력 표시 (백준/프로그래머스/리트코드는 description에 이미 포함)
             if (problem.testCases.isNotEmpty()
-                && problem.source != ProblemSource.PROGRAMMERS
-                && problem.source != ProblemSource.BAEKJOON
-                && problem.source != ProblemSource.LEETCODE) {
+                && problem.source == ProblemSource.SWEA) {
                 for ((i, tc) in problem.testCases.withIndex()) {
                     val preStyle = if (useCef) {
                         if (isDark) "background:#1e1e1e; color:#a9b7c6; padding:10px; border:1px solid #555; font-family:monospace; white-space:pre-wrap; border-radius:4px;"

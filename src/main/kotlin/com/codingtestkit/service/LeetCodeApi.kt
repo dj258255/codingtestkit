@@ -374,13 +374,6 @@ object LeetCodeApi {
         return JsonParser.parseString(respBody).asJsonObject
     }
 
-    /** 쿠키 문자열에서 csrftoken 값 추출 */
-    private fun extractCsrfToken(cookies: String?): String? {
-        if (cookies.isNullOrBlank()) return null
-        val match = Regex("csrftoken=([^;]+)").find(cookies)
-        return match?.groupValues?.get(1)
-    }
-
     /** LeetCode graphql 엔드포인트에서 CSRF 토큰 가져오기 */
     private fun fetchCsrfToken(): String {
         val response = Jsoup.connect(GRAPHQL_URL)

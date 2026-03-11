@@ -57,6 +57,10 @@ class CodeSubmitDialog(
         ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/$problemId"
         ProblemSource.SWEA -> "https://swexpertacademy.com/main/solvingProblem/solvingProblem.do?contestProbId=$problemId"
         ProblemSource.LEETCODE -> "https://leetcode.com/problems/$problemId/"
+        ProblemSource.CODEFORCES -> {
+            val parts = problemId.split("/")
+            "https://codeforces.com/contest/${parts[0]}/submit/${parts.getOrElse(1) { "" }}"
+        }
     }
 
     private fun getGuideText(): String = when (source) {
@@ -76,6 +80,9 @@ class CodeSubmitDialog(
         ProblemSource.LEETCODE -> I18n.t(
             "코드가 자동 입력됩니다. 확인 후 <b>Submit</b> 버튼을 클릭하세요.",
             "Code is auto-filled. Review and click <b>Submit</b>.")
+        ProblemSource.CODEFORCES -> I18n.t(
+            "코드와 언어, 문제가 자동 입력됩니다. Cloudflare 인증 후 <b>Submit</b> 버튼을 클릭하세요.",
+            "Code, language, and problem are auto-filled. Complete Cloudflare verification, then click <b>Submit</b>.")
     }
 
     private fun createBrowserPanel(): JComponent {
@@ -98,6 +105,7 @@ class CodeSubmitDialog(
                     ProblemSource.PROGRAMMERS -> injectProgrammersCode(browser.cefBrowser)
                     ProblemSource.SWEA -> injectSweaCode(browser.cefBrowser)
                     ProblemSource.LEETCODE -> injectLeetCodeCode(browser.cefBrowser)
+                    ProblemSource.CODEFORCES -> injectCodeforcesCode(browser.cefBrowser)
                 }
             }
         }
@@ -132,6 +140,7 @@ class CodeSubmitDialog(
                     ProblemSource.PROGRAMMERS -> handleProgrammersLoad(cefBrowser, url)
                     ProblemSource.SWEA -> handleSweaLoad(cefBrowser, url)
                     ProblemSource.LEETCODE -> handleLeetCodeLoad(cefBrowser, url)
+                    ProblemSource.CODEFORCES -> handleCodeforcesLoad(cefBrowser, url)
                 }
             }
         }, browser.cefBrowser)
@@ -541,6 +550,92 @@ class CodeSubmitDialog(
         updateStatus(I18n.t("코드 입력 완료! 확인 후 'Submit' 버튼을 클릭하세요.", "Code filled! Review and click 'Submit' button."), Color(0, 100, 180))
     }
 
+    // ─── Codeforces ───
+
+    private fun getCodeforcesLangKeyword(): String = when (language) {
+        Language.JAVA -> "Java"
+        Language.PYTHON -> "Python 3"
+        Language.CPP -> "GNU C++20"
+        Language.KOTLIN -> "Kotlin"
+        Language.JAVASCRIPT -> "Node.js"
+    }
+
+    private fun handleCodeforcesLoad(cefBrowser: CefBrowser?, url: String) {
+        // 제출 페이지 감지 (submit이 URL에 포함)
+        if (url.contains("/submit") && !codeInjected) {
+            codeInjected = true
+            Timer(2000) { injectCodeforcesCode(cefBrowser) }.apply {
+                isRepeats = false; start()
+            }
+            Timer(5000) { injectCodeforcesCode(cefBrowser) }.apply {
+                isRepeats = false; start()
+            }
+        } else if ((url.contains("/my") || url.contains("/status")) && !submitted) {
+            markSubmitted()
+            checkResultFromPage(cefBrowser, url)
+        }
+    }
+
+    private fun injectCodeforcesCode(cefBrowser: CefBrowser?) {
+        if (cefBrowser == null) return
+        val escaped = escapeForJs(code)
+        val langKeyword = getCodeforcesLangKeyword()
+        val problemLetter = problemId.split("/").getOrElse(1) { "" }
+
+        val js = """
+            (function() {
+                // 문제 선택
+                var probSelect = document.querySelector('select[name="submittedProblemIndex"]');
+                if (probSelect) {
+                    for (var i = 0; i < probSelect.options.length; i++) {
+                        if (probSelect.options[i].value === '$problemLetter' ||
+                            probSelect.options[i].text.indexOf('$problemLetter - ') === 0) {
+                            probSelect.selectedIndex = i;
+                            probSelect.dispatchEvent(new Event('change', {bubbles: true}));
+                            break;
+                        }
+                    }
+                }
+
+                // 언어 선택
+                var langSelect = document.querySelector('select[name="programTypeId"]');
+                if (langSelect) {
+                    for (var i = 0; i < langSelect.options.length; i++) {
+                        if (langSelect.options[i].text.indexOf('$langKeyword') >= 0) {
+                            langSelect.selectedIndex = i;
+                            langSelect.dispatchEvent(new Event('change', {bubbles: true}));
+                            break;
+                        }
+                    }
+                }
+
+                // Ace Editor
+                var injected = false;
+                if (typeof ace !== 'undefined') {
+                    var editors = document.querySelectorAll('.ace_editor');
+                    if (editors.length > 0) {
+                        var editor = ace.edit(editors[0]);
+                        editor.setValue('$escaped', -1);
+                        injected = true;
+                    }
+                }
+                // textarea fallback
+                if (!injected) {
+                    var ta = document.querySelector('#sourceCodeTextarea') ||
+                             document.querySelector('textarea[name="source"]') ||
+                             document.querySelector('textarea');
+                    if (ta) {
+                        ta.value = '$escaped';
+                        ta.dispatchEvent(new Event('input', {bubbles: true}));
+                    }
+                }
+            })();
+        """.trimIndent()
+
+        cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
+        updateStatus(I18n.t("코드 입력 완료! 확인 후 'Submit' 버튼을 클릭하세요.", "Code filled! Review and click 'Submit' button."), Color(0, 100, 180))
+    }
+
     // ─── 공통 ───
 
     private fun escapeForJs(text: String): String {
@@ -637,6 +732,21 @@ class CodeSubmitDialog(
                     }
                 })();
             """.trimIndent()
+
+            ProblemSource.CODEFORCES -> """
+                (function() {
+                    var cells = document.querySelectorAll('td.verdict-accepted, .verdict-accepted');
+                    if (cells.length > 0) { document.title = '__CTK_ACCEPTED__'; return; }
+                    var body = document.body.innerText || '';
+                    if (body.indexOf('Accepted') >= 0 && body.indexOf('verdict') >= 0) {
+                        document.title = '__CTK_ACCEPTED__';
+                    } else if (body.indexOf('Wrong answer') >= 0 || body.indexOf('Time limit') >= 0 ||
+                               body.indexOf('Runtime error') >= 0 || body.indexOf('Memory limit') >= 0 ||
+                               body.indexOf('Compilation error') >= 0) {
+                        document.title = '__CTK_REJECTED__';
+                    }
+                })();
+            """.trimIndent()
         }
 
         // title 변경 감지 JS: 폴링으로 제목 확인
@@ -718,6 +828,16 @@ class CodeSubmitDialog(
                             var body = document.body.innerText || '';
                             if (body.indexOf('Pass') >= 0 || body.indexOf('PASS') >= 0) accepted = true;
                             else if (body.indexOf('Fail') >= 0 || body.indexOf('FAIL') >= 0) rejected = true;
+                        """.trimIndent()
+                        ProblemSource.CODEFORCES -> """
+                            var ac = document.querySelectorAll('.verdict-accepted, td.verdict-accepted');
+                            if (ac.length > 0) accepted = true;
+                            else {
+                                var body = document.body.innerText || '';
+                                if (body.indexOf('Wrong answer') >= 0 || body.indexOf('Time limit') >= 0 ||
+                                    body.indexOf('Runtime error') >= 0 || body.indexOf('Memory limit') >= 0 ||
+                                    body.indexOf('Compilation error') >= 0) rejected = true;
+                            }
                         """.trimIndent()
                     }}
                     if (accepted) {
