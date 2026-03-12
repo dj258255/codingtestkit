@@ -8,7 +8,11 @@ import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.MessageType
+import com.intellij.openapi.ui.popup.Balloon
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.JBColor
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import java.awt.*
@@ -61,7 +65,22 @@ class ProblemSearchDialog(private val project: Project) : DialogWrapper(project)
         }
         val loggedIn = AuthService.getInstance().isLoggedIn(ProblemSource.BAEKJOON)
         isEnabled = loggedIn
-        if (!loggedIn) toolTipText = I18n.t("백준 로그인이 필요합니다", "BOJ login required")
+        if (!loggedIn) {
+            toolTipText = I18n.t("백준 로그인이 필요합니다", "BOJ login required")
+            val combo = this
+            addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder(
+                            I18n.t("풀이 필터를 사용하려면<br>백준에 로그인하세요", "Login to BOJ<br>to use solved filter"),
+                            MessageType.WARNING, null
+                        )
+                        .setFadeoutTime(3000)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(combo), Balloon.Position.above)
+                }
+            })
+        }
     }
 
     // 자동완성

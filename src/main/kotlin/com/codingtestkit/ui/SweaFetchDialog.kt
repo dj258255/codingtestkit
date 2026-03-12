@@ -3,7 +3,9 @@ package com.codingtestkit.ui
 import com.codingtestkit.model.Problem
 import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.model.TestCase
+import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
+import com.codingtestkit.service.SwexpertApi
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -56,11 +58,34 @@ class SweaFetchDialog(
             contestProbId = problemId
             FetchState.LOADING_DETAIL
         } else {
-            FetchState.LOADING_LIST
+            // Jsoup으로 contestProbId 빠르게 조회 시도 (저장된 쿠키 활용)
+            contestProbId = resolveContestProbId(problemId)
+            if (contestProbId != null) FetchState.LOADING_DETAIL else FetchState.LOADING_LIST
         }
         title = I18n.t("SWEA 문제 가져오기", "Fetch SWEA Problem")
         setSize(500, 150)
         init()
+    }
+
+    /**
+     * 문제번호 → contestProbId 변환 (Jsoup, 최대 3초)
+     * 저장된 SWEA 쿠키가 있으면 목록 페이지를 Jsoup으로 조회하여
+     * JCEF 목록 페이지 로딩을 건너뜀
+     */
+    private fun resolveContestProbId(number: String): String? {
+        return try {
+            val cookies = AuthService.getInstance().getCookies(ProblemSource.SWEA)
+            if (cookies.isBlank()) return null
+            val future = java.util.concurrent.CompletableFuture.supplyAsync {
+                try {
+                    val result = SwexpertApi.searchProblems(keyword = number, cookies = cookies, pageSize = 10)
+                    result.problems.firstOrNull { it.number == number }?.contestProbId
+                } catch (_: Exception) { null }
+            }
+            future.get(3, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun createActions(): Array<Action> {
@@ -509,90 +534,92 @@ class SweaFetchDialog(
                 // Description 추출 - SWEA Problem 탭 콘텐츠
                 result.description = '';
 
-                // 방법 1: ng-bind-html 속성이 있는 요소 (SWEA가 문제 설명을 바인딩하는 방식)
-                var bindHtmlEls = document.querySelectorAll('[ng-bind-html]');
-                for (var i = 0; i < bindHtmlEls.length; i++) {
-                    var el = bindHtmlEls[i];
-                    var html = el.innerHTML;
-                    // 문제 본문은 보통 100자 이상이고 "무단 복제" 또는 문제 관련 텍스트 포함
-                    if (html.length > 100) {
+                // 댓글 콘텐츠 판별 함수 (텍스트 패턴 기반)
+                var isCommentContent = function(html) {
+                    var text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                    if (text.match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/) && text.indexOf('댓글') >= 0) return true;
+                    if (text.match(/\d+\s*\/\s*\d+자/)) return true;
+                    if (text.indexOf('등록') >= 0 && text.match(/@\S+/)) return true;
+                    return false;
+                };
+
+                // 방법 1 (최우선): SWEA 고유 셀렉터 - div.box4 > p.txt
+                var box4 = document.querySelector('div.box4');
+                if (box4 && box4.innerHTML.length > 100) {
+                    result.description = box4.innerHTML;
+                    console.log('SWEA desc: Method1 div.box4, len=' + box4.innerHTML.length);
+                }
+
+                // 방법 2: p.txt 직접 선택
+                if (!result.description || result.description.length < 100) {
+                    var ptxt = document.querySelector('p.txt');
+                    if (ptxt && ptxt.innerHTML.length > 100) {
+                        result.description = ptxt.innerHTML;
+                        console.log('SWEA desc: Method2 p.txt, len=' + ptxt.innerHTML.length);
+                    }
+                }
+
+                // 방법 3: ng-bind-html (일부 문제에서 사용 가능)
+                if (!result.description || result.description.length < 100) {
+                    var bindHtmlEls = document.querySelectorAll('[ng-bind-html]');
+                    for (var i = 0; i < bindHtmlEls.length; i++) {
+                        var el = bindHtmlEls[i];
+                        var html = el.innerHTML;
+                        if (html.length < 100 || isCommentContent(html)) continue;
                         result.description = html;
                         break;
                     }
                 }
 
-                // 방법 2: 활성 탭 패널 (Problem 탭) 내의 콘텐츠
+                // 방법 4: "무단 복제" 또는 "[입력]"/"[출력]" 포함 요소 (가장 작은 것 우선)
                 if (!result.description || result.description.length < 100) {
-                    var tabSelectors = [
-                        '.tab-pane.active',
-                        '.tab-content > .active',
-                        '[role="tabpanel"]:not([hidden])',
-                        '.panel.active',
-                        '.tab_content.active'
-                    ];
-                    for (var i = 0; i < tabSelectors.length; i++) {
-                        var el = document.querySelector(tabSelectors[i]);
-                        if (el && el.innerHTML.length > 200) {
-                            result.description = el.innerHTML;
-                            break;
-                        }
-                    }
-                }
-
-                // 방법 3: "무단 복제" 또는 "[입력]"/"[출력]" 텍스트가 포함된 요소 찾기
-                if (!result.description || result.description.length < 100) {
-                    var allEls = document.querySelectorAll('div, section');
+                    var allEls = document.querySelectorAll('div, section, p');
+                    var bestEl = null;
+                    var bestLen = Infinity;
                     for (var i = 0; i < allEls.length; i++) {
                         var el = allEls[i];
                         var text = el.textContent || '';
                         var html = el.innerHTML;
-                        // 문제 본문 특징: "무단 복제" 경고문 또는 "[입력]"/"[출력]" 섹션 포함
                         if ((text.indexOf('무단 복제') >= 0 || text.indexOf('[입력]') >= 0 || text.indexOf('[출력]') >= 0) &&
                             html.length > 200 && html.length < 50000) {
-                            // 이 요소가 통계 영역이 아닌지 확인
-                            if (!text.match(/참여자.*제출.*정답/)) {
-                                result.description = html;
-                                break;
+                            if (!text.match(/참여자.*제출.*정답/) && !isCommentContent(html)) {
+                                // 가장 작은 (구체적인) 매칭 요소 선택
+                                if (html.length < bestLen) {
+                                    bestEl = el;
+                                    bestLen = html.length;
+                                }
                             }
                         }
                     }
+                    if (bestEl) {
+                        result.description = bestEl.innerHTML;
+                        console.log('SWEA desc: Method4 smallest match, len=' + bestLen);
+                    }
                 }
 
-                // 방법 4: AngularJS scope에서 문제 설명 추출
+                // 방법 5: AngularJS scope (일부 문제에서 사용 가능)
                 if ((!result.description || result.description.length < 100) && typeof angular !== 'undefined') {
                     try {
-                        var ctrl = document.querySelector('[ng-controller]');
-                        if (ctrl) {
-                            var scope = angular.element(ctrl).scope();
-                            if (scope) {
-                                var findDesc = function(obj, depth) {
-                                    if (depth > 3 || !obj) return null;
-                                    if (typeof obj === 'object' && !Array.isArray(obj)) {
-                                        var descKeys = ['problemContent', 'content', 'problemDesc', 'description', 'html', 'problemHtml', 'htmlContent'];
-                                        for (var k = 0; k < descKeys.length; k++) {
-                                            var val = obj[descKeys[k]];
-                                            if (typeof val === 'string' && val.length > 100 && (val.indexOf('<') >= 0 || val.indexOf('\n') >= 0)) {
-                                                return val;
-                                            }
-                                        }
-                                        for (var key in obj) {
-                                            if (key.charAt(0) === '$' || key === 'this' || key === 'constructor') continue;
-                                            try {
-                                                var found = findDesc(obj[key], depth + 1);
-                                                if (found) return found;
-                                            } catch(e) {}
+                        var ctrls = document.querySelectorAll('[ng-controller]');
+                        for (var ci = 0; ci < ctrls.length; ci++) {
+                            try {
+                                var sc = angular.element(ctrls[ci]).scope();
+                                for (var s = sc; s; s = s['${'$'}parent']) {
+                                    if (s.contestProb && s.contestProb.problemCont) {
+                                        var pc = s.contestProb.problemCont;
+                                        if (typeof pc === 'string' && pc.length > 100) {
+                                            result.description = pc;
+                                            break;
                                         }
                                     }
-                                    return null;
-                                };
-                                var desc = findDesc(scope, 0);
-                                if (desc) result.description = desc;
-                            }
+                                }
+                                if (result.description && result.description.length >= 100) break;
+                            } catch(e) {}
                         }
                     } catch(e) {}
                 }
 
-                // 방법 5: 알려진 SWEA 셀렉터
+                // 방법 6: 알려진 SWEA 셀렉터
                 if (!result.description || result.description.length < 100) {
                     var descSelectors = [
                         '#problemContent', '.problem_description', '.problemContent',
@@ -616,9 +643,9 @@ class SweaFetchDialog(
                     // ng-src, data-src → src 변환
                     result.description = result.description.replace(/ng-src="/g, 'src="');
                     result.description = result.description.replace(/data-src="/g, 'src="');
-                    // 상대경로 → 절대경로
+                    // 상대경로 → 절대경로 (data:, file:, http(s): 는 제외)
                     result.description = result.description.replace(/src="\/([^"]*?)"/g, 'src="https://swexpertacademy.com/$1"');
-                    result.description = result.description.replace(/src="(?!http|img_)([^"]*?)"/g, 'src="https://swexpertacademy.com/$1"');
+                    result.description = result.description.replace(/src="(?!https?:|data:|file:|img_)([^"]*?)"/g, 'src="https://swexpertacademy.com/$1"');
 
                     // 1) src 속성에서 URL 추출 (regex)
                     var imgRegex = /src="(https?:\/\/[^"]+)"/g;
@@ -653,6 +680,14 @@ class SweaFetchDialog(
 
                     console.log('SWEA Image URLs found:', result.imageUrls.length, JSON.stringify(result.imageUrls));
 
+                    // description에서 다운로드 링크, 파일명 제거
+                    result.description = result.description.replace(/<a[^>]*>[^<]*다운로드[^<]*<\/a>/gi, '');
+                    result.description = result.description.replace(/<a[^>]*>[^<]*download[^<]*<\/a>/gi, '');
+                    result.description = result.description.replace(/<button[^>]*>[^<]*다운로드[^<]*<\/button>/gi, '');
+                    // 파일명 텍스트 제거 (ex_020_input(1).txt 등)
+                    result.description = result.description.replace(/\S*input\S*\.txt/gi, '');
+                    result.description = result.description.replace(/\S*output\S*\.txt/gi, '');
+
                     // description에서 이미지 URL을 로컬 파일명으로 교체
                     for (var idx = 0; idx < result.imageUrls.length; idx++) {
                         var url = result.imageUrls[idx];
@@ -686,11 +721,13 @@ class SweaFetchDialog(
                 var allLi = document.querySelectorAll('li');
                 for (var i = 0; i < allLi.length; i++) {
                     var text = allLi[i].textContent.replace(/\s+/g, ' ').trim();
-                    if (text.match(/시간|Time/i) && text.match(/초|sec/i)) {
-                        result.timeLimit = text.replace(/^[·•\s]*시간\s*:?\s*/, '').trim();
+                    // 댓글 텍스트 제외: 실제 제한 정보는 짧음 (80자 이내)
+                    if (text.length > 80) continue;
+                    if (text.match(/시간|Time/i) && text.match(/\d+\s*초|\d+\s*sec/i)) {
+                        result.timeLimit = text.replace(/^[·•\s]*(시간|Time\s*Limit)\s*:?\s*/i, '').trim();
                     }
-                    if (text.match(/메모리|Memory/i) && text.match(/MB|KB/i)) {
-                        result.memoryLimit = text.replace(/^[·•\s]*메모리\s*:?\s*/, '').trim();
+                    if (text.match(/메모리|Memory/i) && text.match(/\d+\s*MB|\d+\s*KB/i)) {
+                        result.memoryLimit = text.replace(/^[·•\s]*(메모리|Memory\s*Limit)\s*:?\s*/i, '').trim();
                     }
                 }
 
@@ -770,52 +807,60 @@ class SweaFetchDialog(
                 var inputText = '';
                 var outputText = '';
 
-                // "입력"/"출력" 헤더가 있는 섹션에서 데이터 추출
-                var allBoxes = document.querySelectorAll('div, section, td');
-                for (var i = 0; i < allBoxes.length; i++) {
-                    var box = allBoxes[i];
-                    var children = box.children;
-                    if (children.length < 1) continue;
-                    var headerText = (children[0].textContent || '').trim();
-                    // "입력" 또는 "출력" 헤더를 가진 박스
-                    if (headerText === '입력' || headerText === '출력') {
-                        // 헤더 제외한 데이터 영역에서 텍스트 추출
-                        var dataText = '';
-                        for (var j = 1; j < children.length; j++) {
-                            var child = children[j];
-                            var ct = (child.textContent || '').trim();
-                            // 파일명(sample_input.txt 등)은 제외
-                            if (ct && !ct.match(/sample_(input|output)/i) && !ct.match(/^\d+_sample/i)
-                                && ct !== '다운로드' && ct !== 'download') {
-                                dataText += (dataText ? '\n' : '') + ct;
+                // 테스트 데이터 정리 함수: // 코멘트 줄 제거, 빈줄 정리
+                var cleanTestData = function(text) {
+                    return text.split('\n')
+                        .filter(function(line) { return !line.trim().match(/^\/\//); })
+                        .join('\n').replace(/\n{2,}/g, '\n').trim();
+                };
+
+                // 방법 A: SWEA 고유 구조 - div.box5 > table > td:first-child
+                var box5s = document.querySelectorAll('div.box5');
+                for (var i = 0; i < box5s.length; i++) {
+                    var box = box5s[i];
+                    var header = box.querySelector('span.title1');
+                    var firstTd = box.querySelector('table td:first-child');
+                    if (!header || !firstTd) continue;
+                    var headerText = header.textContent.trim();
+                    var data = cleanTestData(firstTd.innerText || firstTd.textContent || '');
+                    if (headerText === '입력' && data && !inputText) inputText = data;
+                    if (headerText === '출력' && data && !outputText) outputText = data;
+                }
+
+                // 방법 B: "입력"/"출력" 헤더가 있는 일반 섹션
+                if (!inputText || !outputText) {
+                    var allBoxes = document.querySelectorAll('div, section, td');
+                    for (var i = 0; i < allBoxes.length; i++) {
+                        var box = allBoxes[i];
+                        var children = box.children;
+                        if (children.length < 2) continue;
+                        var hdrText = (children[0].textContent || '').trim();
+                        if (hdrText === '입력' || hdrText === '출력') {
+                            var dataText = '';
+                            for (var j = 1; j < children.length; j++) {
+                                var child = children[j];
+                                // TABLE이면 첫 번째 td만 사용
+                                var target = child.tagName === 'TABLE' ? child.querySelector('td:first-child') : child;
+                                if (!target) continue;
+                                var ct = cleanTestData(target.innerText || target.textContent || '');
+                                if (ct && ct.toLowerCase() !== '다운로드' && ct.toLowerCase() !== 'download'
+                                    && !(ct.match(/input/i) && ct.match(/\.txt$/i))
+                                    && !(ct.match(/output/i) && ct.match(/\.txt$/i))) {
+                                    dataText += (dataText ? '\n' : '') + ct;
+                                }
                             }
+                            if (hdrText === '입력' && dataText && !inputText) inputText = dataText;
+                            if (hdrText === '출력' && dataText && !outputText) outputText = dataText;
                         }
-                        if (headerText === '입력' && dataText && !inputText) inputText = dataText;
-                        if (headerText === '출력' && dataText && !outputText) outputText = dataText;
                     }
                 }
 
-                // fallback: pre, textarea, 코드 블록에서
+                // 방법 C: pre, code 블록
                 if (!inputText || !outputText) {
-                    var preEls = document.querySelectorAll('pre, textarea, .CodeMirror, code');
+                    var preEls = document.querySelectorAll('pre, code');
                     if (preEls.length >= 2) {
-                        if (!inputText) inputText = preEls[0].textContent.trim();
-                        if (!outputText) outputText = preEls[1].textContent.trim();
-                    }
-                }
-
-                // fallback: sample 클래스 섹션
-                if (!inputText || !outputText) {
-                    var sections = document.querySelectorAll('.problem_sample, .sample_data, [class*="sample"], [class*="test"]');
-                    for (var i = 0; i < sections.length; i++) {
-                        var sec = sections[i];
-                        var secText = sec.textContent || '';
-                        if (secText.indexOf('input') >= 0 && !inputText) {
-                            inputText = secText.replace(/\d*_?sample_input\.txt/gi, '').replace(/input\.txt/gi, '').replace(/다운로드/g, '').replace(/입력/g, '').trim();
-                        }
-                        if (secText.indexOf('output') >= 0 && !outputText) {
-                            outputText = secText.replace(/\d*_?sample_output\.txt/gi, '').replace(/output\.txt/gi, '').replace(/다운로드/g, '').replace(/출력/g, '').trim();
-                        }
+                        if (!inputText) inputText = cleanTestData(preEls[0].innerText || preEls[0].textContent || '');
+                        if (!outputText) outputText = cleanTestData(preEls[1].innerText || preEls[1].textContent || '');
                     }
                 }
 
@@ -848,13 +893,40 @@ class SweaFetchDialog(
                 var inputUrl = downloadViaAngular(inputDownloadInfo);
                 var outputUrl = downloadViaAngular(outputDownloadInfo);
 
-                // 4단계: URL이 없으면 알려진 패턴 시도
+                // 4단계: 다운로드 URL 수집
                 var downloadUrls = [];
+
+                // 4-a: 페이지에서 실제 다운로드 링크 href 직접 추출 (가장 신뢰)
+                var dlInputHref = '';
+                var dlOutputHref = '';
+                var allDlLinks = document.querySelectorAll('a[href*="contestProbDown"], a[href*="Down"]');
+                for (var di = 0; di < allDlLinks.length; di++) {
+                    var href = allDlLinks[di].getAttribute('href') || '';
+                    var linkText = (allDlLinks[di].textContent || '').toLowerCase();
+                    if (href.indexOf('downType=in') >= 0 || linkText.indexOf('input') >= 0) {
+                        if (!dlInputHref) dlInputHref = href;
+                    }
+                    if (href.indexOf('downType=out') >= 0 || linkText.indexOf('output') >= 0) {
+                        if (!dlOutputHref) dlOutputHref = href;
+                    }
+                }
+                if (dlInputHref && dlOutputHref) {
+                    var toAbsolute = function(u) { return u.startsWith('/') ? 'https://swexpertacademy.com' + u : u; };
+                    downloadUrls.push({ input: toAbsolute(dlInputHref), output: toAbsolute(dlOutputHref) });
+                    console.log('SWEA: Direct href download URLs found');
+                }
+
+                // 4-b: 기존 방식 (inputDownloadInfo/outputDownloadInfo에서 추출)
                 if (inputUrl && outputUrl) {
                     downloadUrls.push({ input: inputUrl, output: outputUrl });
                 }
+
+                // 4-c: 알려진 다운로드 패턴들
                 if (cpId) {
-                    // SWEA 알려진 다운로드 패턴들
+                    downloadUrls.push({
+                        input: '/main/common/contestProb/contestProbDown.do?downType=in&contestProbId=' + cpId,
+                        output: '/main/common/contestProb/contestProbDown.do?downType=out&contestProbId=' + cpId
+                    });
                     downloadUrls.push({
                         input: '/main/code/problem/problemSampleDown.do?contestProbId=' + cpId + '&type=input',
                         output: '/main/code/problem/problemSampleDown.do?contestProbId=' + cpId + '&type=output'
@@ -862,14 +934,6 @@ class SweaFetchDialog(
                     downloadUrls.push({
                         input: '/main/code/problem/problemSampleDownload.do?contestProbId=' + cpId + '&type=input',
                         output: '/main/code/problem/problemSampleDownload.do?contestProbId=' + cpId + '&type=output'
-                    });
-                    downloadUrls.push({
-                        input: '/main/sampledata/download?contestProbId=' + cpId + '&fileName=input.txt',
-                        output: '/main/sampledata/download?contestProbId=' + cpId + '&fileName=output.txt'
-                    });
-                    downloadUrls.push({
-                        input: '/main/code/problem/fileDownload.do?contestProbId=' + cpId + '&fileName=input.txt',
-                        output: '/main/code/problem/fileDownload.do?contestProbId=' + cpId + '&fileName=output.txt'
                     });
                 }
 
@@ -904,6 +968,8 @@ class SweaFetchDialog(
                         if (inp && out && !isHtml(inp) && !isHtml(out) && inp.length < 10000000) {
                             result.inputFileContent = inp;
                             result.outputFileContent = out;
+                            // 다운로드 성공 시 testCases도 깨끗한 파일 데이터로 교체
+                            result.testCases = [{ input: inp, output: out }];
                             console.log('SWEA: Download SUCCESS from URL pair', idx);
                             sendResult();
                         } else {
@@ -949,8 +1015,8 @@ class SweaFetchDialog(
                     val obj = tc.asJsonObject
                     testCases.add(
                         TestCase(
-                            input = obj.get("input")?.asString ?: "",
-                            expectedOutput = obj.get("output")?.asString ?: ""
+                            input = cleanTestText(obj.get("input")?.asString ?: ""),
+                            expectedOutput = cleanTestText(obj.get("output")?.asString ?: "")
                         )
                     )
                 }
@@ -993,6 +1059,15 @@ class SweaFetchDialog(
             problem = null
         }
     }
+
+    /** 테스트 데이터 정리: \r 제거, // 주석 줄 제거, 연속 빈 줄 합치기 */
+    private fun cleanTestText(text: String): String =
+        text.replace("\r", "")
+            .lines()
+            .filter { !it.trimStart().startsWith("//") }
+            .joinToString("\n")
+            .replace(Regex("\\n{2,}"), "\n")
+            .trim()
 
     fun getProblem(): Problem? = problem
 }

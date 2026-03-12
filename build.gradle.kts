@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.codingtestkit"
-version = "1.0.8"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -32,7 +32,7 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.codingtestkit"
         name = "CodingTestKit"
-        version = "1.0.8"
+        version = "1.1.0"
         ideaVersion {
             sinceBuild = "241"
             untilBuild = "263.*"

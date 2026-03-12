@@ -8,7 +8,11 @@ import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.MessageType
+import com.intellij.openapi.ui.popup.Balloon
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.JBColor
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import java.awt.*
@@ -60,7 +64,27 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         I18n.t("전체", "All"),
         I18n.t("내가 푼 문제만", "Only solved"),
         I18n.t("안 푼 문제만", "Not solved")
-    )).apply { renderer = comboRenderer() }
+    )).apply {
+        renderer = comboRenderer()
+        val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
+        isEnabled = cookies.isNotBlank()
+        if (cookies.isBlank()) {
+            toolTipText = I18n.t("LeetCode 로그인이 필요합니다", "LeetCode login required")
+            val combo = this
+            addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder(
+                            I18n.t("풀이 필터를 사용하려면<br>LeetCode에 로그인하세요", "Login to LeetCode<br>to use solved filter"),
+                            MessageType.WARNING, null
+                        )
+                        .setFadeoutTime(3000)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(combo), Balloon.Position.above)
+                }
+            })
+        }
+    }
 
     private val searchButton = JButton(I18n.t("검색", "Search"))
 

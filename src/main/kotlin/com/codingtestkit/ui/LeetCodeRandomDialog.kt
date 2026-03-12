@@ -7,8 +7,11 @@ import com.codingtestkit.service.LeetCodeApi
 import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.MessageType
+import com.intellij.openapi.ui.popup.Balloon
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.JBColor
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import java.awt.*
@@ -123,10 +126,25 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         }
         val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
         isEnabled = cookies.isNotBlank()
-        if (cookies.isBlank()) toolTipText = I18n.t(
-            "LeetCode 로그인이 필요합니다 (제출 탭에서 로그인)",
-            "LeetCode login required (login via Submit tab)"
-        )
+        if (cookies.isBlank()) {
+            toolTipText = I18n.t(
+                "LeetCode 로그인이 필요합니다 (제출 탭에서 로그인)",
+                "LeetCode login required (login via Submit tab)"
+            )
+            val combo = this
+            addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder(
+                            I18n.t("풀이 필터를 사용하려면<br>LeetCode에 로그인하세요", "Login to LeetCode<br>to use solved filter"),
+                            MessageType.WARNING, null
+                        )
+                        .setFadeoutTime(3000)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(combo), Balloon.Position.above)
+                }
+            })
+        }
     }
 
     // ─── 기타 ───

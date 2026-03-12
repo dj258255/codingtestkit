@@ -282,25 +282,26 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         problemIdField.putClientProperty("JTextField.placeholderText", placeholder)
         problemIdField.toolTipText = tooltip
 
-        // 프로그래머스/SWEA는 검색·랜덤 미지원
-        val hasSearchRandom = source == ProblemSource.BAEKJOON || source == ProblemSource.LEETCODE || source == ProblemSource.CODEFORCES
-        randomButton.isVisible = hasSearchRandom
-        searchButton2.isVisible = hasSearchRandom
+        // 모든 플랫폼에서 검색·랜덤 지원
+        randomButton.isVisible = true
+        searchButton2.isVisible = true
 
         // 내 풀이 버튼: 백준, Codeforces, LeetCode만 지원
         mySolvedButton.isVisible = SolvedProblemsService.isSupported(source)
 
-        if (hasSearchRandom) {
-            randomButton.toolTipText = when (source) {
-                ProblemSource.LEETCODE -> I18n.t("LeetCode에서 랜덤 문제를 뽑습니다", "Pick random problems from LeetCode")
-                ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 랜덤 문제를 뽑습니다", "Pick random problems from Codeforces")
-                else -> I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
-            }
-            searchButton2.toolTipText = when (source) {
-                ProblemSource.LEETCODE -> I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
-                ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 문제를 검색합니다", "Search problems on Codeforces")
-                else -> I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
-            }
+        randomButton.toolTipText = when (source) {
+            ProblemSource.LEETCODE -> I18n.t("LeetCode에서 랜덤 문제를 뽑습니다", "Pick random problems from LeetCode")
+            ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 랜덤 문제를 뽑습니다", "Pick random problems from Codeforces")
+            ProblemSource.PROGRAMMERS -> I18n.t("프로그래머스에서 랜덤 문제를 뽑습니다", "Pick random problems from Programmers")
+            ProblemSource.SWEA -> I18n.t("SWEA에서 랜덤 문제를 뽑습니다", "Pick random problems from SWEA")
+            else -> I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
+        }
+        searchButton2.toolTipText = when (source) {
+            ProblemSource.LEETCODE -> I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
+            ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 문제를 검색합니다", "Search problems on Codeforces")
+            ProblemSource.PROGRAMMERS -> I18n.t("프로그래머스에서 문제를 검색합니다", "Search problems on Programmers")
+            ProblemSource.SWEA -> I18n.t("SWEA에서 문제를 검색합니다", "Search problems on SWEA")
+            else -> I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
         }
     }
 
@@ -421,6 +422,22 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     fetchProblem()
                 }
             }
+            ProblemSource.PROGRAMMERS -> {
+                val dialog = ProgrammersSearchDialog(project)
+                if (dialog.showAndGet()) {
+                    val id = dialog.selectedProblemId ?: return
+                    problemIdField.text = id
+                    fetchProblem()
+                }
+            }
+            ProblemSource.SWEA -> {
+                val dialog = SwexpertSearchDialog(project)
+                if (dialog.showAndGet()) {
+                    val id = dialog.selectedProblemId ?: return
+                    problemIdField.text = id
+                    fetchProblem()
+                }
+            }
             else -> {
                 val dialog = ProblemSearchDialog(project)
                 if (dialog.showAndGet()) {
@@ -446,6 +463,22 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             ProblemSource.CODEFORCES -> {
                 val dialog = CodeforcesRandomDialog(project)
+                if (dialog.showAndGet()) {
+                    val ids = dialog.selectedProblemIds
+                    if (ids.isEmpty()) return
+                    fetchMultipleProblems(ids)
+                }
+            }
+            ProblemSource.PROGRAMMERS -> {
+                val dialog = ProgrammersRandomDialog(project)
+                if (dialog.showAndGet()) {
+                    val ids = dialog.selectedProblemIds
+                    if (ids.isEmpty()) return
+                    fetchMultipleProblems(ids)
+                }
+            }
+            ProblemSource.SWEA -> {
+                val dialog = SwexpertRandomDialog(project)
                 if (dialog.showAndGet()) {
                     val ids = dialog.selectedProblemIds
                     if (ids.isEmpty()) return
@@ -1104,6 +1137,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     append("th, td { padding: 6px 12px; border: 1px solid #444; font-family: monospace; }")
                     append("th { background: #2b2d30; color: #ccc; font-weight: bold; }")
                     append("img { max-width: 100%; height: auto; }")
+                    append("img[src^='data:'] { filter: invert(1); }")
                     append("hr { border: none; border-top: 1px solid #3c3f41; margin: 12px 0; }")
                     append("pre { background: #1a1a1a; color: #c5c8c6; padding: 12px; border: 1px solid #3c3f41; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
                     append("code { background: #2b2d30; color: #c5c8c6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")
@@ -1326,8 +1360,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     if (problem.source == ProblemSource.SWEA) {
                         val inputPreview = truncatePreview(tc.input, 10)
                         val outputPreview = truncatePreview(tc.expectedOutput, 5)
-                        val inputHtml = inputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                        val outputHtml = outputPreview.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val inputHtml = inputPreview.replace("\r", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val outputHtml = outputPreview.replace("\r", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
                         append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
                         append("<div style='$preStyle'>$inputHtml</div>")
                         append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>input.txt</code> 참고", "See <code>input.txt</code> for full data")}</div>")
@@ -1335,8 +1369,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                         append("<div style='$preStyle'>$outputHtml</div>")
                         append("<div style='color:#888; font-size:11px;'>${t("전체 데이터는 <code>output.txt</code> 참고", "See <code>output.txt</code> for full data")}</div>")
                     } else {
-                        val inputHtml = tc.input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                        val outputHtml = tc.expectedOutput.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val inputHtml = tc.input.replace("\r", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+                        val outputHtml = tc.expectedOutput.replace("\r", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
                         append("<h2>${t("예제 입력", "Sample Input")} ${i + 1}</h2>")
                         append("<div style='$preStyle'>$inputHtml</div>")
                         append("<h2>${t("예제 출력", "Sample Output")} ${i + 1}</h2>")
