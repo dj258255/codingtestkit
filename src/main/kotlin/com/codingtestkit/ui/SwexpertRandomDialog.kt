@@ -4,6 +4,7 @@ import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.AuthService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.SwexpertApi
+import com.codingtestkit.service.TranslateService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -138,6 +139,13 @@ class SwexpertRandomDialog(private val project: Project) : DialogWrapper(project
     private var headerCheck = JCheckBox().apply { horizontalAlignment = SwingConstants.CENTER }
 
     private var results: List<SwexpertApi.ProblemInfo> = emptyList()
+    private var showingTranslated = false
+    private var translatedTitles: Map<String, String> = emptyMap()
+    private val translateButton = JButton("EN").apply {
+        toolTipText = I18n.t("영어로 번역", "Translate to English")
+        preferredSize = Dimension(JBUI.scale(50), preferredSize.height)
+        addActionListener { toggleTranslation() }
+    }
     var selectedProblemIds: List<String> = emptyList()
         private set
 
@@ -258,11 +266,12 @@ class SwexpertRandomDialog(private val project: Project) : DialogWrapper(project
 
         panel.add(JScrollPane(resultTable), BorderLayout.CENTER)
 
-        // 하단: 상태 라벨
+        // 하단: 상태 라벨 + 번역 버튼
         val bottomPanel = JPanel(BorderLayout()).apply {
             statusLabel.foreground = JBColor.GRAY
             statusLabel.font = statusLabel.font.deriveFont(JBUI.scaleFontSize(12f).toFloat())
             add(statusLabel, BorderLayout.CENTER)
+            add(translateButton, BorderLayout.EAST)
         }
         panel.add(bottomPanel, BorderLayout.SOUTH)
 
@@ -428,6 +437,9 @@ class SwexpertRandomDialog(private val project: Project) : DialogWrapper(project
         statusLabel.text = I18n.t("문제를 가져오는 중...", "Fetching problems...")
         tableModel.rowCount = 0
         isOKActionEnabled = false
+        showingTranslated = false
+        translatedTitles = emptyMap()
+        translateButton.text = "EN"
 
         Thread {
             try {
@@ -465,6 +477,52 @@ class SwexpertRandomDialog(private val project: Project) : DialogWrapper(project
                 }
             }
         }.start()
+    }
+
+    // ─── 번역 ───
+
+    private fun toggleTranslation() {
+        if (results.isEmpty()) return
+        showingTranslated = !showingTranslated
+        if (showingTranslated && translatedTitles.isEmpty()) {
+            translateButton.isEnabled = false
+            translateButton.text = "..."
+            Thread {
+                try {
+                    val batch = results.map { it.title }.joinToString("\n")
+                    val translated = TranslateService.translate(batch, "ko", "en")
+                    val translatedList = translated.split("\n")
+                    val map = mutableMapOf<String, String>()
+                    for ((idx, p) in results.withIndex()) {
+                        if (idx < translatedList.size) map[p.contestProbId] = translatedList[idx].trim()
+                    }
+                    translatedTitles = map
+                    SwingUtilities.invokeLater { applyTranslation(); translateButton.isEnabled = true }
+                } catch (_: Exception) {
+                    SwingUtilities.invokeLater {
+                        showingTranslated = false
+                        translateButton.text = "EN"
+                        translateButton.isEnabled = true
+                        statusLabel.text = I18n.t("번역 실패", "Translation failed")
+                        statusLabel.foreground = JBColor.RED
+                    }
+                }
+            }.start()
+        } else {
+            applyTranslation()
+        }
+    }
+
+    private fun applyTranslation() {
+        translateButton.text = if (showingTranslated) "KO" else "EN"
+        translateButton.toolTipText = if (showingTranslated)
+            I18n.t("한국어 원문 보기", "Show original Korean") else I18n.t("영어로 번역", "Translate to English")
+        for ((idx, p) in results.withIndex()) {
+            if (idx < tableModel.rowCount) {
+                val title = if (showingTranslated) translatedTitles[p.contestProbId] ?: p.title else p.title
+                tableModel.setValueAt(title, idx, 2)
+            }
+        }
     }
 
     override fun getPreferredFocusedComponent(): JComponent = pickButton

@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -61,7 +61,15 @@
             <li>Email: <a href="mailto:dj258255@naver.com">dj258255@naver.com</a></li>
         </ul>
 
-        <p><em>Disclaimer: All problem content is copyrighted by its respective platform (BOJ, Programmers, SWEA, LeetCode, Codeforces). This plugin only fetches and stores problems locally for personal use.</em></p>
+        <h3>Disclaimer</h3>
+        <p><em>All problem content is copyrighted by its respective platform. This plugin is intended for <b>personal study purposes only</b>. Do not redistribute, commercially use, or publish fetched content. The plugin fetches problems locally for individual learning and does not store or redistribute any content externally.</em></p>
+        <ul>
+            <li>BOJ (Baekjoon): <a href="https://www.acmicpc.net">www.acmicpc.net</a></li>
+            <li>Programmers: <a href="https://school.programmers.co.kr/learn/challenges">school.programmers.co.kr</a></li>
+            <li>SWEA: <a href="https://swexpertacademy.com">swexpertacademy.com</a></li>
+            <li>LeetCode: <a href="https://leetcode.com">leetcode.com</a></li>
+            <li>Codeforces: <a href="https://codeforces.com">codeforces.com</a></li>
+        </ul>
 
         <hr/>
 
@@ -121,10 +129,34 @@
             <li>이메일: <a href="mailto:dj258255@naver.com">dj258255@naver.com</a></li>
         </ul>
 
-        <p><em>면책 조항: 모든 문제의 저작권은 해당 플랫폼(백준, 프로그래머스, SWEA, LeetCode, Codeforces)에 있습니다. 이 플러그인은 개인 학습 목적으로 문제를 로컬에 저장할 뿐이며, 문제를 재배포하지 않습니다.</em></p>
+        <h3>면책 조항</h3>
+        <p><em>모든 문제의 저작권은 해당 플랫폼에 있습니다. 이 플러그인은 <b>개인 학습 목적으로만 사용</b>해 주세요. 가져온 문제를 재배포, 상업적 이용, 외부 게시하지 마세요. 플러그인은 개인 학습을 위해 문제를 로컬에 가져올 뿐이며, 어떠한 콘텐츠도 외부에 저장하거나 재배포하지 않습니다.</em></p>
+        <ul>
+            <li>백준 (BOJ): <a href="https://www.acmicpc.net">www.acmicpc.net</a></li>
+            <li>프로그래머스: <a href="https://school.programmers.co.kr/learn/challenges">school.programmers.co.kr</a></li>
+            <li>SWEA: <a href="https://swexpertacademy.com">swexpertacademy.com</a></li>
+            <li>LeetCode: <a href="https://leetcode.com">leetcode.com</a></li>
+            <li>Codeforces: <a href="https://codeforces.com">codeforces.com</a></li>
+        </ul>
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.1.1</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] SWEA random EN/KO translation</b> – Added one-click Korean↔English title translation button to SWEA random problem picker (matching all other platforms)</li>
+            <li><b>[New] Source attribution</b> – Each problem now shows a source attribution link at the bottom with platform name, problem URL, and copyright notice</li>
+            <li><b>[Improve] Disclaimer</b> – Strengthened disclaimer in plugin description: personal study use only, no redistribution, no commercial use</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] SWEA 랜덤 뽑기 한/영 번역</b> – SWEA 랜덤 문제 뽑기에 원클릭 한↔영 제목 번역 버튼 추가 (다른 플랫폼과 동일하게 적용)</li>
+            <li><b>[신규] 출처 표시</b> – 각 문제 하단에 플랫폼명, 문제 URL, 저작권 안내를 포함한 출처 표시 추가</li>
+            <li><b>[개선] 면책 조항</b> – 플러그인 설명의 면책 조항 강화: 개인 학습 목적 전용, 재배포·상업적 이용 금지 명시</li>
+        </ul>
+
         <h3>v1.1.0</h3>
 
         <b>English</b>

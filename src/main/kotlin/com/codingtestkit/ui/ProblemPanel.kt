@@ -1379,6 +1379,28 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
 
+            // ─── 출처 (Source Attribution) ───
+            val problemUrl = when (problem.source) {
+                ProblemSource.BAEKJOON -> "https://www.acmicpc.net/problem/${problem.id}"
+                ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/${problem.id}"
+                ProblemSource.SWEA -> "https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=${problem.contestProbId.ifBlank { problem.id }}"
+                ProblemSource.LEETCODE -> "https://leetcode.com/problems/${problem.id}/"
+                ProblemSource.CODEFORCES -> "https://codeforces.com/problemset/problem/${problem.contestProbId.ifBlank { problem.id }}"
+            }
+            val sourceDisplay = when (problem.source) {
+                ProblemSource.BAEKJOON -> t("백준 온라인 저지", "Baekjoon Online Judge")
+                ProblemSource.PROGRAMMERS -> t("프로그래머스 코딩 테스트 연습", "Programmers Coding Test Practice")
+                ProblemSource.SWEA -> "SW Expert Academy"
+                ProblemSource.LEETCODE -> "LeetCode"
+                ProblemSource.CODEFORCES -> "Codeforces"
+            }
+            append("<hr style='border:none; border-top:1px solid ${if (isDark) "#3c3f41" else "#ddd"}; margin:20px 0 8px 0;'>")
+            append("<div style='color:#888; font-size:11px;'>")
+            append("${t("출처", "Source")}: $sourceDisplay<br>")
+            append("<span style='color:#589df6;'>$problemUrl</span><br>")
+            append("${t("이 문제의 저작권은 ${sourceDisplay}에 있습니다. 개인 학습 목적으로만 사용하세요.", "All rights reserved by ${sourceDisplay}. For personal study use only.")}")
+            append("</div>")
+
             if (useCef) {
                 // KaTeX: Kotlin에서 미리 추출한 <span class='ktx'> 마커를 katex.render()로 렌더링
                 append("<script src='katex.min.js'></script>")
