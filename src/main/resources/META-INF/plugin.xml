@@ -476,7 +476,8 @@
         <notificationGroup id="CodingTestKit" displayType="BALLOON"/>
         <daemon.highlightInfoFilter
                 implementation="com.codingtestkit.service.DuplicateClassHighlightFilter"/>
-        <statusBarWidgetFactory implementation="com.codingtestkit.ui.CodingTestKitStatusBarFactory"/>
+        <statusBarWidgetFactory id="CodingTestKit.StatusBar"
+                               implementation="com.codingtestkit.ui.CodingTestKitStatusBarFactory"/>
     </extensions>
 
     <actions>

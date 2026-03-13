@@ -41,6 +41,16 @@ intellijPlatform {
 
     buildSearchableOptions = false
 
+    pluginVerification {
+        ides {
+            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity, "2024.2")
+        }
+        failureLevel = listOf(
+            org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+            org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES
+        )
+    }
+
     publishing {
         token = providers.environmentVariable("PUBLISH_TOKEN")
     }
