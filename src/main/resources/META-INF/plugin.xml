@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -141,6 +141,22 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.2.0</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] Keyboard shortcuts</b> – Ctrl+Alt+F (Fetch), Ctrl+Alt+R (Run All), Ctrl+Alt+S (Submit), Ctrl+Alt+T (Translate); customizable via Settings → Keymap</li>
+            <li><b>[New] Test diff highlighting</b> – Failed test cases now show line-level and character-level diff highlighting between expected and actual output (red background for mismatched lines, darker red for specific character differences)</li>
+            <li><b>[New] Status bar widget</b> – Shows current platform and problem number (e.g. "CTK: BOJ #1000") in the IDE status bar; click to open the tool window</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] 키보드 단축키</b> – Ctrl+Alt+F (가져오기), Ctrl+Alt+R (전체 실행), Ctrl+Alt+S (제출), Ctrl+Alt+T (번역); 설정 → 키맵에서 변경 가능</li>
+            <li><b>[신규] 테스트 diff 하이라이팅</b> – 실패한 테스트 케이스에서 예상 출력과 실제 출력의 차이를 줄/글자 단위로 색상 표시 (빨간 배경: 다른 줄, 진한 빨간: 구체적 차이점)</li>
+            <li><b>[신규] 상태바 위젯</b> – IDE 하단 상태바에 현재 플랫폼과 문제 번호 표시 (예: "CTK: 백준 #1000"); 클릭하면 도구 창 열기</li>
+        </ul>
+
         <h3>v1.1.1</h3>
 
         <b>English</b>
@@ -447,11 +463,42 @@
                     anchor="right"
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
+        <projectService serviceImplementation="com.codingtestkit.service.CodingTestKitActionService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.GitHubService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.PluginSettingsService"/>
         <notificationGroup id="CodingTestKit" displayType="BALLOON"/>
         <daemon.highlightInfoFilter
                 implementation="com.codingtestkit.service.DuplicateClassHighlightFilter"/>
+        <statusBarWidgetFactory implementation="com.codingtestkit.ui.CodingTestKitStatusBarFactory"/>
     </extensions>
+
+    <actions>
+        <group id="CodingTestKit.Actions" text="CodingTestKit" description="CodingTestKit Actions">
+            <action id="CodingTestKit.FetchProblem"
+                    class="com.codingtestkit.action.FetchProblemAction"
+                    text="CodingTestKit: Fetch Problem"
+                    description="Fetch a problem from the selected platform">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt F"/>
+            </action>
+            <action id="CodingTestKit.RunAllTests"
+                    class="com.codingtestkit.action.RunAllTestsAction"
+                    text="CodingTestKit: Run All Tests"
+                    description="Run all test cases">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt R"/>
+            </action>
+            <action id="CodingTestKit.SubmitCode"
+                    class="com.codingtestkit.action.SubmitCodeAction"
+                    text="CodingTestKit: Submit Code"
+                    description="Submit code to the platform">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt S"/>
+            </action>
+            <action id="CodingTestKit.TranslateProblem"
+                    class="com.codingtestkit.action.TranslateProblemAction"
+                    text="CodingTestKit: Translate Problem"
+                    description="Translate problem description">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt T"/>
+            </action>
+        </group>
+    </actions>
 </idea-plugin>

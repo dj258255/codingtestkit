@@ -1,6 +1,7 @@
 package com.codingtestkit.ui
 
 import com.codingtestkit.service.I18n
+import com.codingtestkit.service.CodingTestKitActionService
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.Problem
 import com.codingtestkit.model.ProblemSource
@@ -263,6 +264,13 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         githubLoginButton.addActionListener { handleGitHubLogin() }
         problemIdField.addActionListener { fetchProblem() }
         updatePlaceholder()
+
+        // 키보드 단축키 액션 등록
+        CodingTestKitActionService.getInstance(project).apply {
+            fetchAction = { fetchButton.doClick() }
+            submitAction = { submitButton.doClick() }
+            translateAction = { translateButton.doClick() }
+        }
     }
 
     private fun updatePlaceholder() {

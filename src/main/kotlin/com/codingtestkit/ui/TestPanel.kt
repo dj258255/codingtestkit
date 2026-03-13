@@ -90,6 +90,11 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 이벤트
         runButton.addActionListener { runAllTests() }
         addButton.addActionListener { addTestCase() }
+
+        // 키보드 단축키 액션 등록
+        com.codingtestkit.service.CodingTestKitActionService.getInstance(project).runAllAction = {
+            runButton.doClick()
+        }
     }
 
     fun setTestCases(cases: List<TestCase>) {
@@ -293,11 +298,12 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             border = JBUI.Borders.empty(4)
             lineWrap = true
         }
-        private val actualArea = JTextArea("", 3, 20).apply {
+        private val actualArea = object : JTextPane() {
+            override fun getScrollableTracksViewportWidth() = true
+        }.apply {
             font = Font("JetBrains Mono", Font.PLAIN, JBUI.scale(12))
             border = JBUI.Borders.empty(4)
             isEditable = false
-            lineWrap = true
             background = JBColor(Color(245, 245, 245), Color(43, 43, 43))
         }
         private val defaultActualFg = JBColor.foreground()
@@ -413,7 +419,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             updateMaxSize()
         }
 
-        private fun createFieldPanel(label: String, textArea: JTextArea): JPanel {
+        private fun createFieldPanel(label: String, textArea: JComponent): JPanel {
             var fieldHeight = JBUI.scale(100)
 
             val scrollPane = JBScrollPane(textArea).apply {
@@ -581,6 +587,12 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     || it.startsWith("error:") || it.contains("runtime error", ignoreCase = true)
             }
             actualArea.foreground = if (isError) errorFg else defaultActualFg
+
+            // Diff 하이라이팅: FAIL이고 에러가 아닌 경우 줄/글자 단위 차이 표시
+            if (tc.passed == false && !isError) {
+                applyDiffHighlighting(tc.expectedOutput, tc.actualOutput)
+            }
+
             val timeStr = buildString {
                 if (timeMs > 0 || memKB > 0) {
                     append(" (")
@@ -635,6 +647,47 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
                 debugPanel.isVisible = true
                 revalidate()
+            }
+        }
+
+        private fun applyDiffHighlighting(expected: String, @Suppress("UNUSED_PARAMETER") actual: String) {
+            val doc = actualArea.styledDocument
+            val root = doc.defaultRootElement
+            val expectedLines = expected.trimEnd().replace("\r", "").lines().map { it.trimEnd() }
+
+            val lineDiffBg = JBColor(Color(255, 230, 230), Color(70, 40, 40))
+            val charDiffBg = JBColor(Color(255, 180, 180), Color(110, 50, 50))
+
+            for (i in 0 until root.elementCount) {
+                val elem = root.getElement(i)
+                val start = elem.startOffset
+                val end = elem.endOffset.coerceAtMost(doc.length)
+                if (end <= start) continue
+                val lineText = doc.getText(start, end - start).trimEnd('\n', '\r')
+                val expectedLine = expectedLines.getOrNull(i)?.trimEnd()
+
+                if (expectedLine == null || lineText != expectedLine) {
+                    // 전체 줄: 연한 빨간 배경
+                    val lineAttrs = javax.swing.text.SimpleAttributeSet()
+                    javax.swing.text.StyleConstants.setBackground(lineAttrs, lineDiffBg)
+                    doc.setCharacterAttributes(start, end - start, lineAttrs, false)
+
+                    // 글자 단위: 다른 부분만 진한 빨간 배경
+                    if (expectedLine != null && lineText.isNotEmpty()) {
+                        val commonPrefix = lineText.zip(expectedLine).takeWhile { (a, b) -> a == b }.size
+                        val commonSuffix = lineText.reversed().zip(expectedLine.reversed())
+                            .takeWhile { (a, b) -> a == b }.size
+                            .coerceAtMost(lineText.length - commonPrefix)
+                            .coerceAtMost(expectedLine.length - commonPrefix)
+                        val diffStart = commonPrefix
+                        val diffEnd = lineText.length - commonSuffix
+                        if (diffEnd > diffStart) {
+                            val charAttrs = javax.swing.text.SimpleAttributeSet()
+                            javax.swing.text.StyleConstants.setBackground(charAttrs, charDiffBg)
+                            doc.setCharacterAttributes(start + diffStart, diffEnd - diffStart, charAttrs, false)
+                        }
+                    }
+                }
             }
         }
     }

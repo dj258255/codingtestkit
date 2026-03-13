@@ -1,5 +1,6 @@
 package com.codingtestkit.ui
 
+import com.codingtestkit.service.CodingTestKitActionService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.ProblemFileManager
 import com.intellij.icons.AllIcons
@@ -44,6 +45,9 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             testPanel.setProblemSource(problem.source)
             testPanel.setParameterNames(problem.parameterNames)
             testPanel.setTestCases(problem.testCases)
+            CodingTestKitActionService.getInstance(project).updateStatus(
+                problem.source.localizedName(), problem.id
+            )
         }
 
         // 파일 열면 자동으로 문제 인식
@@ -62,6 +66,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                         } else {
                             detectAndLoadProblem(selected, basePath)
                         }
@@ -72,6 +77,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                             return
                         }
                         detectAndLoadProblem(file, basePath)
@@ -116,6 +122,9 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         testPanel.setProblemSource(problem.source)
         testPanel.setParameterNames(problem.parameterNames)
         testPanel.setTestCases(problem.testCases)
+        CodingTestKitActionService.getInstance(project).updateStatus(
+            problem.source.localizedName(), problem.id
+        )
 
         // 현재 문제 폴더를 소스 루트로 전환 (자동완성 활성화)
         ApplicationManager.getApplication().invokeLater {
