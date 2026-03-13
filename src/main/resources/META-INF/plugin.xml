@@ -148,6 +148,9 @@
             <li><b>[New] Keyboard shortcuts</b> – Ctrl+Alt+F (Fetch), Ctrl+Alt+R (Run All), Ctrl+Alt+S (Submit), Ctrl+Alt+T (Translate); customizable via Settings → Keymap</li>
             <li><b>[New] Test diff highlighting</b> – Failed test cases now show line-level and character-level diff highlighting between expected and actual output (red background for mismatched lines, darker red for specific character differences)</li>
             <li><b>[New] Status bar widget</b> – Shows current platform and problem number (e.g. "CTK: BOJ #1000") in the IDE status bar; click to open the tool window</li>
+            <li><b>[New] SWEA random EN/KO translation</b> – Added one-click Korean↔English title translation button to SWEA random problem picker (matching all other platforms)</li>
+            <li><b>[New] Source attribution</b> – Each problem now shows a source attribution link at the bottom with platform name, problem URL, and copyright notice</li>
+            <li><b>[Improve] Disclaimer</b> – Strengthened disclaimer in plugin description: personal study use only, no redistribution, no commercial use</li>
         </ul>
 
         <b>한국어</b>
@@ -155,6 +158,9 @@
             <li><b>[신규] 키보드 단축키</b> – Ctrl+Alt+F (가져오기), Ctrl+Alt+R (전체 실행), Ctrl+Alt+S (제출), Ctrl+Alt+T (번역); 설정 → 키맵에서 변경 가능</li>
             <li><b>[신규] 테스트 diff 하이라이팅</b> – 실패한 테스트 케이스에서 예상 출력과 실제 출력의 차이를 줄/글자 단위로 색상 표시 (빨간 배경: 다른 줄, 진한 빨간: 구체적 차이점)</li>
             <li><b>[신규] 상태바 위젯</b> – IDE 하단 상태바에 현재 플랫폼과 문제 번호 표시 (예: "CTK: 백준 #1000"); 클릭하면 도구 창 열기</li>
+            <li><b>[신규] SWEA 랜덤 뽑기 한/영 번역</b> – SWEA 랜덤 문제 뽑기에 원클릭 한↔영 제목 번역 버튼 추가 (다른 플랫폼과 동일하게 적용)</li>
+            <li><b>[신규] 출처 표시</b> – 각 문제 하단에 플랫폼명, 문제 URL, 저작권 안내를 포함한 출처 표시 추가</li>
+            <li><b>[개선] 면책 조항</b> – 플러그인 설명의 면책 조항 강화: 개인 학습 목적 전용, 재배포·상업적 이용 금지 명시</li>
         </ul>
 
         <h3>v1.1.1</h3>
