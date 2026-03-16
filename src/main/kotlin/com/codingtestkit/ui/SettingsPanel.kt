@@ -332,7 +332,7 @@ class SettingsPanel(private val project: Project) : JPanel() {
         focusAlertToggle.isSelected = enabled
         ExamModeState.focusAlertEnabled = enabled
 
-        val frame = SwingUtilities.getWindowAncestor(this) as? java.awt.Window ?: return
+        val frame = SwingUtilities.getWindowAncestor(this) ?: return
 
         if (enabled) {
             focusLostCount = 0

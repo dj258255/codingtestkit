@@ -7,6 +7,67 @@ object SolvedAcApi {
 
     private const val BASE_URL = "https://solved.ac/api/v3"
 
+    // ─── 태그 목록 (동적 로딩 + 캐싱) ───
+
+    data class TagInfo(val id: String, val ko: String, val en: String)
+
+    @Volatile
+    private var cachedTags: List<TagInfo>? = null
+    @Volatile
+    private var tagCacheTime = 0L
+    private const val TAG_CACHE_TTL = 600_000L // 10분
+
+    /**
+     * solved.ac /tag/list API에서 전체 태그 목록을 가져옴 (ko/en 이름 포함)
+     * problemCount 순으로 정렬되어 반환됨
+     */
+    fun fetchTagList(): List<TagInfo> {
+        val now = System.currentTimeMillis()
+        cachedTags?.let { if (now - tagCacheTime < TAG_CACHE_TTL) return it }
+
+        val tags = mutableListOf<TagInfo>()
+        var page = 1
+        var totalCount = Int.MAX_VALUE
+
+        while (tags.size < totalCount) {
+            val json = Jsoup.connect("$BASE_URL/tag/list")
+                .data("page", page.toString())
+                .data("sort", "problemCount")
+                .data("direction", "desc")
+                .ignoreContentType(true)
+                .userAgent("Mozilla/5.0")
+                .timeout(10000)
+                .get()
+                .body()
+                .text()
+
+            val root = JsonParser.parseString(json).asJsonObject
+            totalCount = root.get("count")?.asInt ?: 0
+            val items = root.getAsJsonArray("items") ?: break
+            if (items.size() == 0) break
+
+            for (item in items) {
+                val obj = item.asJsonObject
+                val key = obj.get("key")?.asString ?: continue
+                var ko = key
+                var en = key
+                obj.getAsJsonArray("displayNames")?.forEach { dn ->
+                    val dnObj = dn.asJsonObject
+                    val lang = dnObj.get("language")?.asString
+                    val name = dnObj.get("short")?.asString ?: dnObj.get("name")?.asString
+                    if (lang == "ko" && name != null) ko = name
+                    if (lang == "en" && name != null) en = name
+                }
+                tags.add(TagInfo(key, ko, en))
+            }
+            page++
+        }
+
+        cachedTags = tags
+        tagCacheTime = now
+        return tags
+    }
+
     data class ProblemInfo(
         val problemId: Int,
         val title: String,

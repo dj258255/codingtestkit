@@ -138,11 +138,50 @@ object CodeforcesApi {
         return ids
     }
 
-    val commonTags = listOf(
-        "implementation", "math", "greedy", "dp", "data structures",
-        "brute force", "constructive algorithms", "graphs", "sortings",
-        "binary search", "dfs and similar", "trees", "strings",
-        "number theory", "geometry", "combinatorics", "two pointers",
-        "bitmasks", "dsu", "shortest paths"
+    // ─── 태그 목록 (동적 로딩 + 캐싱) ───
+
+    @Volatile
+    private var cachedTagList: List<String>? = null
+    @Volatile
+    private var tagListCacheTime = 0L
+
+    /**
+     * 전체 문제에서 고유 태그를 추출하여 사용 빈도순으로 반환
+     */
+    fun fetchAllTags(): List<String> {
+        val now = System.currentTimeMillis()
+        cachedTagList?.let { if (now - tagListCacheTime < 600_000) return it }
+
+        val problems = fetchAllProblems()
+        val tagCount = mutableMapOf<String, Int>()
+        for (p in problems) {
+            for (tag in p.tags) {
+                tagCount[tag] = (tagCount[tag] ?: 0) + 1
+            }
+        }
+
+        val tags = tagCount.entries.sortedByDescending { it.value }.map { it.key }
+        cachedTagList = tags
+        tagListCacheTime = now
+        return tags
+    }
+
+    /** 영어 태그명 → 한국어 번역 */
+    val tagToKo = mapOf(
+        "implementation" to "구현", "math" to "수학", "greedy" to "그리디",
+        "dp" to "DP", "data structures" to "자료 구조", "brute force" to "브루트포스",
+        "constructive algorithms" to "구성적", "graphs" to "그래프", "sortings" to "정렬",
+        "binary search" to "이분 탐색", "dfs and similar" to "DFS 등", "trees" to "트리",
+        "strings" to "문자열", "number theory" to "정수론", "geometry" to "기하학",
+        "combinatorics" to "조합론", "two pointers" to "투 포인터", "bitmasks" to "비트마스크",
+        "dsu" to "유니온 파인드", "shortest paths" to "최단 경로",
+        "probabilities" to "확률", "hashing" to "해싱", "games" to "게임 이론",
+        "flows" to "플로우", "interactive" to "인터랙티브", "matrices" to "행렬",
+        "fft" to "FFT", "ternary search" to "삼분 탐색", "expression parsing" to "수식 파싱",
+        "meet-in-the-middle" to "밋 인 더 미들", "string suffix structures" to "접미사 구조",
+        "divide and conquer" to "분할 정복", "chinese remainder theorem" to "중국인 나머지 정리",
+        "schedules" to "스케줄링", "2-sat" to "2-SAT", "graph matchings" to "그래프 매칭"
     )
+
+    fun tagToKoStr(tag: String): String = tagToKo[tag] ?: tag
 }

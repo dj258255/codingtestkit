@@ -145,21 +145,43 @@
 
         <b>English</b>
         <ul>
+            <li><b>[New] SWEA background fetch</b> – SWEA problems are now fetched in the background using an offscreen JCEF browser, eliminating the JCEF dialog popup</li>
+            <li><b>[New] SWEA batch fetch</b> – Random picker now fetches multiple SWEA problems in a single browser session instead of opening a dialog for each problem</li>
+            <li><b>[New] SWEA HTTP fast fetch</b> – Problem content is now fetched via direct HTTP POST (Jsoup) instead of headless browser, reducing fetch time from ~5-15s to under 1s per problem. Falls back to JCEF if HTTP extraction fails</li>
+            <li><b>[Improve] SWEA parallel fetch</b> – Multiple SWEA problems are now fetched in parallel (up to 3 concurrent) instead of sequentially, dramatically reducing total fetch time for random picks</li>
+            <li><b>[Improve] SWEA random speed</b> – Parallelized D1~D8 level scanning (8 sequential requests → parallel), reducing random picker load time from ~8s to ~1-2s</li>
             <li><b>[New] Keyboard shortcuts</b> – Ctrl+Alt+F (Fetch), Ctrl+Alt+R (Run All), Ctrl+Alt+S (Submit), Ctrl+Alt+T (Translate); customizable via Settings → Keymap</li>
             <li><b>[New] Test diff highlighting</b> – Failed test cases now show line-level and character-level diff highlighting between expected and actual output (red background for mismatched lines, darker red for specific character differences)</li>
             <li><b>[New] Status bar widget</b> – Shows current platform and problem number (e.g. "CTK: BOJ #1000") in the IDE status bar; click to open the tool window</li>
             <li><b>[New] SWEA random EN/KO translation</b> – Added one-click Korean↔English title translation button to SWEA random problem picker (matching all other platforms)</li>
             <li><b>[New] Source attribution</b> – Each problem now shows a source attribution link at the bottom with platform name, problem URL, and copyright notice</li>
+            <li><b>[Improve] SWEA test data in-memory loading</b> – Test data is now downloaded via Kotlin HttpURLConnection with zip support (java.util.zip) and loaded directly into test case panels instead of saving input.txt/output.txt files locally</li>
+            <li><b>[Improve] SWEA image base64 inline</b> – Images are now converted to base64 data URIs directly in the JCEF browser (fetch + FileReader.readAsDataURL), eliminating local image file downloads and storage</li>
+            <li><b>[Improve] SWEA fetch architecture overhaul</b> – Replaced search-and-click browser workflow with direct form submit (POST) for detail page navigation; AngularJS rendering detection now uses JS polling (500ms intervals) instead of fixed timers (5s/9s/14s); removed manual fallback and in-browser search entirely</li>
+            <li><b>[Improve] Dynamic tag loading</b> – Algorithm tags for BOJ, LeetCode, and Codeforces are now fetched dynamically from APIs instead of hardcoded lists (10-min TTL cache)</li>
+            <li><b>[Improve] Centralized tag translation</b> – Korean↔English tag translation maps moved from UI dialogs to API service objects (SolvedAcApi, LeetCodeApi, CodeforcesApi)</li>
+            <li><b>[Improve] Tag loading state</b> – Tag popup shows "Loading tags..." balloon when tags haven't loaded yet</li>
             <li><b>[Improve] Disclaimer</b> – Strengthened disclaimer in plugin description: personal study use only, no redistribution, no commercial use</li>
         </ul>
 
         <b>한국어</b>
         <ul>
+            <li><b>[신규] SWEA 백그라운드 fetch</b> – SWEA 문제를 오프스크린 JCEF 브라우저로 백그라운드에서 자동 가져오기. JCEF 다이얼로그 팝업 제거</li>
+            <li><b>[신규] SWEA 배치 fetch</b> – 랜덤 뽑기에서 여러 SWEA 문제를 하나의 브라우저 세션으로 한번에 가져오기 (기존: 문제마다 다이얼로그 1개씩)</li>
+            <li><b>[신규] SWEA HTTP 고속 fetch</b> – 헤드리스 브라우저 대신 HTTP POST(Jsoup)로 직접 문제 콘텐츠를 가져와 문제당 ~5-15초 → 1초 미만으로 단축. HTTP 추출 실패 시 JCEF 자동 fallback</li>
+            <li><b>[개선] SWEA 병렬 fetch</b> – 여러 SWEA 문제를 순차가 아닌 병렬(최대 3개 동시)로 가져와 랜덤 뽑기 총 소요 시간 대폭 단축</li>
+            <li><b>[개선] SWEA 랜덤 속도 개선</b> – D1~D8 레벨 스캔을 병렬화 (순차 8회 → 병렬), 랜덤 뽑기 목록 로딩 ~8초 → ~1-2초</li>
             <li><b>[신규] 키보드 단축키</b> – Ctrl+Alt+F (가져오기), Ctrl+Alt+R (전체 실행), Ctrl+Alt+S (제출), Ctrl+Alt+T (번역); 설정 → 키맵에서 변경 가능</li>
             <li><b>[신규] 테스트 diff 하이라이팅</b> – 실패한 테스트 케이스에서 예상 출력과 실제 출력의 차이를 줄/글자 단위로 색상 표시 (빨간 배경: 다른 줄, 진한 빨간: 구체적 차이점)</li>
             <li><b>[신규] 상태바 위젯</b> – IDE 하단 상태바에 현재 플랫폼과 문제 번호 표시 (예: "CTK: 백준 #1000"); 클릭하면 도구 창 열기</li>
             <li><b>[신규] SWEA 랜덤 뽑기 한/영 번역</b> – SWEA 랜덤 문제 뽑기에 원클릭 한↔영 제목 번역 버튼 추가 (다른 플랫폼과 동일하게 적용)</li>
             <li><b>[신규] 출처 표시</b> – 각 문제 하단에 플랫폼명, 문제 URL, 저작권 안내를 포함한 출처 표시 추가</li>
+            <li><b>[개선] SWEA 테스트 데이터 메모리 내 로딩</b> – 테스트 데이터를 Kotlin HttpURLConnection으로 다운로드하고, zip 파일이면 java.util.zip으로 메모리 내 추출하여 테스트 케이스 패널에 직접 로딩 (input.txt/output.txt 파일 저장 제거)</li>
+            <li><b>[개선] SWEA 이미지 base64 인라인</b> – JCEF 브라우저 내에서 이미지를 base64 data URI로 직접 변환 (fetch + FileReader.readAsDataURL), 로컬 이미지 파일 다운로드 및 저장 제거</li>
+            <li><b>[개선] SWEA 가져오기 아키텍처 전면 개선</b> – 브라우저 내 검색·클릭 방식을 제거하고 form submit(POST)으로 상세 페이지 직접 이동; AngularJS 렌더링 감지를 고정 타이머(5s/9s/14s)에서 JS polling(500ms 간격)으로 변경; 수동 fallback 및 브라우저 내 검색 완전 제거</li>
+            <li><b>[개선] 태그 동적 로딩</b> – 백준, LeetCode, Codeforces의 알고리즘 태그를 하드코딩 대신 API에서 동적으로 가져오도록 변경 (10분 TTL 캐싱)</li>
+            <li><b>[개선] 태그 번역 중앙화</b> – 한↔영 태그 번역 맵을 UI 다이얼로그에서 API 서비스 객체(SolvedAcApi, LeetCodeApi, CodeforcesApi)로 이동</li>
+            <li><b>[개선] 태그 로딩 상태 표시</b> – 태그가 아직 로딩되지 않았을 때 팝업에 "태그 로딩 중..." 풍선 표시</li>
             <li><b>[개선] 면책 조항</b> – 플러그인 설명의 면책 조항 강화: 개인 학습 목적 전용, 재배포·상업적 이용 금지 명시</li>
         </ul>
 

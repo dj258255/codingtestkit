@@ -67,31 +67,11 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
     private val classPanel = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0))
     private val rangeCards = JPanel(CardLayout())
 
-    // ─── 알고리즘 다중선택 ───
+    // ─── 알고리즘 다중선택 (동적 로딩) ───
 
-    private val tagEntries = listOf(
-        "math" to I18n.t("수학", "Math"),
-        "implementation" to I18n.t("구현", "Implementation"),
-        "dp" to I18n.t("다이나믹 프로그래밍", "DP"),
-        "graphs" to I18n.t("그래프 이론", "Graph"),
-        "greedy" to I18n.t("그리디", "Greedy"),
-        "sorting" to I18n.t("정렬", "Sorting"),
-        "string" to I18n.t("문자열", "String"),
-        "bruteforcing" to I18n.t("브루트포스", "Brute Force"),
-        "binary_search" to I18n.t("이분 탐색", "Binary Search"),
-        "bfs" to "BFS",
-        "dfs" to "DFS",
-        "trees" to I18n.t("트리", "Trees"),
-        "data_structures" to I18n.t("자료 구조", "Data Structures"),
-        "shortest_path" to I18n.t("최단 경로", "Shortest Path"),
-        "backtracking" to I18n.t("백트래킹", "Backtracking"),
-        "two_pointer" to I18n.t("투 포인터", "Two Pointer"),
-        "divide_and_conquer" to I18n.t("분할 정복", "Divide & Conquer"),
-        "segtree" to I18n.t("세그먼트 트리", "Segment Tree"),
-        "union_find" to I18n.t("유니온 파인드", "Union Find"),
-        "geometry" to I18n.t("기하학", "Geometry"),
-        "number_theory" to I18n.t("정수론", "Number Theory")
-    )
+    @Volatile
+    private var tagEntries: List<Pair<String, String>> = emptyList()
+    private var tagsLoaded = false
 
     private val selectedTags = mutableSetOf<String>()
     private val dialogWidth = JBUI.scale(680)
@@ -220,6 +200,23 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
         setCancelButtonText(I18n.t("닫기", "Close"))
         init()
         isOKActionEnabled = false
+        loadTagsAsync()
+    }
+
+    private fun loadTagsAsync() {
+        Thread {
+            try {
+                val tags = SolvedAcApi.fetchTagList()
+                val entries = tags.map { it.id to I18n.t(it.ko, it.en) }
+                SwingUtilities.invokeLater {
+                    tagEntries = entries
+                    tagsLoaded = true
+                    updateTagChips()
+                }
+            } catch (_: Exception) {
+                // 로딩 실패 시 무시 — 팝업에서 "로딩 중" 표시 유지
+            }
+        }.start()
     }
 
     private var doubleClicked = false
@@ -396,6 +393,18 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
     // ─── 태그 다중선택 팝업 ───
 
     private fun showTagPopup() {
+        if (!tagsLoaded) {
+            JBPopupFactory.getInstance()
+                .createHtmlTextBalloonBuilder(
+                    I18n.t("태그 목록을 불러오는 중...", "Loading tags..."),
+                    MessageType.INFO, null
+                )
+                .setFadeoutTime(2000)
+                .createBalloon()
+                .show(RelativePoint.getCenterOf(addTagButton), Balloon.Position.above)
+            return
+        }
+
         val checkboxes = mutableListOf<JCheckBox>()
         val listPanel = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
 
@@ -486,7 +495,7 @@ class RandomProblemDialog(private val project: Project) : DialogWrapper(project)
         val prevSize = window?.size
         tagChipPanel.revalidate()
         tagChipPanel.repaint()
-        if (prevSize != null) window?.size = prevSize
+        if (prevSize != null) window.size = prevSize
     }
 
     private fun createTagChip(display: String, key: String): JPanel {

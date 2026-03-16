@@ -165,6 +165,7 @@ object SolvedProblemsService {
 
     // ─── LeetCode ───
 
+    @Suppress("UNUSED_PARAMETER")
     private fun fetchLeetCode(username: String, page: Int, query: String): SolvedPage {
         val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE).ifBlank { null }
         val skip = (page - 1) * PAGE_SIZE

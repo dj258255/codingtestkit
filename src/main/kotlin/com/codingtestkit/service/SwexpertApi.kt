@@ -112,17 +112,22 @@ object SwexpertApi {
         passFilterYn: Boolean,
         cookies: String
     ): List<ProblemInfo> {
-        val allProblems = mutableListOf<ProblemInfo>()
-        for (d in 1..8) {
-            val result = searchProblems(
-                levels = listOf(d), language = language,
-                orderBy = "INQUERY_COUNT",
-                passFilterYn = passFilterYn,
-                page = 1, pageSize = 30, cookies = cookies
-            )
-            allProblems.addAll(result.problems)
+        // D1~D8 병렬 조회 (8 req 순차 ~8초 → 병렬 ~1-2초)
+        val futures = (1..8).map { d ->
+            java.util.concurrent.CompletableFuture.supplyAsync {
+                try {
+                    searchProblems(
+                        levels = listOf(d), language = language,
+                        orderBy = "INQUERY_COUNT",
+                        passFilterYn = passFilterYn,
+                        page = 1, pageSize = 30, cookies = cookies
+                    ).problems
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
         }
-        return allProblems
+        return futures.flatMap { it.join() }
     }
 
     /**

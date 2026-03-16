@@ -13,6 +13,63 @@ object LeetCodeApi {
     private const val GRAPHQL_URL = "https://leetcode.com/graphql/"
     private val gson = Gson()
 
+    // ─── 토픽 태그 목록 (동적 로딩 + 캐싱) ───
+
+    data class TopicTag(val slug: String, val name: String)
+
+    @Volatile
+    private var cachedTopicTags: List<TopicTag>? = null
+    @Volatile
+    private var topicTagsCacheTime = 0L
+    private const val TOPIC_TAGS_TTL = 600_000L // 10분
+
+    /**
+     * LeetCode GraphQL에서 전체 토픽 태그 목록을 가져옴
+     */
+    fun fetchTopicTags(cookies: String? = null): List<TopicTag> {
+        val now = System.currentTimeMillis()
+        cachedTopicTags?.let { if (now - topicTagsCacheTime < TOPIC_TAGS_TTL) return it }
+
+        val query = "query { topicTags { name slug } }"
+        val result = graphql(query, emptyMap(), cookies)
+        val tagsArray = result.getAsJsonObject("data")
+            ?.getAsJsonArray("topicTags") ?: return emptyList()
+
+        val tags = tagsArray.mapNotNull { el ->
+            val obj = el.asJsonObject
+            val slug = obj.get("slug")?.asString ?: return@mapNotNull null
+            val name = obj.get("name")?.asString ?: slug
+            TopicTag(slug, name)
+        }
+
+        cachedTopicTags = tags
+        topicTagsCacheTime = now
+        return tags
+    }
+
+    /** 영어 태그명 → 한국어 번역 (API에서 한국어를 제공하지 않으므로 매핑 사용) */
+    val tagKoMap = mapOf(
+        "Array" to "배열", "String" to "문자열", "Hash Table" to "해시 테이블",
+        "Dynamic Programming" to "동적 프로그래밍", "Math" to "수학", "Sorting" to "정렬",
+        "Greedy" to "그리디", "Depth-First Search" to "DFS", "Breadth-First Search" to "BFS",
+        "Binary Search" to "이분 탐색", "Tree" to "트리", "Graph" to "그래프",
+        "Linked List" to "연결 리스트", "Stack" to "스택", "Heap (Priority Queue)" to "힙",
+        "Two Pointers" to "투 포인터", "Sliding Window" to "슬라이딩 윈도우",
+        "Backtracking" to "백트래킹", "Divide and Conquer" to "분할 정복",
+        "Bit Manipulation" to "비트 조작", "Union Find" to "유니온 파인드",
+        "Matrix" to "행렬", "Simulation" to "시뮬레이션", "Recursion" to "재귀",
+        "Binary Tree" to "이진 트리", "Trie" to "트라이", "Queue" to "큐",
+        "Design" to "설계", "Prefix Sum" to "누적 합", "Counting" to "카운팅",
+        "Database" to "데이터베이스", "Enumeration" to "열거", "Geometry" to "기하학",
+        "Number Theory" to "정수론", "Topological Sort" to "위상 정렬",
+        "Segment Tree" to "세그먼트 트리", "Binary Indexed Tree" to "펜윅 트리",
+        "Memoization" to "메모이제이션", "Monotonic Stack" to "단조 스택",
+        "Ordered Set" to "정렬 집합", "Interactive" to "인터랙티브",
+        "Brainteaser" to "브레인티저", "Combinatorics" to "조합론"
+    )
+
+    fun tagToKo(tag: String): String = tagKoMap[tag] ?: tag
+
     data class LeetCodeProblemInfo(
         val frontendId: String,
         val title: String,
@@ -66,11 +123,6 @@ object LeetCodeApi {
         val title = question.get("title")?.asString ?: ""
         val content = question.get("content")?.asString ?: ""
         val difficulty = question.get("difficulty")?.asString ?: ""
-
-        // 태그 추출
-        val tags = question.getAsJsonArray("topicTags")?.map {
-            it.asJsonObject.get("name")?.asString ?: ""
-        } ?: emptyList()
 
         // 코드 스니펫에서 선택한 언어의 코드 추출
         val langSlug = languageToLeetCodeSlug(language)

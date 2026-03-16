@@ -30,31 +30,11 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         "HARD" to JCheckBox("Hard").apply { isSelected = true }
     )
 
-    // ─── 태그 다중선택 ───
+    // ─── 태그 다중선택 (동적 로딩) ───
 
-    private val tagEntries = listOf(
-        "array" to "Array",
-        "string" to "String",
-        "hash-table" to "Hash Table",
-        "dynamic-programming" to "DP",
-        "math" to "Math",
-        "sorting" to "Sorting",
-        "greedy" to "Greedy",
-        "depth-first-search" to "DFS",
-        "breadth-first-search" to "BFS",
-        "binary-search" to "Binary Search",
-        "tree" to "Tree",
-        "graph" to "Graph",
-        "linked-list" to "Linked List",
-        "stack" to "Stack",
-        "heap-priority-queue" to "Heap",
-        "two-pointers" to "Two Pointers",
-        "sliding-window" to "Sliding Window",
-        "backtracking" to "Backtracking",
-        "divide-and-conquer" to "Divide & Conquer",
-        "bit-manipulation" to "Bit Manipulation",
-        "union-find" to "Union Find"
-    )
+    @Volatile
+    private var tagEntries: List<Pair<String, String>> = emptyList()
+    private var tagsLoaded = false
 
     private val selectedTags = mutableSetOf<String>()
     private val dialogWidth = JBUI.scale(680)
@@ -195,6 +175,22 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         setCancelButtonText(I18n.t("닫기", "Close"))
         init()
         isOKActionEnabled = false
+        loadTagsAsync()
+    }
+
+    private fun loadTagsAsync() {
+        Thread {
+            try {
+                val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
+                val tags = LeetCodeApi.fetchTopicTags(cookies.ifBlank { null })
+                val entries = tags.map { it.slug to I18n.t(LeetCodeApi.tagToKo(it.name), it.name) }
+                SwingUtilities.invokeLater {
+                    tagEntries = entries
+                    tagsLoaded = true
+                    updateTagChips()
+                }
+            } catch (_: Exception) { }
+        }.start()
     }
 
     private var doubleClicked = false
@@ -340,6 +336,18 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
     // ─── 태그 팝업 ───
 
     private fun showTagPopup() {
+        if (!tagsLoaded) {
+            JBPopupFactory.getInstance()
+                .createHtmlTextBalloonBuilder(
+                    I18n.t("태그 목록을 불러오는 중...", "Loading tags..."),
+                    MessageType.INFO, null
+                )
+                .setFadeoutTime(2000)
+                .createBalloon()
+                .show(com.intellij.ui.awt.RelativePoint.getCenterOf(addTagButton), Balloon.Position.above)
+            return
+        }
+
         val checkboxes = mutableListOf<JCheckBox>()
         val listPanel = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
 
@@ -430,7 +438,7 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
         val prevSize = window?.size
         tagChipPanel.revalidate()
         tagChipPanel.repaint()
-        if (prevSize != null) window?.size = prevSize
+        if (prevSize != null) window.size = prevSize
     }
 
     private fun createTagChip(display: String, key: String): JPanel {
@@ -615,7 +623,7 @@ class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project
             if (idx < tableModel.rowCount) {
                 val title = if (showingTranslated) translatedTitles[p.titleSlug] ?: p.title else p.title
                 tableModel.setValueAt(title, idx, 2)
-                val tags = if (showingTranslated) p.tags.take(3).map { LeetCodeSearchDialog.tagToKo(it) }.joinToString(", ")
+                val tags = if (showingTranslated) p.tags.take(3).map { LeetCodeApi.tagToKo(it) }.joinToString(", ")
                     else p.tags.take(3).joinToString(", ")
                 tableModel.setValueAt(tags, idx, 5)
             }

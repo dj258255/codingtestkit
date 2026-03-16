@@ -29,6 +29,9 @@ import org.cef.network.CefResponse
 import org.cef.callback.CefCallback
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -314,7 +317,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun createComboRenderer(): ListCellRenderer<Any?> {
-        return ListCellRenderer { list, value, index, isSelected, cellHasFocus ->
+        return ListCellRenderer { list, value, _, isSelected, _ ->
             JLabel(value?.toString() ?: "").apply {
                 isOpaque = true
                 border = JBUI.Borders.empty(2, 8)
@@ -531,7 +534,97 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             fetchProblem()
             return
         }
-        // 여러 문제를 순차적으로 가져오기
+
+        val source = getSelectedSource()
+
+        // SWEA: JCEF 오프스크린 브라우저로 병렬 fetch (최대 3개 동시)
+        if (source == ProblemSource.SWEA) {
+            fetchButton.isEnabled = false
+            val sweaCookies = AuthService.getInstance().getCookies(ProblemSource.SWEA)
+            val language = getSelectedLanguage()
+            val total = problemIds.size
+            val successCount = AtomicInteger(0)
+            val failCount = AtomicInteger(0)
+            val completedCount = AtomicInteger(0)
+
+            SwingUtilities.invokeLater {
+                fetchButton.text = I18n.t(
+                    "가져오는 중... (0/$total)",
+                    "Fetching... (0/$total)"
+                )
+            }
+
+            val executor = Executors.newFixedThreadPool(3.coerceAtMost(total))
+            val futures = problemIds.map { cpId ->
+                CompletableFuture.supplyAsync({
+                    try {
+                        // HTTP 먼저 시도 (빠름), 실패 시 JCEF fallback
+                        var problem = SweaHttpFetcher.fetchProblem(cpId, sweaCookies)
+                        if (problem == null && SweaJcefFetcher.isAvailable()) {
+                            problem = SweaJcefFetcher.fetchProblem(cpId)
+                        }
+
+                        if (problem != null) {
+                            val finalProblem = if (problem.contestProbId.isNotBlank() && sweaCookies.isNotBlank()) {
+                                val downloadResult = SweaTestDataDownloader.download(problem.contestProbId, sweaCookies)
+                                if (downloadResult != null && downloadResult.testCases.isNotEmpty()) {
+                                    problem.copy(testCases = downloadResult.testCases.toMutableList())
+                                } else problem
+                            } else problem
+
+                            val files = ProblemFileManager.createProblemFiles(project, finalProblem, language)
+                            SwingUtilities.invokeLater {
+                                handleFetchSuccess(finalProblem, files)
+                            }
+                            successCount.incrementAndGet()
+                        } else {
+                            failCount.incrementAndGet()
+                        }
+                    } catch (e: Exception) {
+                        failCount.incrementAndGet()
+                    } finally {
+                        val done = completedCount.incrementAndGet()
+                        SwingUtilities.invokeLater {
+                            fetchButton.text = I18n.t(
+                                "가져오는 중... ($done/$total)",
+                                "Fetching... ($done/$total)"
+                            )
+                        }
+                    }
+                }, executor)
+            }
+
+            ApplicationManager.getApplication().executeOnPooledThread {
+                CompletableFuture.allOf(*futures.toTypedArray()).join()
+                executor.shutdown()
+
+                SwingUtilities.invokeLater {
+                    fetchButton.isEnabled = true
+                    fetchButton.text = I18n.t("가져오기", "Fetch")
+                    val sc = successCount.get()
+                    val fc = failCount.get()
+                    if (fc > 0 && sc > 0) {
+                        Messages.showInfoMessage(project,
+                            I18n.t(
+                                "${sc}개 성공, ${fc}개 실패",
+                                "$sc succeeded, $fc failed"
+                            ),
+                            "CodingTestKit")
+                    } else if (sc == 0) {
+                        val detail = SweaJcefFetcher.lastError
+                        Messages.showWarningDialog(project,
+                            I18n.t(
+                                "SWEA 문제를 가져오지 못했습니다.\n원인: $detail",
+                                "Failed to fetch SWEA problems.\nReason: $detail"
+                            ),
+                            "CodingTestKit")
+                    }
+                }
+            }
+            return
+        }
+
+        // 기본: 순차 fetch
         Thread {
             for (id in problemIds) {
                 SwingUtilities.invokeAndWait {
@@ -607,94 +700,84 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun fetchSweaProblem(problemId: String, language: Language) {
-        val dialog = SweaFetchDialog(project, problemId)
-        if (dialog.showAndGet()) {
-            val problem = dialog.getProblem()
-            if (problem != null) {
-                fetchButton.isEnabled = false
-                fetchButton.text = I18n.t("파일 생성 중...", "Creating files...")
-                val inputFileContent = dialog.inputFileContent
-                val outputFileContent = dialog.outputFileContent
-                val imageUrls = dialog.imageUrls
-                val sweaCookies = AuthService.getInstance().getCookies(ProblemSource.SWEA)
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    try {
-                        // README용 problem: 다운로드 데이터가 있으면 테스트 케이스 포함
-                        val problemForMd = if (inputFileContent.isNotBlank() && outputFileContent.isNotBlank()) {
-                            problem.copy(
-                                testCases = mutableListOf(
-                                    com.codingtestkit.model.TestCase(
-                                        input = inputFileContent.trim(),
-                                        expectedOutput = outputFileContent.trim()
-                                    )
-                                )
-                            )
-                        } else {
-                            problem
-                        }
-                        val files = ProblemFileManager.createProblemFiles(project, problemForMd, language)
-                        // SWEA 전용: 이미지 파일 다운로드
-                        println("[CodingTestKit] Image URLs to download: ${imageUrls.size} - $imageUrls")
-                        println("[CodingTestKit] SWEA cookies length: ${sweaCookies.length}")
-                        for ((idx, url) in imageUrls.withIndex()) {
-                            try {
-                                val response = org.jsoup.Jsoup.connect(url)
-                                    .header("Cookie", sweaCookies)
-                                    .header("Referer", "https://swexpertacademy.com/")
-                                    .header("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
-                                    .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                                    .ignoreContentType(true)
-                                    .followRedirects(true)
-                                    .maxBodySize(10 * 1024 * 1024)
-                                    .timeout(15000)
-                                    .execute()
-                                val bytes = response.bodyAsBytes()
-                                val contentType = response.contentType() ?: ""
-                                println("[CodingTestKit] Image $idx: status=${response.statusCode()}, type=$contentType, size=${bytes.size}")
-                                // 실제 이미지인지 확인 (HTML이 반환되면 저장하지 않음)
-                                if (!contentType.contains("image") && bytes.size < 50000) {
-                                    val preview = String(bytes.take(200).toByteArray())
-                                    if (preview.contains("<html", ignoreCase = true) || preview.contains("<!DOCTYPE", ignoreCase = true)) {
-                                        println("[CodingTestKit] Skipping non-image response for $url")
-                                        continue
-                                    }
-                                }
-                                val ext = when {
-                                    contentType.contains("jpeg") || contentType.contains("jpg") -> "jpg"
-                                    contentType.contains("gif") -> "gif"
-                                    contentType.contains("webp") -> "webp"
-                                    contentType.contains("svg") -> "svg"
-                                    url.contains(".jpg") || url.contains(".jpeg") -> "jpg"
-                                    url.contains(".gif") -> "gif"
-                                    else -> "png"
-                                }
-                                val fileName = "img_${idx + 1}.$ext"
-                                if (bytes.size > 100) {
-                                    java.io.File(files.folder, fileName).writeBytes(bytes)
-                                    println("[CodingTestKit] Saved: ${files.folder}/$fileName (${bytes.size} bytes)")
-                                }
-                            } catch (e: Exception) {
-                                println("[CodingTestKit] Image download failed for $url: ${e.message}")
-                            }
-                        }
-                        // SWEA 전용: input.txt / output.txt 파일 저장
-                        if (inputFileContent.isNotBlank()) {
-                            java.io.File(files.folder, "input.txt").writeText(inputFileContent)
-                        }
-                        if (outputFileContent.isNotBlank()) {
-                            java.io.File(files.folder, "output.txt").writeText(outputFileContent)
-                        }
-                        SwingUtilities.invokeLater {
-                            handleFetchSuccess(problemForMd, files)
-                        }
-                    } catch (e: Exception) {
-                        SwingUtilities.invokeLater {
-                            handleFetchError(e)
+        fetchButton.isEnabled = false
+        fetchButton.text = I18n.t("가져오는 중...", "Fetching...")
+
+        val sweaCookies = AuthService.getInstance().getCookies(ProblemSource.SWEA)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                // 1) contestProbId 해석
+                val contestProbId = if (problemId.any { it.isLetter() }) {
+                    problemId
+                } else {
+                    val result = SwexpertApi.searchProblems(keyword = problemId, cookies = sweaCookies, pageSize = 10)
+                    result.problems.firstOrNull { it.number == problemId }?.contestProbId
+                }
+
+                if (contestProbId == null) {
+                    SwingUtilities.invokeLater {
+                        handleFetchError(Exception(I18n.t(
+                            "문제 번호를 찾을 수 없습니다. SWEA에 로그인했는지 확인하세요.",
+                            "Could not resolve problem number. Please check SWEA login."
+                        )))
+                    }
+                    return@executeOnPooledThread
+                }
+
+                // 2) HTTP 직접 fetch 시도 (빠름)
+                var problem = SweaHttpFetcher.fetchProblem(contestProbId, sweaCookies)
+
+                // 3) HTTP 실패 시 JCEF 오프스크린 시도
+                if (problem == null && SweaJcefFetcher.isAvailable()) {
+                    problem = SweaJcefFetcher.fetchProblem(contestProbId)
+                }
+
+                // 4) JCEF 오프스크린도 실패 시 다이얼로그 fallback
+                if (problem == null) {
+                    SwingUtilities.invokeAndWait {
+                        val dialog = SweaFetchDialog(project, problemId)
+                        if (dialog.showAndGet()) {
+                            problem = dialog.getProblem()
                         }
                     }
                 }
-            } else {
-                Messages.showWarningDialog(project, I18n.t("SWEA 문제를 가져오지 못했습니다.", "Failed to fetch SWEA problem."), "CodingTestKit")
+
+                if (problem == null) {
+                    SwingUtilities.invokeLater {
+                        fetchButton.isEnabled = true
+                        fetchButton.text = I18n.t("가져오기", "Fetch")
+                        Messages.showWarningDialog(project,
+                            I18n.t("SWEA 문제를 가져오지 못했습니다.", "Failed to fetch SWEA problem."),
+                            "CodingTestKit")
+                    }
+                    return@executeOnPooledThread
+                }
+
+                val prob = problem!!
+
+                // 4) 테스트 데이터 다운로드
+                val finalProblem = if (prob.contestProbId.isNotBlank() && sweaCookies.isNotBlank()) {
+                    val downloadResult = SweaTestDataDownloader.download(prob.contestProbId, sweaCookies)
+                    if (downloadResult != null && downloadResult.testCases.isNotEmpty()) {
+                        println("[CodingTestKit] SWEA test data downloaded: input=${downloadResult.rawInput.length}, output=${downloadResult.rawOutput.length}")
+                        prob.copy(testCases = downloadResult.testCases.toMutableList())
+                    } else {
+                        println("[CodingTestKit] SWEA test data download failed, using preview data")
+                        prob
+                    }
+                } else {
+                    prob
+                }
+
+                val files = ProblemFileManager.createProblemFiles(project, finalProblem, language)
+                SwingUtilities.invokeLater {
+                    handleFetchSuccess(finalProblem, files)
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    handleFetchError(e)
+                }
             }
         }
     }

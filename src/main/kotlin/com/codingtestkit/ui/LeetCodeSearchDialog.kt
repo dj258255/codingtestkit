@@ -32,30 +32,7 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         I18n.t("전체", "All"), "Easy", "Medium", "Hard"
     )).apply { renderer = comboRenderer() }
 
-    private val tagEntries = listOf(
-        "" to I18n.t("전체", "All"),
-        "array" to "Array",
-        "string" to "String",
-        "hash-table" to "Hash Table",
-        "dynamic-programming" to "DP",
-        "math" to "Math",
-        "sorting" to "Sorting",
-        "greedy" to "Greedy",
-        "depth-first-search" to "DFS",
-        "breadth-first-search" to "BFS",
-        "binary-search" to "Binary Search",
-        "tree" to "Tree",
-        "graph" to "Graph",
-        "linked-list" to "Linked List",
-        "stack" to "Stack",
-        "heap-priority-queue" to "Heap",
-        "two-pointers" to "Two Pointers",
-        "sliding-window" to "Sliding Window",
-        "backtracking" to "Backtracking",
-        "divide-and-conquer" to "Divide & Conquer",
-        "bit-manipulation" to "Bit Manipulation",
-        "union-find" to "Union Find"
-    )
+    private var tagEntries: List<Pair<String, String>> = listOf("" to I18n.t("전체", "All"))
     private val tagCombo = ComboBox(tagEntries.map { it.second }.toTypedArray()).apply {
         renderer = comboRenderer()
     }
@@ -116,6 +93,23 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
         setCancelButtonText(I18n.t("닫기", "Close"))
         init()
         isOKActionEnabled = false
+        loadTagsAsync()
+    }
+
+    private fun loadTagsAsync() {
+        Thread {
+            try {
+                val cookies = AuthService.getInstance().getCookies(ProblemSource.LEETCODE)
+                val tags = LeetCodeApi.fetchTopicTags(cookies.ifBlank { null })
+                val entries = listOf("" to I18n.t("전체", "All")) +
+                    tags.map { it.slug to I18n.t(LeetCodeApi.tagToKo(it.name), it.name) }
+                SwingUtilities.invokeLater {
+                    tagEntries = entries
+                    tagCombo.removeAllItems()
+                    for ((_, display) in entries) tagCombo.addItem(display)
+                }
+            } catch (_: Exception) { }
+        }.start()
     }
 
     override fun createCenterPanel(): JComponent {
@@ -303,35 +297,11 @@ class LeetCodeSearchDialog(private val project: Project) : DialogWrapper(project
             if (idx < tableModel.rowCount) {
                 val title = if (showingTranslated) translatedTitles[p.titleSlug] ?: p.title else p.title
                 tableModel.setValueAt(title, idx, 1)
-                val tags = if (showingTranslated) p.tags.take(3).map { tagToKo(it) }.joinToString(", ")
+                val tags = if (showingTranslated) p.tags.take(3).map { LeetCodeApi.tagToKo(it) }.joinToString(", ")
                     else p.tags.take(3).joinToString(", ")
                 tableModel.setValueAt(tags, idx, 4)
             }
         }
-    }
-
-    companion object {
-        private val tagKoMap = mapOf(
-            "Array" to "배열", "String" to "문자열", "Hash Table" to "해시 테이블",
-            "Dynamic Programming" to "동적 프로그래밍", "Math" to "수학", "Sorting" to "정렬",
-            "Greedy" to "그리디", "Depth-First Search" to "DFS", "Breadth-First Search" to "BFS",
-            "Binary Search" to "이분 탐색", "Tree" to "트리", "Graph" to "그래프",
-            "Linked List" to "연결 리스트", "Stack" to "스택", "Heap (Priority Queue)" to "힙",
-            "Two Pointers" to "투 포인터", "Sliding Window" to "슬라이딩 윈도우",
-            "Backtracking" to "백트래킹", "Divide and Conquer" to "분할 정복",
-            "Bit Manipulation" to "비트 조작", "Union Find" to "유니온 파인드",
-            "Matrix" to "행렬", "Simulation" to "시뮬레이션", "Recursion" to "재귀",
-            "Binary Tree" to "이진 트리", "Trie" to "트라이", "Queue" to "큐",
-            "Design" to "설계", "Prefix Sum" to "누적 합", "Counting" to "카운팅",
-            "Database" to "데이터베이스", "Enumeration" to "열거", "Geometry" to "기하학",
-            "Number Theory" to "정수론", "Topological Sort" to "위상 정렬",
-            "Segment Tree" to "세그먼트 트리", "Binary Indexed Tree" to "펜윅 트리",
-            "Memoization" to "메모이제이션", "Monotonic Stack" to "단조 스택",
-            "Ordered Set" to "정렬 집합", "Interactive" to "인터랙티브",
-            "Brainteaser" to "브레인티저", "Combinatorics" to "조합론"
-        )
-
-        fun tagToKo(tag: String): String = tagKoMap[tag] ?: tag
     }
 
     override fun getPreferredFocusedComponent(): JComponent = searchField

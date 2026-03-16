@@ -159,8 +159,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         extracted = true
 
         val domain = getDomain()
-        val cookieManager = browser.jbCefCookieManager?.cefCookieManager
-            ?: CefCookieManager.getGlobalManager()
+        val cookieManager = browser.jbCefCookieManager.cefCookieManager
         val cookieBuilder = StringBuilder()
         var callbackFired = false
 

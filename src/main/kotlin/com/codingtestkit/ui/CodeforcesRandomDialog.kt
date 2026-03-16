@@ -23,30 +23,11 @@ import javax.swing.table.DefaultTableModel
 
 class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(project) {
 
-    // ─── 태그 다중선택 (칩 방식) ───
+    // ─── 태그 다중선택 (동적 로딩) ───
 
-    private val tagEntries = listOf(
-        "implementation" to I18n.t("구현", "Implementation"),
-        "math" to I18n.t("수학", "Math"),
-        "greedy" to I18n.t("그리디", "Greedy"),
-        "dp" to I18n.t("다이나믹 프로그래밍", "DP"),
-        "data structures" to I18n.t("자료 구조", "Data Structures"),
-        "brute force" to I18n.t("브루트포스", "Brute Force"),
-        "constructive algorithms" to I18n.t("구성적", "Constructive"),
-        "graphs" to I18n.t("그래프", "Graphs"),
-        "sortings" to I18n.t("정렬", "Sorting"),
-        "binary search" to I18n.t("이분 탐색", "Binary Search"),
-        "dfs and similar" to I18n.t("DFS 등", "DFS & Similar"),
-        "trees" to I18n.t("트리", "Trees"),
-        "strings" to I18n.t("문자열", "Strings"),
-        "number theory" to I18n.t("정수론", "Number Theory"),
-        "geometry" to I18n.t("기하학", "Geometry"),
-        "combinatorics" to I18n.t("조합론", "Combinatorics"),
-        "two pointers" to I18n.t("투 포인터", "Two Pointers"),
-        "bitmasks" to I18n.t("비트마스크", "Bitmasks"),
-        "dsu" to I18n.t("유니온 파인드", "DSU"),
-        "shortest paths" to I18n.t("최단 경로", "Shortest Paths")
-    )
+    @Volatile
+    private var tagEntries: List<Pair<String, String>> = emptyList()
+    private var tagsLoaded = false
 
     private val selectedTags = mutableSetOf<String>()
     private val dialogWidth = JBUI.scale(700)
@@ -196,6 +177,21 @@ class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(proje
         setCancelButtonText(I18n.t("닫기", "Close"))
         init()
         isOKActionEnabled = false
+        loadTagsAsync()
+    }
+
+    private fun loadTagsAsync() {
+        Thread {
+            try {
+                val tags = CodeforcesApi.fetchAllTags()
+                val entries = tags.map { it to I18n.t(CodeforcesApi.tagToKoStr(it), it) }
+                SwingUtilities.invokeLater {
+                    tagEntries = entries
+                    tagsLoaded = true
+                    updateTagChips()
+                }
+            } catch (_: Exception) { }
+        }.start()
     }
 
     private var doubleClicked = false
@@ -349,6 +345,18 @@ class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(proje
     // ─── 태그 팝업 (JBPopupFactory) ───
 
     private fun showTagPopup() {
+        if (!tagsLoaded) {
+            JBPopupFactory.getInstance()
+                .createHtmlTextBalloonBuilder(
+                    I18n.t("태그 목록을 불러오는 중...", "Loading tags..."),
+                    MessageType.INFO, null
+                )
+                .setFadeoutTime(2000)
+                .createBalloon()
+                .show(RelativePoint.getCenterOf(addTagButton), Balloon.Position.above)
+            return
+        }
+
         val checkboxes = mutableListOf<JCheckBox>()
         val listPanel = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
 
@@ -435,7 +443,7 @@ class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(proje
         val prevSize = window?.size
         tagChipPanel.revalidate()
         tagChipPanel.repaint()
-        if (prevSize != null) window?.size = prevSize
+        if (prevSize != null) window.size = prevSize
     }
 
     private fun createTagChip(display: String, key: String): JPanel {
@@ -543,15 +551,6 @@ class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(proje
 
     // ─── 번역 ───
 
-    private val tagToKo = mapOf(
-        "implementation" to "구현", "math" to "수학", "greedy" to "그리디",
-        "dp" to "DP", "data structures" to "자료 구조", "brute force" to "브루트포스",
-        "constructive algorithms" to "구성적", "graphs" to "그래프", "sortings" to "정렬",
-        "binary search" to "이분 탐색", "dfs and similar" to "DFS 등", "trees" to "트리",
-        "strings" to "문자열", "number theory" to "정수론", "geometry" to "기하학",
-        "combinatorics" to "조합론", "two pointers" to "투 포인터", "bitmasks" to "비트마스크",
-        "dsu" to "유니온 파인드", "shortest paths" to "최단 경로"
-    )
 
     private fun toggleTranslation() {
         if (results.isEmpty()) return
@@ -594,7 +593,7 @@ class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(proje
                 val title = if (showingTranslated) translatedTitles[p.id] ?: p.name else p.name
                 tableModel.setValueAt(title, idx, 2)
                 val tags = if (showingTranslated)
-                    p.tags.take(3).joinToString(", ") { tagToKo[it] ?: it }
+                    p.tags.take(3).joinToString(", ") { CodeforcesApi.tagToKoStr(it) }
                 else p.tags.take(3).joinToString(", ")
                 tableModel.setValueAt(tags, idx, 4)
             }
