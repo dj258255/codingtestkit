@@ -2,13 +2,14 @@ package com.codingtestkit.ui
 
 import com.codingtestkit.service.CodingTestKitActionService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
-import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.openapi.wm.ToolWindowManager
-import com.intellij.util.Consumer
-import java.awt.Component
+import com.intellij.openapi.wm.impl.status.TextPanel
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.JComponent
 
 class CodingTestKitStatusBarFactory : StatusBarWidgetFactory {
     override fun getId() = WIDGET_ID
@@ -21,43 +22,49 @@ class CodingTestKitStatusBarFactory : StatusBarWidgetFactory {
     }
 }
 
-class CodingTestKitStatusBarWidget(private val project: Project) :
-    StatusBarWidget, StatusBarWidget.TextPresentation {
+class CodingTestKitStatusBarWidget(private val project: Project) : CustomStatusBarWidget {
 
     private var statusBar: StatusBar? = null
+
+    private val component = TextPanel.WithIconAndArrows().apply {
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                ToolWindowManager.getInstance(project).getToolWindow("CodingTestKit")?.show()
+            }
+        })
+    }
 
     override fun ID() = CodingTestKitStatusBarFactory.WIDGET_ID
 
     override fun install(statusBar: StatusBar) {
         this.statusBar = statusBar
         CodingTestKitActionService.getInstance(project).onStatusChanged = {
+            updateText()
             statusBar.updateWidget(ID())
         }
+        updateText()
     }
 
     override fun dispose() {
         statusBar = null
     }
 
-    override fun getPresentation(): StatusBarWidget.WidgetPresentation = this
+    override fun getComponent(): JComponent = component
 
-    override fun getText(): String {
+    private fun updateText() {
         val service = CodingTestKitActionService.getInstance(project)
-        val platform = service.currentPlatform ?: return "CTK"
-        val id = service.currentProblemId ?: return "CTK: $platform"
-        return "CTK: $platform #$id"
-    }
+        val platform = service.currentPlatform
+        val id = service.currentProblemId
 
-    override fun getAlignment(): Float = Component.CENTER_ALIGNMENT
-
-    override fun getTooltipText(): String {
-        val service = CodingTestKitActionService.getInstance(project)
-        val platform = service.currentPlatform ?: return "CodingTestKit"
-        val id = service.currentProblemId ?: return "CodingTestKit: $platform"
-        return "CodingTestKit: $platform #$id"
-    }
-
-    override fun getClickConsumer(): Consumer<MouseEvent> = Consumer {
-        ToolWindowManager.getInstance(project).getToolWindow("CodingTestKit")?.show()
+        component.text = when {
+            platform == null -> "CTK"
+            id == null -> "CTK: $platform"
+            else -> "CTK: $platform #$id"
+        }
+        component.toolTipText = when {
+            platform == null -> "CodingTestKit"
+            id == null -> "CodingTestKit: $platform"
+            else -> "CodingTestKit: $platform #$id"
+        }
     }
 }

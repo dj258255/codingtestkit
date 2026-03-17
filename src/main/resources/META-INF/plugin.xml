@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -141,6 +141,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.2.1</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] Deprecated API</b> – Replaced StatusBarWidget.TextPresentation (which uses obsolete com.intellij.util.Consumer) with CustomStatusBarWidget + TextPanel.WithIconAndArrows + MouseAdapter</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] Deprecated API</b> – StatusBarWidget.TextPresentation (obsolete인 com.intellij.util.Consumer 사용)을 CustomStatusBarWidget + TextPanel.WithIconAndArrows + MouseAdapter로 교체</li>
+        </ul>
+
         <h3>v1.2.0</h3>
 
         <b>English</b>
