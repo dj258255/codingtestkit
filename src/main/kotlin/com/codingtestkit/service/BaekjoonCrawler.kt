@@ -32,6 +32,7 @@ object BaekjoonCrawler {
         val inputDesc = doc.select("#problem_input").html()
         val outputDesc = doc.select("#problem_output").html()
         val limitDesc = doc.select("#problem_limit").html()
+        val subtaskDesc = doc.select("#problem_subtask").html()
         val hintDesc = doc.select("#problem_hint").html()
 
         val infoTds = doc.select("#problem-info tbody tr td")
@@ -67,6 +68,10 @@ object BaekjoonCrawler {
             if (limitDesc.isNotBlank()) {
                 append("<h2>제한</h2>")
                 append(limitDesc)
+            }
+            if (subtaskDesc.isNotBlank()) {
+                append("<h2>서브태스크</h2>")
+                append(subtaskDesc)
             }
 
             // 예제 입출력 + 예제 설명
