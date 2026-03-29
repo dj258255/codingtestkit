@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.2.1</version>
+    <version>1.2.2</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -141,6 +141,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.2.2</h3>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] LaTeX corrupts test case display</b> – <code>&lt;pre&gt;</code> blocks (sample input/output) are now protected from LaTeX/KaTeX processing. Previously, literal <code>$</code> characters in test case grids (e.g. BOJ #9328) were matched as math delimiters, causing <code>$</code> to disappear and <code>*</code> to render as the math operator <code>∗</code> (U+2217)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] LaTeX 처리로 인한 테스트 케이스 깨짐</b> – 예제 입출력의 <code>&lt;pre&gt;</code> 블록이 LaTeX/KaTeX 변환에서 제외되도록 수정. 기존에는 테스트 케이스 그리드의 <code>$</code> 문자(예: 백준 #9328 열쇠)가 수식 구분자로 인식되어 <code>$</code>가 사라지고 <code>*</code>가 수학 연산자 <code>∗</code>(U+2217)로 바뀌는 문제가 있었음</li>
+        </ul>
+
         <h3>v1.2.1</h3>
 
         <b>English</b>

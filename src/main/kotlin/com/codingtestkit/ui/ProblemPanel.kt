@@ -1367,6 +1367,13 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
 
+            // <pre> 블록을 LaTeX 처리에서 보호 (테스트 케이스의 $, * 등이 수식으로 변환되는 것을 방지)
+            val preBlocks = mutableListOf<String>()
+            desc = desc.replace(Regex("""<pre[^>]*>.*?</pre>""", RegexOption.DOT_MATCHES_ALL)) { m ->
+                preBlocks.add(m.value)
+                "<!--PRE_PLACEHOLDER_${preBlocks.size - 1}-->"
+            }
+
             if (useCef) {
                 // Kotlin에서 LaTeX 구분자를 미리 찾아 <span> 마커로 변환
                 // → JCEF에서 katex.render()로 각각 렌더링 (auto-render 대신)
@@ -1405,6 +1412,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 desc = desc.replace(Regex("""\$([^$]+)\$""")) { m ->
                     "<i>${m.groupValues[1]}</i>"
                 }
+            }
+
+            // <pre> 블록 복원
+            for ((i, block) in preBlocks.withIndex()) {
+                desc = desc.replace("<!--PRE_PLACEHOLDER_$i-->", block)
             }
             // BOJ 섹션 제목을 UI 언어에 맞게 치환
             if (problem.source == ProblemSource.BAEKJOON) {
