@@ -164,7 +164,7 @@
         <ul>
             <li><b>[Security] PasswordSafe storage</b> – Site login cookies (BOJ/Programmers/SWEA/LeetCode/Codeforces) and the GitHub access token are now stored in IntelliJ's PasswordSafe (OS keychain) instead of plaintext XML files. Legacy values are automatically migrated on first launch and the old plaintext fields are cleared.</li>
             <li><b>[UX] Login dialog error handling</b> – Login dialog now shows a clear error message and a Reload button when the target site returns 4xx/5xx (e.g. Baekjoon 504 Gateway Time-out) or when the network fails, instead of appearing stuck at "Login will complete automatically...".</li>
-            <li><b>[Fix] untilBuild compatibility</b> – Removed speculative untilBuild so the plugin is not artificially blocked on future IDE versions; Marketplace now manages compatibility dynamically.</li>
+            <li><b>[Compat] untilBuild removed</b> – Removed speculative untilBuild so the plugin is not artificially blocked on future IDE versions; Marketplace now manages compatibility dynamically.</li>
             <li><b>[Docs] Privacy policy</b> – Added PRIVACY.md and a Privacy &amp; Data section to the plugin description listing all network destinations and local storage locations (per the updated JetBrains Marketplace Approval Guidelines).</li>
         </ul>
 
