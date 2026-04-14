@@ -1,6 +1,9 @@
 package com.codingtestkit.service
 
 import com.codingtestkit.model.ProblemSource
+import com.intellij.credentialStore.CredentialAttributes
+import com.intellij.credentialStore.generateServiceName
+import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
@@ -12,41 +15,60 @@ import org.jsoup.Jsoup
 @State(name = "CodingTestKitAuth", storages = [Storage("codingtestkit-auth.xml")])
 class AuthService : PersistentStateComponent<AuthService.AuthState> {
 
+    /**
+     * Secret cookie values are stored in IntelliJ PasswordSafe (OS keychain).
+     * Legacy plaintext cookie fields remain for one-time migration from older plugin versions.
+     */
     data class AuthState(
-        var baekjoonCookies: String = "",
-        var programmersCookies: String = "",
-        var swexpertCookies: String = "",
-        var leetcodeCookies: String = "",
-        var codeforcesCookies: String = "",
         var baekjoonUsername: String = "",
         var programmersUsername: String = "",
         var swexpertUsername: String = "",
         var leetcodeUsername: String = "",
-        var codeforcesUsername: String = ""
+        var codeforcesUsername: String = "",
+        // Legacy plaintext cookies — migrated to PasswordSafe on first load, then cleared
+        var baekjoonCookies: String = "",
+        var programmersCookies: String = "",
+        var swexpertCookies: String = "",
+        var leetcodeCookies: String = "",
+        var codeforcesCookies: String = ""
     )
 
     private var authState = AuthState()
 
     override fun getState(): AuthState = authState
-    override fun loadState(state: AuthState) { authState = state }
 
-    fun getCookies(source: ProblemSource): String = when (source) {
-        ProblemSource.BAEKJOON -> authState.baekjoonCookies
-        ProblemSource.PROGRAMMERS -> authState.programmersCookies
-        ProblemSource.SWEA -> authState.swexpertCookies
-        ProblemSource.LEETCODE -> authState.leetcodeCookies
-        ProblemSource.CODEFORCES -> authState.codeforcesCookies
+    override fun loadState(state: AuthState) {
+        authState = state
+        migrateLegacyCookies()
     }
 
-    fun setCookies(source: ProblemSource, cookies: String) {
-        when (source) {
-            ProblemSource.BAEKJOON -> authState.baekjoonCookies = cookies
-            ProblemSource.PROGRAMMERS -> authState.programmersCookies = cookies
-            ProblemSource.SWEA -> authState.swexpertCookies = cookies
-            ProblemSource.LEETCODE -> authState.leetcodeCookies = cookies
-            ProblemSource.CODEFORCES -> authState.codeforcesCookies = cookies
+    private fun migrateLegacyCookies() {
+        fun migrate(source: ProblemSource, legacy: String, clear: () -> Unit) {
+            if (legacy.isNotBlank()) {
+                writeCookies(source, legacy)
+                clear()
+            }
         }
+        migrate(ProblemSource.BAEKJOON, authState.baekjoonCookies) { authState.baekjoonCookies = "" }
+        migrate(ProblemSource.PROGRAMMERS, authState.programmersCookies) { authState.programmersCookies = "" }
+        migrate(ProblemSource.SWEA, authState.swexpertCookies) { authState.swexpertCookies = "" }
+        migrate(ProblemSource.LEETCODE, authState.leetcodeCookies) { authState.leetcodeCookies = "" }
+        migrate(ProblemSource.CODEFORCES, authState.codeforcesCookies) { authState.codeforcesCookies = "" }
     }
+
+    private fun credentialAttributes(source: ProblemSource): CredentialAttributes =
+        CredentialAttributes(generateServiceName("CodingTestKit", "cookie.${source.name}"))
+
+    private fun writeCookies(source: ProblemSource, cookies: String) {
+        PasswordSafe.instance.setPassword(credentialAttributes(source), cookies.ifBlank { null })
+    }
+
+    private fun readCookies(source: ProblemSource): String =
+        PasswordSafe.instance.getPassword(credentialAttributes(source)) ?: ""
+
+    fun getCookies(source: ProblemSource): String = readCookies(source)
+
+    fun setCookies(source: ProblemSource, cookies: String) = writeCookies(source, cookies)
 
     fun getUsername(source: ProblemSource): String = when (source) {
         ProblemSource.BAEKJOON -> authState.baekjoonUsername

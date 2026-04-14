@@ -3,6 +3,9 @@ package com.codingtestkit.service
 import com.codingtestkit.model.Problem
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.intellij.credentialStore.CredentialAttributes
+import com.intellij.credentialStore.generateServiceName
+import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
@@ -16,22 +19,44 @@ import java.util.Base64
 @State(name = "CodingTestKitGitHub", storages = [Storage("codingtestkit-github.xml")])
 class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
 
+    /**
+     * Token stored in IntelliJ PasswordSafe (OS keychain).
+     * Legacy plaintext `token` field remains for one-time migration.
+     */
     data class GitHubState(
-        var token: String = "",
         var repoFullName: String = "",   // "owner/repo"
-        var autoPushEnabled: Boolean = false
+        var autoPushEnabled: Boolean = false,
+        // Legacy plaintext token — migrated to PasswordSafe on first load, then cleared
+        var token: String = ""
     )
 
     private var state = GitHubState()
 
     override fun getState(): GitHubState = state
-    override fun loadState(state: GitHubState) { this.state = state }
 
-    val token: String get() = state.token
+    override fun loadState(state: GitHubState) {
+        this.state = state
+        if (state.token.isNotBlank()) {
+            writeToken(state.token)
+            state.token = ""
+        }
+    }
+
+    private val tokenCredentialAttributes: CredentialAttributes =
+        CredentialAttributes(generateServiceName("CodingTestKit", "github.token"))
+
+    private fun writeToken(value: String) {
+        PasswordSafe.instance.setPassword(tokenCredentialAttributes, value.ifBlank { null })
+    }
+
+    private fun readToken(): String =
+        PasswordSafe.instance.getPassword(tokenCredentialAttributes) ?: ""
+
+    val token: String get() = readToken()
     val repoFullName: String get() = state.repoFullName
     val autoPushEnabled: Boolean get() = state.autoPushEnabled
 
-    fun setToken(token: String) { state.token = token }
+    fun setToken(token: String) = writeToken(token)
     fun setRepoFullName(name: String) { state.repoFullName = name }
     fun setAutoPushEnabled(enabled: Boolean) { state.autoPushEnabled = enabled }
 

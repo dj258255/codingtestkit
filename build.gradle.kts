@@ -1,11 +1,11 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij.platform") version "2.2.1"
+    id("org.jetbrains.intellij.platform") version "2.14.0"
 }
 
 group = "com.codingtestkit"
-version = "1.2.2"
+version = "1.3.0"
 
 repositories {
     mavenCentral()
@@ -32,10 +32,10 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.codingtestkit"
         name = "CodingTestKit"
-        version = "1.2.2"
+        version = "1.3.0"
         ideaVersion {
             sinceBuild = "241"
-            untilBuild = "263.*"
+            untilBuild = provider { null }
         }
     }
 
@@ -43,7 +43,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity, "2024.2")
+            create(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity, "2024.2")
         }
         failureLevel = listOf(
             org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,

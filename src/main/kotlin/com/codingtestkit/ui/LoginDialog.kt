@@ -26,8 +26,18 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
     private var cookies = ""
     private var username = ""
     private var extracted = false
+    private var cefBrowserRef: CefBrowser? = null
     private val statusLabel = JLabel(I18n.t("로그인하면 자동으로 완료됩니다...", "Login will complete automatically...")).apply {
         foreground = Color.GRAY
+    }
+    private val retryButton = JButton(I18n.t("새로고침", "Reload")).apply {
+        isVisible = false
+        addActionListener {
+            isVisible = false
+            statusLabel.text = I18n.t("로그인하면 자동으로 완료됩니다...", "Login will complete automatically...")
+            statusLabel.foreground = Color.GRAY
+            cefBrowserRef?.reload()
+        }
     }
 
     init {
@@ -75,15 +85,31 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
         // 브라우저
         panel.add(browser.component, BorderLayout.CENTER)
 
-        // 하단 상태만 표시 (버튼 없음)
+        // 하단 상태 + 재시도 버튼
         val bottomPanel = JPanel(FlowLayout(FlowLayout.CENTER, 10, 8))
         bottomPanel.add(statusLabel)
+        bottomPanel.add(retryButton)
         panel.add(bottomPanel, BorderLayout.SOUTH)
+
+        cefBrowserRef = browser.cefBrowser
 
         // 페이지 로드 완료 시마다 로그인 여부 확인
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(cefBrowser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
                 if (frame?.isMain != true) return
+
+                // 서버 오류(5xx) 또는 페이지 없음(4xx) 처리
+                if (httpStatusCode in 400..599) {
+                    SwingUtilities.invokeLater {
+                        statusLabel.text = I18n.t(
+                            "사이트 응답 오류 ($httpStatusCode). 잠시 후 새로고침하세요.",
+                            "Site error ($httpStatusCode). Please reload in a moment."
+                        )
+                        statusLabel.foreground = Color.RED
+                        retryButton.isVisible = true
+                    }
+                    return
+                }
 
                 // 스크롤 성능 개선
                 cefBrowser?.executeJavaScript(
@@ -100,6 +126,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                     SwingUtilities.invokeLater {
                         statusLabel.text = I18n.t("로그인 감지! 쿠키 추출 중...", "Login detected! Extracting cookies...")
                         statusLabel.foreground = Color(0, 120, 0)
+                        retryButton.isVisible = false
                     }
                     // DOM에서 유저네임 추출 시도 (결과는 usernameQuery 핸들러로 전달됨)
                     val js = getUsernameJS()
@@ -113,6 +140,26 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
                     javax.swing.Timer(500) {
                         extractCookiesAndClose(browser)
                     }.apply { isRepeats = false; start() }
+                }
+            }
+
+            override fun onLoadError(
+                cefBrowser: CefBrowser?,
+                frame: CefFrame?,
+                errorCode: org.cef.handler.CefLoadHandler.ErrorCode?,
+                errorText: String?,
+                failedUrl: String?
+            ) {
+                if (frame?.isMain != true) return
+                // ABORTED는 사용자가 다른 링크 클릭 등 정상 상황에서도 발생 — 무시
+                if (errorCode == org.cef.handler.CefLoadHandler.ErrorCode.ERR_ABORTED) return
+                SwingUtilities.invokeLater {
+                    statusLabel.text = I18n.t(
+                        "네트워크 오류: ${errorText ?: errorCode?.name ?: "알 수 없음"}. 새로고침 해주세요.",
+                        "Network error: ${errorText ?: errorCode?.name ?: "unknown"}. Please reload."
+                    )
+                    statusLabel.foreground = Color.RED
+                    retryButton.isVisible = true
                 }
             }
         }, browser.cefBrowser)
