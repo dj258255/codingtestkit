@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.codingtestkit"
-version = "1.3.0"
+version = "1.3.1"
 
 repositories {
     mavenCentral()
@@ -22,7 +22,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
 
     intellijPlatform {
-        intellijIdeaCommunity("2024.1")
+        intellijIdeaCommunity("2024.3")
         pluginVerifier()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
@@ -32,9 +32,9 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.codingtestkit"
         name = "CodingTestKit"
-        version = "1.3.0"
+        version = "1.3.1"
         ideaVersion {
-            sinceBuild = "241"
+            sinceBuild = "242"
             untilBuild = provider { null }
         }
     }
@@ -43,7 +43,11 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity, "2024.2")
+            val ic = org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity
+            ide(ic, "2024.2.6")
+            ide(ic, "2024.3.7")
+            ide(ic, "2025.1.7")
+            ide(ic, "2025.2.6.1")
         }
         failureLevel = listOf(
             org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,

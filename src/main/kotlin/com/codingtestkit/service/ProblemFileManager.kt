@@ -10,7 +10,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.module.ModuleManager
-import com.intellij.openapi.module.ModuleTypeId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -94,7 +93,7 @@ object ProblemFileManager {
         if (module == null) {
             WriteAction.runAndWait<Throwable> {
                 val imlPath = "${project.basePath}/.idea/$CTK_MODULE_NAME.iml"
-                module = moduleManager.newModule(imlPath, ModuleTypeId.JAVA_MODULE)
+                module = moduleManager.newModule(imlPath, "JAVA_MODULE")
             }
         }
 

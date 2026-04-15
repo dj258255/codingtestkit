@@ -4,7 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.net.URLEncoder
 
 object ProgrammersApi {
@@ -118,7 +118,7 @@ object ProgrammersApi {
     }
 
     private fun fetchJson(url: String, cookies: String): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = (URI.create(url).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
