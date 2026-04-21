@@ -8,15 +8,7 @@
 
 ## English
 
-Search problems directly from the IDE on BOJ (via solved.ac) and LeetCode.
-
-### BOJ (solved.ac)
-
-| Feature | Description |
-|---------|-------------|
-| **Autocomplete** | Real-time results as you type problem numbers or titles |
-| **Sort Options** | By difficulty, number, title, or solved count |
-| **Quick Fetch** | Double-click any result to fetch immediately |
+Search problems directly from the IDE on LeetCode, Codeforces, Programmers, and SWEA.
 
 ### LeetCode
 
@@ -27,21 +19,15 @@ Search problems directly from the IDE on BOJ (via solved.ac) and LeetCode.
 | **Tag Filter** | Filter by algorithm tags (Array, DP, Graph, etc.) |
 | **Auto Search** | Debounced auto-search while typing |
 
-> Search is not available for Programmers and SWEA.
+### Codeforces / Programmers / SWEA
+
+Each platform supports keyword/tag/difficulty search through its official API or listing pages.
 
 ---
 
 ## 한국어
 
-IDE에서 바로 백준(solved.ac)과 LeetCode 문제를 검색할 수 있습니다.
-
-### 백준 (solved.ac)
-
-| 기능 | 설명 |
-|------|------|
-| **자동완성** | 문제 번호나 제목을 입력하면 실시간으로 검색 결과 표시 |
-| **정렬 옵션** | 난이도순, 번호순, 제목순, 푼 사람순으로 정렬 |
-| **바로 가져오기** | 검색 결과에서 더블클릭으로 즉시 가져오기 |
+IDE에서 바로 LeetCode, Codeforces, 프로그래머스, SWEA 문제를 검색할 수 있습니다.
 
 ### LeetCode
 
@@ -52,4 +38,6 @@ IDE에서 바로 백준(solved.ac)과 LeetCode 문제를 검색할 수 있습니
 | **태그 필터** | Array, DP, Graph 등 알고리즘 태그로 필터링 |
 | **자동 검색** | 입력 시 자동으로 검색 (디바운스 적용) |
 
-> 프로그래머스와 SWEA는 검색 기능을 지원하지 않습니다.
+### Codeforces / 프로그래머스 / SWEA
+
+각 플랫폼의 공식 API 또는 목록 페이지를 활용해 키워드·태그·난이도로 검색합니다.

@@ -14,10 +14,10 @@ Select the platform and language, enter a problem number, and the problem descri
 
 | Platform | Input | Example |
 |----------|-------|---------|
-| **BOJ** | Problem number | `1000` |
 | **Programmers** | Number after `/lessons/` in URL | `12947` |
 | **SWEA** | Problem number or full URL | `1204` or paste URL |
 | **LeetCode** | Number, slug, or full URL | `1`, `two-sum`, or full URL |
+| **Codeforces** | contestId+letter, or full URL | `1234A` or full URL |
 
 ### What Happens After Fetch
 
@@ -39,11 +39,6 @@ Select the platform and language, enter a problem number, and the problem descri
 </p>
 
 ### Platform-Specific Details
-
-#### BOJ (Baekjoon)
-- Fetches from `acmicpc.net`
-- Parses HTML to extract problem description, input/output format, and example I/O
-- Supports problems with multiple test cases
 
 #### Programmers
 - Fetches from `programmers.co.kr`
@@ -70,10 +65,10 @@ Select the platform and language, enter a problem number, and the problem descri
 
 | 플랫폼 | 입력 방식 | 예시 |
 |--------|----------|------|
-| **백준** | 문제 번호 | `1000` |
 | **프로그래머스** | URL의 `/lessons/` 뒤 숫자 | `12947` |
 | **SWEA** | 문제 번호 또는 URL | `1204` 또는 URL 붙여넣기 |
 | **LeetCode** | 번호, slug, 또는 URL | `1`, `two-sum`, 또는 URL |
+| **Codeforces** | 콘테스트번호+문제번호 또는 URL | `1234A` 또는 URL |
 
 ### 가져오기 후 결과
 
@@ -83,11 +78,6 @@ Select the platform and language, enter a problem number, and the problem descri
 4. **테스트 케이스**가 자동 추출되어 바로 실행 가능합니다
 
 ### 플랫폼별 상세
-
-#### 백준 (BOJ)
-- `acmicpc.net`에서 가져옴
-- HTML 파싱으로 문제 설명, 입출력 형식, 예제 입출력 추출
-- 여러 테스트 케이스를 가진 문제 지원
 
 #### 프로그래머스
 - `programmers.co.kr`에서 가져옴

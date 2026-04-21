@@ -171,8 +171,6 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
      * 플랫폼별 유저네임 추출 JS 표현식
      */
     private fun getUsernameJS(): String = when (source) {
-        ProblemSource.BAEKJOON ->
-            "(document.querySelector('a.username')||document.querySelector('a[href*=\"/user/\"]')||{}).textContent||''"
         ProblemSource.LEETCODE ->
             "(document.querySelector('a[href*=\"/u/\"]')||{}).textContent||''"
         ProblemSource.PROGRAMMERS ->
@@ -185,8 +183,6 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
     private fun isLoggedInUrl(url: String): Boolean {
         return when (source) {
-            ProblemSource.BAEKJOON -> url.contains("acmicpc.net") &&
-                    !url.contains("/login") && !url.contains("/signin")
             ProblemSource.PROGRAMMERS -> url.contains("programmers.co.kr") &&
                     !url.contains("/sign_in") && !url.contains("/login")
             ProblemSource.SWEA -> url.contains("swexpertacademy") &&
@@ -309,7 +305,6 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
     }
 
     private fun getDomain(): String = when (source) {
-        ProblemSource.BAEKJOON -> "www.acmicpc.net"
         ProblemSource.PROGRAMMERS -> "school.programmers.co.kr"
         ProblemSource.SWEA -> "swexpertacademy.com"
         ProblemSource.LEETCODE -> "leetcode.com"

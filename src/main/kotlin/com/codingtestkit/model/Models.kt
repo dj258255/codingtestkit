@@ -20,7 +20,6 @@ enum class ProblemSource(
     val folderName: String,
     val mainClassName: String
 ) {
-    BAEKJOON("백준", "Baekjoon", "baekjoon", "Main"),
     PROGRAMMERS("프로그래머스", "Programmers", "programmers", "Solution"),
     SWEA("SWEA", "SWEA", "swea", "Solution"),
     LEETCODE("LeetCode", "LeetCode", "leetcode", "Solution"),
@@ -53,28 +52,17 @@ data class CodeTemplate(
 enum class Language(
     val displayName: String,
     val extension: String,
-    val baekjoonId: Int,
     val sweaId: Int
 ) {
-    JAVA("Java", "java", 93, 0),
-    PYTHON("Python", "py", 28, 5),
-    CPP("C++", "cpp", 84, 1),
-    KOTLIN("Kotlin", "kt", 69, -1),
-    JAVASCRIPT("JavaScript", "js", 17, -1);
+    JAVA("Java", "java", 0),
+    PYTHON("Python", "py", 5),
+    CPP("C++", "cpp", 1),
+    KOTLIN("Kotlin", "kt", -1),
+    JAVASCRIPT("JavaScript", "js", -1);
 
     fun defaultCode(source: ProblemSource): String {
         return when (this) {
             JAVA -> when (source) {
-                ProblemSource.BAEKJOON -> """
-                    |import java.util.Scanner;
-                    |
-                    |public class Main {
-                    |    public static void main(String[] args) {
-                    |        Scanner sc = new Scanner(System.in);
-                    |
-                    |    }
-                    |}
-                """.trimMargin()
                 ProblemSource.PROGRAMMERS -> """
                     |class Solution {
                     |    public int solution() {
@@ -109,7 +97,6 @@ enum class Language(
                 """.trimMargin()
             }
             PYTHON -> when (source) {
-                ProblemSource.BAEKJOON -> ""
                 ProblemSource.PROGRAMMERS -> """
                     |def solution():
                     |    answer = 0
@@ -124,15 +111,6 @@ enum class Language(
                 ProblemSource.CODEFORCES -> ""
             }
             CPP -> when (source) {
-                ProblemSource.BAEKJOON -> """
-                    |#include <iostream>
-                    |using namespace std;
-                    |
-                    |int main() {
-                    |
-                    |    return 0;
-                    |}
-                """.trimMargin()
                 ProblemSource.PROGRAMMERS -> """
                     |#include <string>
                     |#include <vector>
@@ -168,11 +146,6 @@ enum class Language(
                 """.trimMargin()
             }
             KOTLIN -> when (source) {
-                ProblemSource.BAEKJOON -> """
-                    |fun main() {
-                    |
-                    |}
-                """.trimMargin()
                 ProblemSource.PROGRAMMERS -> """
                     |fun solution(): Int {
                     |    var answer = 0
@@ -195,15 +168,6 @@ enum class Language(
                 """.trimMargin()
             }
             JAVASCRIPT -> when (source) {
-                ProblemSource.BAEKJOON -> """
-                    |const readline = require('readline');
-                    |const rl = readline.createInterface({ input: process.stdin });
-                    |const lines = [];
-                    |rl.on('line', (line) => lines.push(line));
-                    |rl.on('close', () => {
-                    |
-                    |});
-                """.trimMargin()
                 ProblemSource.PROGRAMMERS -> """
                     |function solution() {
                     |    var answer = 0;

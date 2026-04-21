@@ -57,10 +57,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         toolTipText = I18n.t("문제를 가져옵니다", "Fetch the problem")
     }
     private val randomButton = JButton(I18n.t("랜덤", "Random"), AllIcons.Actions.Refresh).apply {
-        toolTipText = I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
+        toolTipText = I18n.t("랜덤 문제를 뽑습니다", "Pick random problems")
     }
     private val searchButton2 = JButton(I18n.t("검색", "Search"), AllIcons.Actions.Search).apply {
-        toolTipText = I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
+        toolTipText = I18n.t("문제를 검색합니다", "Search problems")
     }
     private val mySolvedButton = JButton(I18n.t("내 풀이", "My Solved"), AllIcons.Actions.ListFiles).apply {
         toolTipText = I18n.t("내가 풀었던 문제 기록", "My solved problems history")
@@ -279,8 +279,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun updatePlaceholder() {
         val source = getSelectedSource()
         val (placeholder, tooltip) = when (source) {
-            ProblemSource.BAEKJOON -> I18n.t("예: 1000", "e.g. 1000") to
-                    I18n.t("백준 문제 번호 (URL의 /problem/1000 에서 1000)", "BOJ problem number (1000 from /problem/1000)")
             ProblemSource.PROGRAMMERS -> I18n.t("예: 12947 (URL의 lessons/뒤 숫자)", "e.g. 12947 (number after /lessons/)") to
                     I18n.t("프로그래머스: URL이 /lessons/12947 이면 12947 입력", "Programmers: Enter 12947 if URL is /lessons/12947")
             ProblemSource.SWEA -> I18n.t("예: 2001 또는 URL 붙여넣기", "e.g. 2001 or paste URL") to
@@ -297,7 +295,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         randomButton.isVisible = true
         searchButton2.isVisible = true
 
-        // 내 풀이 버튼: 백준, Codeforces, LeetCode만 지원
+        // 내 풀이 버튼: Codeforces, LeetCode만 지원
         mySolvedButton.isVisible = SolvedProblemsService.isSupported(source)
 
         randomButton.toolTipText = when (source) {
@@ -305,14 +303,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 랜덤 문제를 뽑습니다", "Pick random problems from Codeforces")
             ProblemSource.PROGRAMMERS -> I18n.t("프로그래머스에서 랜덤 문제를 뽑습니다", "Pick random problems from Programmers")
             ProblemSource.SWEA -> I18n.t("SWEA에서 랜덤 문제를 뽑습니다", "Pick random problems from SWEA")
-            else -> I18n.t("solved.ac에서 랜덤 문제를 뽑습니다", "Pick random problems from solved.ac")
         }
         searchButton2.toolTipText = when (source) {
             ProblemSource.LEETCODE -> I18n.t("LeetCode에서 문제를 검색합니다", "Search problems on LeetCode")
             ProblemSource.CODEFORCES -> I18n.t("Codeforces에서 문제를 검색합니다", "Search problems on Codeforces")
             ProblemSource.PROGRAMMERS -> I18n.t("프로그래머스에서 문제를 검색합니다", "Search problems on Programmers")
             ProblemSource.SWEA -> I18n.t("SWEA에서 문제를 검색합니다", "Search problems on SWEA")
-            else -> I18n.t("solved.ac에서 문제를 검색합니다", "Search problems on solved.ac")
         }
     }
 
@@ -449,15 +445,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     fetchProblem()
                 }
             }
-            else -> {
-                val dialog = ProblemSearchDialog(project)
-                if (dialog.showAndGet()) {
-                    val problemId = dialog.selectedProblemId ?: return
-                    problemIdField.text = problemId.toString()
-                    sourceCombo.selectedIndex = 0 // 백준
-                    fetchProblem()
-                }
-            }
         }
     }
 
@@ -494,15 +481,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     val ids = dialog.selectedProblemIds
                     if (ids.isEmpty()) return
                     fetchMultipleProblems(ids)
-                }
-            }
-            else -> {
-                val dialog = RandomProblemDialog(project)
-                if (dialog.showAndGet()) {
-                    val ids = dialog.selectedProblemIds
-                    if (ids.isEmpty()) return
-                    sourceCombo.selectedIndex = 0 // 백준
-                    fetchMultipleProblems(ids.map { it.toString() })
                 }
             }
         }
@@ -679,7 +657,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 val problem = when (source) {
-                    ProblemSource.BAEKJOON -> BaekjoonCrawler.fetchProblem(id)
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
                     ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
                     ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id)
@@ -1002,10 +979,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val text = input.trim()
         if (!text.contains("://")) return null
 
-        // 백준: https://www.acmicpc.net/problem/23971
-        val bojMatch = Regex("acmicpc\\.net/problem/(\\d+)").find(text)
-        if (bojMatch != null) return ProblemSource.BAEKJOON to bojMatch.groupValues[1]
-
         // 프로그래머스: https://school.programmers.co.kr/learn/courses/30/lessons/258705
         val progMatch = Regex("programmers\\.co\\.kr/learn/courses/\\d+/lessons/(\\d+)").find(text)
         if (progMatch != null) return ProblemSource.PROGRAMMERS to progMatch.groupValues[1]
@@ -1192,14 +1165,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 플랫폼 이름도 타겟 언어에 맞게 변환
         val sourceName = when (overrideLang) {
             "en" -> when (problem.source) {
-                ProblemSource.BAEKJOON -> "BOJ (Baekjoon)"
                 ProblemSource.PROGRAMMERS -> "Programmers"
                 ProblemSource.SWEA -> "SWEA"
                 ProblemSource.LEETCODE -> "LeetCode"
                 ProblemSource.CODEFORCES -> "Codeforces"
             }
             "ko" -> when (problem.source) {
-                ProblemSource.BAEKJOON -> "백준"
                 ProblemSource.PROGRAMMERS -> "프로그래머스"
                 ProblemSource.SWEA -> "SWEA"
                 ProblemSource.LEETCODE -> "LeetCode"
@@ -1418,39 +1389,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             for ((i, block) in preBlocks.withIndex()) {
                 desc = desc.replace("<!--PRE_PLACEHOLDER_$i-->", block)
             }
-            // BOJ 섹션 제목을 UI 언어에 맞게 치환
-            if (problem.source == ProblemSource.BAEKJOON) {
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*예제 입력\s*(\d+)\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("예제 입력", "Sample Input")} ${m.groupValues[2]}${m.groupValues[3]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*예제 출력\s*(\d+)\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("예제 출력", "Sample Output")} ${m.groupValues[2]}${m.groupValues[3]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*문제\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("문제", "Problem")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*입력\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("입력", "Input")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*출력\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("출력", "Output")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*제한\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("제한", "Constraints")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*힌트\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("힌트", "Hint")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*노트\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("노트", "Note")}${m.groupValues[2]}"
-                }
-                desc = desc.replace(Regex("""(<h\d[^>]*>)\s*부분 ?점수\s*(</h\d>)""")) { m ->
-                    "${m.groupValues[1]}${t("부분 점수", "Partial Score")}${m.groupValues[2]}"
-                }
-            }
             append(desc)
 
-            // 예제 입출력 표시 (백준/프로그래머스/리트코드는 description에 이미 포함)
+            // 예제 입출력 표시 (프로그래머스/리트코드는 description에 이미 포함)
             if (problem.testCases.isNotEmpty()
                 && problem.source == ProblemSource.SWEA) {
                 for ((i, tc) in problem.testCases.withIndex()) {
@@ -1484,14 +1425,12 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             // ─── 출처 (Source Attribution) ───
             val problemUrl = when (problem.source) {
-                ProblemSource.BAEKJOON -> "https://www.acmicpc.net/problem/${problem.id}"
                 ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/${problem.id}"
                 ProblemSource.SWEA -> "https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=${problem.contestProbId.ifBlank { problem.id }}"
                 ProblemSource.LEETCODE -> "https://leetcode.com/problems/${problem.id}/"
                 ProblemSource.CODEFORCES -> "https://codeforces.com/problemset/problem/${problem.contestProbId.ifBlank { problem.id }}"
             }
             val sourceDisplay = when (problem.source) {
-                ProblemSource.BAEKJOON -> t("백준 온라인 저지", "Baekjoon Online Judge")
                 ProblemSource.PROGRAMMERS -> t("프로그래머스 코딩 테스트 연습", "Programmers Coding Test Practice")
                 ProblemSource.SWEA -> "SW Expert Academy"
                 ProblemSource.LEETCODE -> "LeetCode"

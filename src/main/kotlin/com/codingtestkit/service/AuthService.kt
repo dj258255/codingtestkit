@@ -20,13 +20,11 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
      * Legacy plaintext cookie fields remain for one-time migration from older plugin versions.
      */
     data class AuthState(
-        var baekjoonUsername: String = "",
         var programmersUsername: String = "",
         var swexpertUsername: String = "",
         var leetcodeUsername: String = "",
         var codeforcesUsername: String = "",
         // Legacy plaintext cookies — migrated to PasswordSafe on first load, then cleared
-        var baekjoonCookies: String = "",
         var programmersCookies: String = "",
         var swexpertCookies: String = "",
         var leetcodeCookies: String = "",
@@ -49,11 +47,16 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
                 clear()
             }
         }
-        migrate(ProblemSource.BAEKJOON, authState.baekjoonCookies) { authState.baekjoonCookies = "" }
         migrate(ProblemSource.PROGRAMMERS, authState.programmersCookies) { authState.programmersCookies = "" }
         migrate(ProblemSource.SWEA, authState.swexpertCookies) { authState.swexpertCookies = "" }
         migrate(ProblemSource.LEETCODE, authState.leetcodeCookies) { authState.leetcodeCookies = "" }
         migrate(ProblemSource.CODEFORCES, authState.codeforcesCookies) { authState.codeforcesCookies = "" }
+
+        // 과거 BAEKJOON 쿠키 항목을 PasswordSafe에서 제거 (플러그인 업데이트 후 정리)
+        PasswordSafe.instance.setPassword(
+            CredentialAttributes(generateServiceName("CodingTestKit", "cookie.BAEKJOON")),
+            null
+        )
     }
 
     private fun credentialAttributes(source: ProblemSource): CredentialAttributes =
@@ -71,7 +74,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     fun setCookies(source: ProblemSource, cookies: String) = writeCookies(source, cookies)
 
     fun getUsername(source: ProblemSource): String = when (source) {
-        ProblemSource.BAEKJOON -> authState.baekjoonUsername
         ProblemSource.PROGRAMMERS -> authState.programmersUsername
         ProblemSource.SWEA -> authState.swexpertUsername
         ProblemSource.LEETCODE -> authState.leetcodeUsername
@@ -80,7 +82,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
 
     fun setUsername(source: ProblemSource, username: String) {
         when (source) {
-            ProblemSource.BAEKJOON -> authState.baekjoonUsername = username
             ProblemSource.PROGRAMMERS -> authState.programmersUsername = username
             ProblemSource.SWEA -> authState.swexpertUsername = username
             ProblemSource.LEETCODE -> authState.leetcodeUsername = username
@@ -119,7 +120,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
 
         return try {
             when (source) {
-                ProblemSource.BAEKJOON -> fetchBaekjoonUsername(cookies)
                 ProblemSource.PROGRAMMERS -> fetchProgrammersUsername(cookies)
                 ProblemSource.SWEA -> fetchSwexpertUsername(cookies)
                 ProblemSource.LEETCODE -> fetchLeetCodeUsername(cookies)
@@ -128,19 +128,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         } catch (_: Exception) {
             ""
         }
-    }
-
-    private fun fetchBaekjoonUsername(cookies: String): String {
-        val doc = Jsoup.connect("https://www.acmicpc.net/")
-            .userAgent("Mozilla/5.0")
-            .header("Cookie", cookies)
-            .timeout(5000)
-            .get()
-
-        // 백준 상단 네비게이션에서 유저네임 추출
-        val username = doc.select("a.username").text().trim()
-            .ifBlank { doc.select(".loginbar a[href^=/user/]").text().trim() }
-        return username
     }
 
     private fun fetchProgrammersUsername(cookies: String): String {
@@ -195,7 +182,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     }
 
     fun getLoginUrl(source: ProblemSource): String = when (source) {
-        ProblemSource.BAEKJOON -> "https://www.acmicpc.net/login"
         ProblemSource.PROGRAMMERS -> "https://programmers.co.kr/account/sign_in?referer=https://school.programmers.co.kr/"
         ProblemSource.SWEA -> "https://swexpertacademy.com/main/identity/anonymous/loginPage.do"
         ProblemSource.LEETCODE -> "https://leetcode.com/accounts/login/"
@@ -203,10 +189,6 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
     }
 
     fun getCookieHelpText(source: ProblemSource): String = when (source) {
-        ProblemSource.BAEKJOON -> I18n.t(
-            "acmicpc.net에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: OnlineJudge (세션 쿠키)",
-            "Log in at acmicpc.net and copy cookies.\nRequired: OnlineJudge (session cookie)"
-        )
         ProblemSource.PROGRAMMERS -> I18n.t(
             "school.programmers.co.kr에서 로그인 후 쿠키를 복사하세요.\n필요한 쿠키: _programmers_session_production",
             "Log in at school.programmers.co.kr and copy cookies.\nRequired: _programmers_session_production"

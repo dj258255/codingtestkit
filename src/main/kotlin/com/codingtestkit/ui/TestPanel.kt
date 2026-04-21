@@ -45,7 +45,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val cards = mutableListOf<TestCaseCard>()
 
     private var testCases = mutableListOf<TestCase>()
-    private var problemSource = ProblemSource.BAEKJOON
+    private var problemSource = ProblemSource.PROGRAMMERS
     private var parameterNames = listOf<String>()
 
     init {

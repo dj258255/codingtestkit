@@ -32,10 +32,6 @@ class MySolvedDialog(
             I18n.t("제목", "Title"), I18n.t("난이도", "Difficulty"),
             I18n.t("정답률", "Acceptance"), I18n.t("태그", "Tags")
         )
-        ProblemSource.BAEKJOON -> arrayOf(
-            I18n.t("번호", "ID"), I18n.t("제목", "Title"),
-            I18n.t("난이도", "Rating"), I18n.t("태그", "Tags")
-        )
         else -> arrayOf(
             I18n.t("번호", "ID"), I18n.t("제목", "Title"),
             I18n.t("난이도", "Rating"), I18n.t("태그", "Tags"),
@@ -95,12 +91,6 @@ class MySolvedDialog(
                 resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(280)
                 resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(70)
                 resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(70)
-                resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(200)
-            }
-            ProblemSource.BAEKJOON -> {
-                resultTable.columnModel.getColumn(0).preferredWidth = JBUI.scale(70)
-                resultTable.columnModel.getColumn(1).preferredWidth = JBUI.scale(300)
-                resultTable.columnModel.getColumn(2).preferredWidth = JBUI.scale(80)
                 resultTable.columnModel.getColumn(3).preferredWidth = JBUI.scale(200)
             }
             else -> {
@@ -181,10 +171,6 @@ class MySolvedDialog(
                             ProblemSource.LEETCODE -> tableModel.addRow(arrayOf(
                                 p.title, p.difficulty,
                                 p.solvedDate,
-                                p.tags.take(3).joinToString(", ")
-                            ))
-                            ProblemSource.BAEKJOON -> tableModel.addRow(arrayOf(
-                                p.id, p.title, p.difficulty,
                                 p.tags.take(3).joinToString(", ")
                             ))
                             else -> tableModel.addRow(arrayOf(

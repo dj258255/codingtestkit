@@ -53,7 +53,6 @@ class CodeSubmitDialog(
     }
 
     private fun getSubmitUrl(): String = when (source) {
-        ProblemSource.BAEKJOON -> "https://www.acmicpc.net/submit/$problemId"
         ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/$problemId"
         ProblemSource.SWEA -> "https://swexpertacademy.com/main/solvingProblem/solvingProblem.do?contestProbId=$problemId"
         ProblemSource.LEETCODE -> "https://leetcode.com/problems/$problemId/"
@@ -64,9 +63,6 @@ class CodeSubmitDialog(
     }
 
     private fun getGuideText(): String = when (source) {
-        ProblemSource.BAEKJOON -> I18n.t(
-            "코드와 언어가 자동 입력됩니다. Cloudflare 인증 후 <b>제출</b> 버튼을 클릭하세요.",
-            "Code and language are auto-filled. Complete Cloudflare verification, then click <b>Submit</b>.")
         ProblemSource.PROGRAMMERS -> I18n.t(
             "코드가 자동 입력됩니다. 확인 후 <b>제출</b> 버튼을 클릭하세요.",
             "Code is auto-filled. Review and click <b>Submit</b>.")
@@ -101,7 +97,6 @@ class CodeSubmitDialog(
             toolTipText = I18n.t("코드가 자동으로 입력되지 않았다면 이 버튼을 눌러보세요", "Click if code was not auto-filled")
             addActionListener {
                 when (source) {
-                    ProblemSource.BAEKJOON -> injectBaekjoonCode(browser.cefBrowser)
                     ProblemSource.PROGRAMMERS -> injectProgrammersCode(browser.cefBrowser)
                     ProblemSource.SWEA -> injectSweaCode(browser.cefBrowser)
                     ProblemSource.LEETCODE -> injectLeetCodeCode(browser.cefBrowser)
@@ -136,7 +131,6 @@ class CodeSubmitDialog(
                 """.trimIndent(), url, 0)
 
                 when (source) {
-                    ProblemSource.BAEKJOON -> handleBaekjoonLoad(cefBrowser, url)
                     ProblemSource.PROGRAMMERS -> handleProgrammersLoad(cefBrowser, url)
                     ProblemSource.SWEA -> handleSweaLoad(cefBrowser, url)
                     ProblemSource.LEETCODE -> handleLeetCodeLoad(cefBrowser, url)
@@ -160,44 +154,6 @@ class CodeSubmitDialog(
         }, browser.cefBrowser)
 
         return panel
-    }
-
-    // ─── 백준 ───
-
-    private fun handleBaekjoonLoad(cefBrowser: CefBrowser?, url: String) {
-        if ((url.contains("/submit/") || url.contains("/submit/$problemId")) && !codeInjected) {
-            codeInjected = true
-            injectBaekjoonCode(cefBrowser)
-        } else if (url.contains("/status") && !submitted) {
-            markSubmitted()
-            checkResultFromPage(cefBrowser, url)
-        }
-    }
-
-    private fun injectBaekjoonCode(cefBrowser: CefBrowser?) {
-        if (cefBrowser == null) return
-        val escaped = escapeForJs(code)
-        val langId = language.baekjoonId
-
-        val js = """
-            (function() {
-                var langSelect = document.getElementById('language');
-                if (langSelect) {
-                    langSelect.value = '$langId';
-                    langSelect.dispatchEvent(new Event('change'));
-                }
-                var cmEl = document.querySelector('.CodeMirror');
-                if (cmEl && cmEl.CodeMirror) {
-                    cmEl.CodeMirror.setValue('$escaped');
-                } else {
-                    var sourceArea = document.getElementById('source');
-                    if (sourceArea) sourceArea.value = '$escaped';
-                }
-            })();
-        """.trimIndent()
-
-        cefBrowser.executeJavaScript(js, cefBrowser.url, 0)
-        updateStatus(I18n.t("코드 입력 완료! Cloudflare 인증 후 '제출' 버튼을 클릭하세요.", "Code filled! Complete Cloudflare verification, then click 'Submit'."), Color(0, 100, 180))
     }
 
     // ─── 프로그래머스 ───
@@ -674,29 +630,6 @@ class CodeSubmitDialog(
         if (cefBrowser == null || accepted) return
 
         val checkJs = when (source) {
-            ProblemSource.BAEKJOON -> """
-                (function() {
-                    var rows = document.querySelectorAll('#status-table tbody tr, .table tbody tr');
-                    for (var i = 0; i < rows.length; i++) {
-                        var cells = rows[i].querySelectorAll('td');
-                        for (var j = 0; j < cells.length; j++) {
-                            var text = cells[j].innerText || '';
-                            if (text.indexOf('맞았습니다') >= 0 || text.indexOf('Accepted') >= 0) {
-                                document.title = '__CTK_ACCEPTED__';
-                                return;
-                            }
-                            if (text.indexOf('틀렸습니다') >= 0 || text.indexOf('Wrong') >= 0 ||
-                                text.indexOf('시간 초과') >= 0 || text.indexOf('Time Limit') >= 0 ||
-                                text.indexOf('메모리 초과') >= 0 || text.indexOf('런타임 에러') >= 0 ||
-                                text.indexOf('컴파일 에러') >= 0 || text.indexOf('출력 초과') >= 0) {
-                                document.title = '__CTK_REJECTED__';
-                                return;
-                            }
-                        }
-                    }
-                })();
-            """.trimIndent()
-
             ProblemSource.PROGRAMMERS -> """
                 (function() {
                     var el = document.querySelector('.result, .test-result, [class*=result]');
@@ -803,16 +736,6 @@ class CodeSubmitDialog(
                     var accepted = false;
                     var rejected = false;
                     ${when (source) {
-                        ProblemSource.BAEKJOON -> """
-                            var rows = document.querySelectorAll('#status-table tbody tr, .table tbody tr');
-                            for (var i = 0; i < rows.length; i++) {
-                                var text = rows[i].innerText || '';
-                                if (text.indexOf('맞았습니다') >= 0) { accepted = true; break; }
-                                if (text.indexOf('틀렸습니다') >= 0 || text.indexOf('시간 초과') >= 0 ||
-                                    text.indexOf('메모리 초과') >= 0 || text.indexOf('런타임 에러') >= 0 ||
-                                    text.indexOf('컴파일 에러') >= 0 || text.indexOf('출력 초과') >= 0) { rejected = true; break; }
-                            }
-                        """.trimIndent()
                         ProblemSource.LEETCODE -> """
                             var body = document.body.innerText || '';
                             if (body.indexOf('Accepted') >= 0) accepted = true;

@@ -10,10 +10,10 @@ class ModelsTest {
 
     @Test
     fun `fromDisplayName returns correct source for Korean names`() {
-        assertEquals(ProblemSource.BAEKJOON, ProblemSource.fromDisplayName("백준"))
         assertEquals(ProblemSource.PROGRAMMERS, ProblemSource.fromDisplayName("프로그래머스"))
         assertEquals(ProblemSource.SWEA, ProblemSource.fromDisplayName("SWEA"))
         assertEquals(ProblemSource.LEETCODE, ProblemSource.fromDisplayName("LeetCode"))
+        assertEquals(ProblemSource.CODEFORCES, ProblemSource.fromDisplayName("Codeforces"))
     }
 
     @Test
@@ -25,18 +25,18 @@ class ModelsTest {
 
     @Test
     fun `ProblemSource has correct folder names`() {
-        assertEquals("baekjoon", ProblemSource.BAEKJOON.folderName)
         assertEquals("programmers", ProblemSource.PROGRAMMERS.folderName)
         assertEquals("swea", ProblemSource.SWEA.folderName)
         assertEquals("leetcode", ProblemSource.LEETCODE.folderName)
+        assertEquals("codeforces", ProblemSource.CODEFORCES.folderName)
     }
 
     @Test
     fun `ProblemSource has correct main class names`() {
-        assertEquals("Main", ProblemSource.BAEKJOON.mainClassName)
         assertEquals("Solution", ProblemSource.PROGRAMMERS.mainClassName)
         assertEquals("Solution", ProblemSource.SWEA.mainClassName)
         assertEquals("Solution", ProblemSource.LEETCODE.mainClassName)
+        assertEquals("Main", ProblemSource.CODEFORCES.mainClassName)
     }
 
     // ── Language ──
@@ -47,22 +47,6 @@ class ModelsTest {
         assertEquals("py", Language.PYTHON.extension)
         assertEquals("cpp", Language.CPP.extension)
         assertEquals("kt", Language.KOTLIN.extension)
-    }
-
-    @Test
-    fun `Language baekjoon IDs are set`() {
-        assertEquals(93, Language.JAVA.baekjoonId)
-        assertEquals(28, Language.PYTHON.baekjoonId)
-        assertEquals(84, Language.CPP.baekjoonId)
-        assertEquals(69, Language.KOTLIN.baekjoonId)
-    }
-
-    @Test
-    fun `Java defaultCode for Baekjoon has Main class with Scanner`() {
-        val code = Language.JAVA.defaultCode(ProblemSource.BAEKJOON)
-        assertTrue(code.contains("public class Main"))
-        assertTrue(code.contains("Scanner"))
-        assertTrue(code.contains("public static void main"))
     }
 
     @Test
@@ -81,9 +65,11 @@ class ModelsTest {
     }
 
     @Test
-    fun `Python defaultCode for Baekjoon is empty`() {
-        val code = Language.PYTHON.defaultCode(ProblemSource.BAEKJOON)
-        assertEquals("", code)
+    fun `Java defaultCode for Codeforces has Main class with Scanner`() {
+        val code = Language.JAVA.defaultCode(ProblemSource.CODEFORCES)
+        assertTrue(code.contains("public class Main"))
+        assertTrue(code.contains("Scanner"))
+        assertTrue(code.contains("public static void main"))
     }
 
     @Test
@@ -94,15 +80,15 @@ class ModelsTest {
     }
 
     @Test
-    fun `Cpp defaultCode for Baekjoon has main function`() {
-        val code = Language.CPP.defaultCode(ProblemSource.BAEKJOON)
+    fun `Cpp defaultCode for Codeforces has main function`() {
+        val code = Language.CPP.defaultCode(ProblemSource.CODEFORCES)
         assertTrue(code.contains("#include <iostream>"))
         assertTrue(code.contains("int main()"))
     }
 
     @Test
-    fun `Kotlin defaultCode for Baekjoon has main function`() {
-        val code = Language.KOTLIN.defaultCode(ProblemSource.BAEKJOON)
+    fun `Kotlin defaultCode for Codeforces has main function`() {
+        val code = Language.KOTLIN.defaultCode(ProblemSource.CODEFORCES)
         assertTrue(code.contains("fun main()"))
     }
 
@@ -139,7 +125,7 @@ class ModelsTest {
     @Test
     fun `Problem creation with defaults`() {
         val problem = Problem(
-            source = ProblemSource.BAEKJOON,
+            source = ProblemSource.PROGRAMMERS,
             id = "1000",
             title = "A+B",
             description = "<p>두 수를 더하세요</p>",

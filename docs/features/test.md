@@ -38,7 +38,7 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 
 ### Platform-Specific Wrapping
 
-- **BOJ / SWEA**: Standard stdin/stdout — code runs as-is
+- **SWEA / Codeforces**: Standard stdin/stdout — code runs as-is
 - **Programmers / LeetCode**: Solution functions are automatically wrapped with test harness code
   - Detects class-based (LeetCode) vs. bare function (Programmers) patterns
   - Generates appropriate driver code for each language
@@ -82,7 +82,7 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 
 ### 플랫폼별 래핑
 
-- **백준 / SWEA**: 표준 stdin/stdout — 코드 그대로 실행
+- **SWEA / Codeforces**: 표준 stdin/stdout — 코드 그대로 실행
 - **프로그래머스 / LeetCode**: solution 함수를 자동으로 테스트 하네스로 래핑
   - 클래스 기반(LeetCode)과 순수 함수(프로그래머스) 패턴 자동 감지
   - 각 언어에 맞는 드라이버 코드 자동 생성

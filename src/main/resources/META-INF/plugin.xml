@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit - Algorithm Problem Solver</name>
-    <version>1.3.1</version>
+    <version>1.4.0</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -11,7 +11,6 @@
 
         <h3>Supported Platforms</h3>
         <ul>
-            <li><b>BOJ (Baekjoon)</b> – Fetch, test, submit, search, random, my solved</li>
             <li><b>Programmers</b> – Fetch, test, submit, search, random</li>
             <li><b>SWEA</b> – Fetch, test, submit, search, random</li>
             <li><b>LeetCode</b> – Fetch, test, submit, search, random, my solved</li>
@@ -24,7 +23,7 @@
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/problem-view.md"><b>Problem View &amp; Translation</b></a> – View problems in-IDE with KaTeX math rendering and one-click KR↔EN translation</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/test.md"><b>Local Test</b></a> – Run and compare code directly in the IDE with execution time &amp; memory metrics</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>Login &amp; Submit</b></a> – Submit via built-in browser with auto language/code/problem selection</li>
-            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>Search</b></a> – Search by keyword, tag, difficulty on BOJ (solved.ac), LeetCode, Codeforces, and Programmers</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>Search</b></a> – Search by keyword, tag, difficulty on LeetCode, Codeforces, and Programmers</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>Random Picker</b></a> – Tier/class/rating range, tag chips, solved filter, accepted count filter, exam collection filter</li>
             <li><b>My Solved</b> – Browse your solved problems per platform with search &amp; pagination</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>Exam Mode</b></a> – Disable autocomplete, hide code vision, block paste, detect focus loss</li>
@@ -40,7 +39,7 @@
         <h3>Getting Started</h3>
         <ol>
             <li>Open <b>CodingTestKit</b> from the right sidebar</li>
-            <li>Select a platform (BOJ / Programmers / SWEA / LeetCode / Codeforces) and language</li>
+            <li>Select a platform (Programmers / SWEA / LeetCode / Codeforces) and language</li>
             <li>Enter a problem number and click <b>Fetch</b></li>
             <li>Write your solution in the auto-generated code file</li>
             <li>Click <b>Run All</b> to test against all test cases</li>
@@ -57,7 +56,7 @@
         <h3>Privacy &amp; Data</h3>
         <ul>
             <li>Login cookies and the GitHub token are stored <b>locally</b> in IntelliJ's PasswordSafe (OS keychain). Nothing is sent to the plugin author.</li>
-            <li>Network requests go <b>only</b> to official platform endpoints (acmicpc.net, solved.ac, school.programmers.co.kr, swexpertacademy.com, leetcode.com, codeforces.com, api.github.com, translate.googleapis.com).</li>
+            <li>Network requests go <b>only</b> to official platform endpoints (school.programmers.co.kr, swexpertacademy.com, leetcode.com, codeforces.com, api.github.com, translate.googleapis.com).</li>
             <li>No analytics, telemetry, or user tracking.</li>
             <li>Full policy: <a href="https://github.com/dj258255/codingtestkit/blob/main/PRIVACY.md">PRIVACY.md</a></li>
         </ul>
@@ -72,7 +71,6 @@
         <h3>Disclaimer</h3>
         <p><em>All problem content is copyrighted by its respective platform. This plugin is intended for <b>personal study purposes only</b>. Do not redistribute, commercially use, or publish fetched content. The plugin fetches problems locally for individual learning and does not store or redistribute any content externally.</em></p>
         <ul>
-            <li>BOJ (Baekjoon): <a href="https://www.acmicpc.net">www.acmicpc.net</a></li>
             <li>Programmers: <a href="https://school.programmers.co.kr/learn/challenges">school.programmers.co.kr</a></li>
             <li>SWEA: <a href="https://swexpertacademy.com">swexpertacademy.com</a></li>
             <li>LeetCode: <a href="https://leetcode.com">leetcode.com</a></li>
@@ -87,7 +85,6 @@
 
         <h3>지원 플랫폼</h3>
         <ul>
-            <li><b>백준 (BOJ)</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤, 내 풀이</li>
             <li><b>프로그래머스</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤</li>
             <li><b>SWEA</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤</li>
             <li><b>LeetCode</b> – 문제 가져오기, 테스트, 제출, 검색, 랜덤, 내 풀이</li>
@@ -100,7 +97,7 @@
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/problem-view.md"><b>문제 보기 &amp; 번역</b></a> – IDE 내에서 문제 확인 + KaTeX 수식 렌더링 + 한/영 원클릭 번역</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/test.md"><b>로컬 테스트</b></a> – Java, Python, C++, Kotlin, JavaScript 코드를 IDE에서 바로 실행 + 실행 시간 &amp; 메모리</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/submit.md"><b>로그인 &amp; 제출</b></a> – 내장 브라우저로 직접 제출 + 언어/코드/문제 자동 선택</li>
-            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>문제 검색</b></a> – 백준(solved.ac), LeetCode, Codeforces, 프로그래머스에서 키워드·태그·난이도로 검색</li>
+            <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/search.md"><b>문제 검색</b></a> – LeetCode, Codeforces, 프로그래머스에서 키워드·태그·난이도로 검색</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/random.md"><b>랜덤 뽑기</b></a> – 티어/클래스/레이팅 범위, 태그 칩, 풀이 필터, 정답자 수 필터, 기출문제 모음 필터</li>
             <li><b>내 풀이</b> – 플랫폼별 풀이 기록 조회 (검색 &amp; 페이지네이션)</li>
             <li><a href="https://github.com/dj258255/codingtestkit/blob/main/docs/features/exam-mode.md"><b>시험 모드</b></a> – 자동완성/검사/사용위치 힌트 끄기, 외부 붙여넣기 차단, 포커스 이탈 감지</li>
@@ -116,7 +113,7 @@
         <h3>시작하기</h3>
         <ol>
             <li>우측 사이드바에서 <b>CodingTestKit</b> 열기</li>
-            <li>플랫폼 (백준 / 프로그래머스 / SWEA / LeetCode / Codeforces)과 언어 선택</li>
+            <li>플랫폼 (프로그래머스 / SWEA / LeetCode / Codeforces)과 언어 선택</li>
             <li>문제 번호 입력 후 <b>가져오기</b> 클릭</li>
             <li>자동 생성된 코드 파일에 풀이 작성</li>
             <li><b>전체 실행</b>으로 테스트 케이스 확인</li>
@@ -133,7 +130,7 @@
         <h3>개인정보 처리 방침</h3>
         <ul>
             <li>로그인 쿠키와 GitHub 토큰은 IntelliJ의 <b>PasswordSafe (OS 키체인)</b>에 로컬로 저장됩니다. 플러그인 제작자에게 전송되는 정보는 없습니다.</li>
-            <li>네트워크 요청은 공식 플랫폼(acmicpc.net, solved.ac, school.programmers.co.kr, swexpertacademy.com, leetcode.com, codeforces.com, api.github.com, translate.googleapis.com)으로만 전송됩니다.</li>
+            <li>네트워크 요청은 공식 플랫폼(school.programmers.co.kr, swexpertacademy.com, leetcode.com, codeforces.com, api.github.com, translate.googleapis.com)으로만 전송됩니다.</li>
             <li>분석/수집/사용자 추적 기능 없음.</li>
             <li>전체 정책: <a href="https://github.com/dj258255/codingtestkit/blob/main/PRIVACY.md">PRIVACY.md</a></li>
         </ul>
@@ -148,7 +145,6 @@
         <h3>면책 조항</h3>
         <p><em>모든 문제의 저작권은 해당 플랫폼에 있습니다. 이 플러그인은 <b>개인 학습 목적으로만 사용</b>해 주세요. 가져온 문제를 재배포, 상업적 이용, 외부 게시하지 마세요. 플러그인은 개인 학습을 위해 문제를 로컬에 가져올 뿐이며, 어떠한 콘텐츠도 외부에 저장하거나 재배포하지 않습니다.</em></p>
         <ul>
-            <li>백준 (BOJ): <a href="https://www.acmicpc.net">www.acmicpc.net</a></li>
             <li>프로그래머스: <a href="https://school.programmers.co.kr/learn/challenges">school.programmers.co.kr</a></li>
             <li>SWEA: <a href="https://swexpertacademy.com">swexpertacademy.com</a></li>
             <li>LeetCode: <a href="https://leetcode.com">leetcode.com</a></li>
@@ -157,6 +153,21 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.4.0</h3>
+        <p><b>백준(BOJ) 지원 제거</b> — 백준 사이트가 종료됨에 따라 해당 플랫폼 지원을 전면 제거했습니다.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Removed] Baekjoon (BOJ) support</b> – All Baekjoon integration (problem fetching, submission, search, random picker, my-solved) has been removed because the BOJ service is shutting down. solved.ac-based features are removed together.</li>
+            <li><b>[Migration] Existing users</b> – Previously stored Baekjoon cookies in PasswordSafe are automatically cleared on first launch after upgrade. Problem folders already created under <code>problems/백준/</code> or <code>problems/Baekjoon/</code> remain on disk but are no longer listed in the fetcher.</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[제거] 백준(BOJ) 지원</b> – 백준 서비스 종료에 따라 관련 기능(문제 가져오기, 제출, 검색, 랜덤, 내 풀이)을 전부 제거했습니다. solved.ac 기반 기능도 함께 제거됐습니다.</li>
+            <li><b>[마이그레이션] 기존 사용자</b> – 업그레이드 후 첫 실행 시 PasswordSafe에 저장돼 있던 백준 쿠키가 자동으로 삭제됩니다. 이미 생성된 <code>problems/백준/</code> 또는 <code>problems/Baekjoon/</code> 폴더는 그대로 유지되지만 더 이상 플러그인에서 다루지 않습니다.</li>
+        </ul>
+
         <h3>v1.3.1</h3>
         <p><b>Marketplace verification fixes</b> — resolves all deprecated API usages flagged by JetBrains Plugin Verifier across IntelliJ IDEA 2024.2 ~ 2025.2.</p>
 

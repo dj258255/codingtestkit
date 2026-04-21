@@ -7,7 +7,7 @@
   An all-in-one IntelliJ plugin to <b>fetch</b>, <b>test</b>, and <b>submit</b> algorithm problems — all without leaving your IDE.
 </p>
 <p align="center">
-  <b>BOJ</b> · <b>Programmers</b> · <b>SWEA</b> · <b>LeetCode</b> &nbsp;|&nbsp; 🌐 Korean / English
+  <b>Programmers</b> · <b>SWEA</b> · <b>LeetCode</b> · <b>Codeforces</b> &nbsp;|&nbsp; 🌐 Korean / English
 </p>
 
 ---
@@ -23,25 +23,25 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 - **Timer**: Stopwatch, circular dial countdown timer, progress bar, digital clock
 - **All-in-One**: Fetch, code, test, and submit without leaving the IDE
 - **Problem Translation**: One-click Korean ↔ English translation with caching and rate limit protection
-- **GitHub Push**: Auto-push accepted solutions to GitHub (BaekjoonHub-style)
+- **GitHub Push**: Auto-push accepted solutions to GitHub
 
 ## Supported Platforms
 
 | Platform | Fetch | Test | Submit | Search | Random |
 |----------|:-----:|:----:|:------:|:------:|:------:|
-| **BOJ (Baekjoon)** | O | O | O | O | O |
-| **Programmers** | O | O | O | - | - |
-| **SWEA** | O | O | O | - | - |
+| **Programmers** | O | O | O | O | O |
+| **SWEA** | O | O | O | O | O |
 | **LeetCode** | O | O | O | O | O |
+| **Codeforces** | O | O | O | O | O |
 
 ## Supported Languages
 
-| Language | BOJ | Programmers | SWEA | LeetCode |
-|----------|:---:|:-----------:|:----:|:--------:|
+| Language | Programmers | SWEA | LeetCode | Codeforces |
+|----------|:-----------:|:----:|:--------:|:----------:|
 | Java | O | O | O | O |
 | Python | O | O | O | O |
 | C++ | O | O | O | O |
-| Kotlin | O | O | X | O |
+| Kotlin | O | X | O | O |
 
 ---
 
@@ -55,10 +55,10 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 
 Select the platform and language, enter a problem number, and the problem description and test cases are automatically extracted.
 
-- **BOJ**: Enter the problem number (e.g., `1000`)
 - **Programmers**: Number after `/lessons/` in URL (e.g., `12947`)
 - **SWEA**: Enter problem number or paste URL
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
+- **Codeforces**: contestId+letter (e.g., `1234A`) or URL
 
 <p align="center">
   <img src="screenshots/main-panel.png" width="500" alt="Main Panel"/>
@@ -74,10 +74,10 @@ When a problem is fetched, a folder is automatically created with a code file an
   <img src="screenshots/folder-structure.png" width="250" alt="Folder Structure"/>
 </p>
 
-- BOJ: `problems/백준/Gold III/16236. 아기 상어/`
-- Programmers: `problems/프로그래머스/Level1/12937. 짝수와 홀수/`
+- Programmers: `problems/Programmers/Level1/12937. 짝수와 홀수/`
 - SWEA: `problems/SWEA/D3/1204. 최빈수 구하기/`
 - LeetCode: `problems/LeetCode/Medium/1. Two Sum/`
+- Codeforces: `problems/Codeforces/800/1000A. Codeforces/`
 
 ### Problem View & Translation
 
@@ -114,14 +114,6 @@ Programmers problems are also displayed with I/O example tables.
 
 ### Problem Search
 
-#### BOJ (solved.ac)
-
-Search BOJ problems using solved.ac.
-
-- **Autocomplete**: Real-time results as you type problem numbers or titles
-- **Sort Options**: By difficulty, number, title, or solved count
-- **Quick Fetch**: Double-click to fetch immediately
-
 #### LeetCode
 
 Search LeetCode problems by keyword, difficulty, and algorithm tags.
@@ -131,18 +123,11 @@ Search LeetCode problems by keyword, difficulty, and algorithm tags.
 - **Tag Filter**: Filter by algorithm tags (Array, DP, Graph, etc.)
 - **Auto Search**: Debounced auto-search while typing
 
+#### Codeforces / Programmers / SWEA
+
+Search via each platform's official API or listing pages by keyword, tag, and difficulty.
+
 ### Random Problem Picker
-
-#### BOJ (solved.ac)
-
-Pick random BOJ problems using the solved.ac API.
-
-- **Tier Range**: Set desired difficulty range from Bronze V to Ruby I
-- **Class Filter**: Filter problems by Class 1–10
-- **Algorithm Tag Chips**: Selected tags shown as chips/badges, individually removable with ×
-- **Exclude Solved**: Enter BOJ handle to exclude already-solved problems
-- **Exclude Obscure**: Exclude problems with ≤100 solvers
-- **Quick Fetch**: Double-click to fetch immediately
 
 #### LeetCode
 
@@ -150,15 +135,13 @@ Pick random BOJ problems using the solved.ac API.
 - **Tag Chips**: Select/remove tags as chips (Array, DP, Graph, etc.)
 - **Count**: Set number of problems to pick (1–20)
 
-> Search and Random are not available for Programmers and SWEA.
+#### Codeforces / Programmers / SWEA
+
+Each platform supports random picking with rating/level ranges and tag chips.
 
 ### Login & Submit
 
 Log in to each platform via the built-in JCEF browser and submit your code directly.
-
-<p align="center">
-  <img src="screenshots/boj-login.png" width="600" alt="BOJ Login"/>
-</p>
 
 Click **Submit**, confirm the dialog, and your code & language are auto-filled.
 
@@ -170,7 +153,7 @@ Click **Submit**, confirm the dialog, and your code & language are auto-filled.
   <img src="screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
 </p>
 
-Login and submission work the same way for BOJ, Programmers, SWEA, and LeetCode.
+Login and submission work the same way for Programmers, SWEA, LeetCode, and Codeforces.
 
 ### Local Test Execution
 
@@ -278,14 +261,14 @@ In exam mode, code auto-completion and inspections are disabled.
 
 ### GitHub Integration
 
-Push your accepted solutions to GitHub automatically — just like BaekjoonHub.
+Push your accepted solutions to GitHub automatically.
 
 - **One-Click Login**: Log in to GitHub via built-in browser — token is auto-generated and saved
 - **Repo Selector**: Choose from your repositories via dropdown after login
 - **Auto Push**: Automatically push code to GitHub when your submission is accepted
 - **Manual Push**: Click the GitHub button to push anytime
 - **Smart Detection**: Only pushes on "Accepted" — wrong answers are never pushed
-- **All Platforms**: Works with BOJ, Programmers, SWEA, and LeetCode
+- **All Platforms**: Works with Programmers, SWEA, LeetCode, and Codeforces
 - **Structured Commits**: `[Platform #ID] Problem Title (Language)` format with README
 
 Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repository.
@@ -310,15 +293,14 @@ Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repo
 1. Open **CodingTestKit** from the right sidebar
 2. Select platform and language
 3. Enter problem ID and click **Fetch**
-   - BOJ: `1000`
    - Programmers: `12947`
    - SWEA: `1204`
    - LeetCode: `1` or `two-sum` or URL
+   - Codeforces: `1234A` or URL
 
 ### 2. Search & Random
-- **Search**: Search by keyword, tag, difficulty on BOJ (solved.ac) and LeetCode
-- **Random**: Set tier/class range, tags, options, and pick random problems
-- Search/Random not available for Programmers & SWEA
+- **Search**: Search by keyword, tag, difficulty on each platform
+- **Random**: Set rating/level range, tags, options, and pick random problems
 
 ### 3. Login
 1. Click **Login**

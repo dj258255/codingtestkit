@@ -38,7 +38,7 @@ object ProblemFileManager {
             I18n.t("프로젝트 경로를 찾을 수 없습니다.", "Project path not found.")
         )
 
-        // 폴더 생성: problems/백준/Gold V/1000. A+B/
+        // 폴더 생성: problems/{플랫폼}/{난이도}/{문제번호. 제목}/
         val levelFolder = problem.difficulty.ifBlank { "Unrated" }
         val folderName = sanitizeFolderName("${problem.id}. ${problem.title}")
         val problemDir = File(basePath, "problems/${problem.source.localizedName()}/$levelFolder/$folderName")

@@ -18,7 +18,7 @@ object CodeRunner {
     )
 
     /**
-     * 백준 방식: stdin으로 입력을 넣고 stdout 결과를 비교
+     * stdin 방식: 입력을 표준입력으로 전달하고 stdout 결과를 비교
      */
     fun run(
         code: String,
@@ -98,7 +98,7 @@ object CodeRunner {
 
     /**
      * Java 클래스명 감지 우선순위:
-     * 1. public class 선언 (백준: Main, SWEA: Solution)
+     * 1. public class 선언 (SWEA: Solution 등)
      * 2. main 메서드가 포함된 class
      * 3. 첫 번째 class 선언
      * 4. 기본값 "Main"

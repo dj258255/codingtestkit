@@ -15,7 +15,7 @@ Log in to each platform via the built-in JCEF browser and submit your code direc
 Click the **Login** button for any platform. A built-in browser opens the platform's login page.
 
 <p align="center">
-  <img src="../screenshots/boj-login.png" width="600" alt="BOJ Login"/>
+  <img src="../screenshots/boj-login.png" width="600" alt="Platform Login"/>
 </p>
 
 ### Submit Flow
@@ -40,10 +40,10 @@ The language dropdown is automatically set on all platforms:
 
 | Platform | Method |
 |----------|--------|
-| **BOJ** | `<select>` element value set via `baekjoonId` |
 | **Programmers** | `<select>` or custom dropdown button click |
 | **SWEA** | `<select>` + AngularJS scope binding |
 | **LeetCode** | Dropdown button click + menu item text matching |
+| **Codeforces** | `<select>` element + problem picker auto-fill |
 
 ### Result Detection
 
@@ -53,9 +53,9 @@ After submitting, the plugin monitors the page for verdict:
 
 ### Platform Notes
 
-- **BOJ**: Cloudflare verification may be required before submitting
 - **SWEA**: Some problems (mock exam, etc.) may not open due to permission restrictions
 - **LeetCode**: Uses titleSlug for the submit URL
+- **Codeforces**: Cloudflare verification may be required before submitting
 
 ---
 
@@ -81,10 +81,10 @@ After submitting, the plugin monitors the page for verdict:
 
 | 플랫폼 | 방식 |
 |--------|------|
-| **백준** | `<select>` 요소에 `baekjoonId` 값 설정 |
 | **프로그래머스** | `<select>` 또는 커스텀 드롭다운 버튼 클릭 |
 | **SWEA** | `<select>` + AngularJS scope 바인딩 |
 | **LeetCode** | 드롭다운 버튼 클릭 + 메뉴 아이템 텍스트 매칭 |
+| **Codeforces** | `<select>` 요소 + 문제 선택 자동 입력 |
 
 ### 결과 감지
 
@@ -94,6 +94,6 @@ After submitting, the plugin monitors the page for verdict:
 
 ### 플랫폼 참고사항
 
-- **백준**: 제출 전 Cloudflare 인증이 필요할 수 있음
 - **SWEA**: 모의 역량테스트 등 일부 문제는 권한 문제로 제출 페이지가 안 열릴 수 있음
 - **LeetCode**: titleSlug를 사용하여 제출 URL 구성
+- **Codeforces**: 제출 전 Cloudflare 인증이 필요할 수 있음

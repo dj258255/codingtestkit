@@ -20,7 +20,7 @@ describes what data the plugin handles and where it goes.
 
 | Item | Where | Purpose |
 | --- | --- | --- |
-| Site login cookies (BOJ, Programmers, SWEA, LeetCode, Codeforces) | `PasswordSafe` | Authenticate when submitting or listing your solved problems. |
+| Site login cookies (Programmers, SWEA, LeetCode, Codeforces) | `PasswordSafe` | Authenticate when submitting or listing your solved problems. |
 | GitHub personal access token | `PasswordSafe` | Push accepted solutions to your repository, if configured. |
 | Usernames, repository name, feature toggles | IntelliJ settings XML | Remember your preferences between sessions. |
 | Fetched problem HTML, test cases, images | Project files you opened in your IDE | Let you view and solve problems offline. |
@@ -30,8 +30,6 @@ describes what data the plugin handles and where it goes.
 The plugin communicates **only** with the following first-party endpoints, and
 only when the user triggers the corresponding feature:
 
-- `https://www.acmicpc.net/` and `https://solved.ac/` — Baekjoon problem fetch,
-  search, submit, solved lookup.
 - `https://school.programmers.co.kr/` — Programmers problem fetch, search,
   submit.
 - `https://swexpertacademy.com/` — SWEA problem fetch, search, submit.

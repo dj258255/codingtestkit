@@ -186,10 +186,7 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
         if (!isConfigured()) return PushResult(false, "GitHub not configured")
 
         val folderPath = buildFolderPath(problem)
-        val codeFileName = when (problem.source) {
-            com.codingtestkit.model.ProblemSource.BAEKJOON -> "Main.${language.extension}"
-            else -> "Solution.${language.extension}"
-        }
+        val codeFileName = "${problem.source.mainClassName}.${language.extension}"
 
         // 1. 코드 파일 푸시
         val commitMsg = buildCommitMessage(problem, language)
@@ -261,7 +258,6 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
     }
 
     private fun getProblemLink(problem: Problem): String = when (problem.source) {
-        com.codingtestkit.model.ProblemSource.BAEKJOON -> "https://www.acmicpc.net/problem/${problem.id}"
         com.codingtestkit.model.ProblemSource.PROGRAMMERS -> "https://school.programmers.co.kr/learn/courses/30/lessons/${problem.id}"
         com.codingtestkit.model.ProblemSource.SWEA -> "https://swexpertacademy.com/main/code/problem/problemDetail.do?contestProbId=${problem.id}"
         com.codingtestkit.model.ProblemSource.LEETCODE -> "https://leetcode.com/problems/${problem.id}/"

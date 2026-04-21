@@ -57,8 +57,8 @@ class ProblemFileManagerTest {
 
     private fun createTestProblem(): Problem {
         return Problem(
-            source = ProblemSource.BAEKJOON,
-            id = "1000",
+            source = ProblemSource.CODEFORCES,
+            id = "1000A",
             title = "A+B",
             description = "<h2>문제</h2><p>두 수를 더하세요</p>",
             testCases = mutableListOf(
@@ -67,7 +67,7 @@ class ProblemFileManagerTest {
             ),
             timeLimit = "2 초",
             memoryLimit = "256 MB",
-            difficulty = "Bronze V",
+            difficulty = "800",
             parameterNames = emptyList()
         )
     }
@@ -126,8 +126,8 @@ class ProblemFileManagerTest {
         dir.mkdirs()
         File(dir, "problem.json").writeText("""
             {
-                "source": "BAEKJOON",
-                "id": "1000",
+                "source": "CODEFORCES",
+                "id": "1000A",
                 "title": "Test",
                 "description": "desc",
                 "testCases": []
@@ -147,7 +147,7 @@ class ProblemFileManagerTest {
     @Test
     fun `findProblemFolder finds folder with problem json`() {
         val problemsDir = File(tempDir, "problems")
-        val problemDir = File(problemsDir, "백준/Bronze V/1000. A+B")
+        val problemDir = File(problemsDir, "Codeforces/800/1000A. A+B")
         problemDir.mkdirs()
         File(problemDir, "problem.json").writeText("{}")
 
@@ -187,7 +187,7 @@ class ProblemFileManagerTest {
         val problem = createTestProblem()
         val markdown = method.invoke(ProblemFileManager, problem) as String
 
-        assertTrue(markdown.contains("[백준 #1000] A+B"))
+        assertTrue(markdown.contains("#1000A] A+B"))
         assertTrue(markdown.contains("시간 제한"))
         assertTrue(markdown.contains("2 초"))
         assertTrue(markdown.contains("메모리 제한"))
@@ -195,7 +195,7 @@ class ProblemFileManagerTest {
     }
 
     @Test
-    fun `generateMarkdown includes test cases for Baekjoon`() {
+    fun `generateMarkdown includes test cases for Codeforces`() {
         val method = ProblemFileManager::class.java.getDeclaredMethod("generateMarkdown", Problem::class.java)
         method.isAccessible = true
 
