@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit</name>
-    <version>1.4.1</version>
+    <version>1.4.2</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -155,6 +155,23 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.4.2</h3>
+        <p><b>Build configuration alignment with IntelliJ Platform 2024.3 SDK.</b> Compile warnings cleaned up; sinceBuild raised to 243.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Compat] sinceBuild 242 → 243</b> – IntelliJ IDEA 2024.2 support dropped to remove the "since-build='242' is lower than target IntelliJ Platform major version: '243'" build warning. Minimum supported version is now IntelliJ IDEA 2024.3.</li>
+            <li><b>[Build] Java/Kotlin target 17 → 21</b> – sourceCompatibility/targetCompatibility and Kotlin jvmTarget bumped to 21 to match what IntelliJ Platform 2024.3 actually requires. Building from source now needs JDK 21.</li>
+            <li><b>[Verifier] 2024.2 dropped from Plugin Verifier matrix</b> – verification now runs against IC 2024.3 / 2025.1 / 2025.2 only.</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[호환성] sinceBuild 242 → 243</b> – 빌드 경고("since-build='242' is lower than target IntelliJ Platform major version: '243'")를 해소하기 위해 IntelliJ IDEA 2024.2 지원을 중단했습니다. 최소 지원 버전은 IntelliJ IDEA 2024.3.</li>
+            <li><b>[빌드] Java/Kotlin 타겟 17 → 21</b> – sourceCompatibility / targetCompatibility / Kotlin jvmTarget을 21로 상향. IntelliJ Platform 2024.3가 실제로 요구하는 버전과 일치시켰습니다. 소스에서 빌드하려면 이제 JDK 21이 필요합니다.</li>
+            <li><b>[Verifier] 2024.2 검증 매트릭스 제거</b> – Plugin Verifier가 IC 2024.3 / 2025.1 / 2025.2 세 버전에 대해서만 실행됩니다.</li>
+        </ul>
+
         <h3>v1.4.1</h3>
         <p><b>Feedback channel added</b> — submit bugs and feature requests in 1 minute via the Google Form.</p>
 

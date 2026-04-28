@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.codingtestkit"
-version = "1.4.1"
+version = "1.4.2"
 
 repositories {
     mavenCentral()
@@ -32,9 +32,9 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.codingtestkit"
         name = "CodingTestKit"
-        version = "1.4.1"
+        version = "1.4.2"
         ideaVersion {
-            sinceBuild = "242"
+            sinceBuild = "243"
             untilBuild = provider { null }
         }
     }
@@ -44,7 +44,6 @@ intellijPlatform {
     pluginVerification {
         ides {
             val ic = org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdeaCommunity
-            ide(ic, "2024.2.6")
             ide(ic, "2024.3.7")
             ide(ic, "2025.1.7")
             ide(ic, "2025.2.6.1")
@@ -60,9 +59,14 @@ intellijPlatform {
     }
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
 tasks {
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+        kotlinOptions.jvmTarget = "21"
     }
 
     test {
