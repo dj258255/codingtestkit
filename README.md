@@ -367,6 +367,14 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 ./gradlew buildPlugin
 ```
 
+## Feedback
+
+Found a bug or have a feature idea? Please let us know:
+
+- **Feedback Form (1 min, anonymous):** https://forms.gle/Qqi5gDoHSi2HU1Xs5
+- GitHub Issues: https://github.com/dj258255/codingtestkit/issues
+- Email: dj258255@naver.com
+
 ---
 
 # 한국어
@@ -699,6 +707,14 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 ```bash
 ./gradlew buildPlugin
 ```
+
+## 피드백 (버그 제보 & 기능 제안)
+
+오류·버그·새 기능 제안이 있으시면 아래로 알려주세요:
+
+- **피드백 폼 (1분 소요, 익명 가능):** https://forms.gle/Qqi5gDoHSi2HU1Xs5
+- GitHub Issues: https://github.com/dj258255/codingtestkit/issues
+- 이메일: dj258255@naver.com
 
 ---
 

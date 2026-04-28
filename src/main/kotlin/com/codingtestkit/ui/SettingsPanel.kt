@@ -13,6 +13,8 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import javax.swing.*
 
+private const val FEEDBACK_FORM_URL = "https://forms.gle/Qqi5gDoHSi2HU1Xs5"
+
 class SettingsPanel(private val project: Project) : JPanel() {
 
     private val autoCompleteToggle = JCheckBox(I18n.t("자동완성 끄기 (Auto Complete OFF)", "Auto Complete OFF"))
@@ -195,6 +197,53 @@ class SettingsPanel(private val project: Project) : JPanel() {
             I18n.t("5가지를 모두 켜면 실제 코딩 테스트와 동일한 환경에서 연습할 수 있습니다",
                 "Enable all 5 to practice in an environment identical to real coding tests")))
         add(helpSection)
+        add(Box.createVerticalStrut(JBUI.scale(8)))
+
+        // 피드백 (오류 / 버그 / 기능 제안)
+        val feedbackSection = createSection(I18n.t("피드백", "Feedback"))
+        feedbackSection.add(JLabel(
+            "<html>" + I18n.t(
+                "오류·버그·새 기능 제안이 있으시면 아래 폼으로 알려주세요. 익명 제출 가능, 1분이면 충분합니다.",
+                "Found a bug or have a feature idea? Submit via the form below — anonymous, takes about 1 minute."
+            ) + "</html>"
+        ).apply {
+            font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
+            foreground = JBColor.GRAY
+            alignmentX = LEFT_ALIGNMENT
+        })
+        feedbackSection.add(Box.createVerticalStrut(JBUI.scale(6)))
+        val feedbackPanel = WrapPanel(FlowLayout.LEFT, JBUI.scale(8), 0).apply {
+            alignmentX = LEFT_ALIGNMENT
+        }
+        val feedbackBtn = JButton(
+            I18n.t("  버그 제보 & 기능 제안  ", "  Report Bug / Suggest Feature  "),
+            AllIcons.General.Information
+        ).apply {
+            toolTipText = I18n.t(
+                "구글 폼이 브라우저로 열립니다 (forms.gle/Qqi5gDoHSi2HU1Xs5)",
+                "Opens the Google Form in your browser (forms.gle/Qqi5gDoHSi2HU1Xs5)"
+            )
+            putClientProperty("JButton.buttonType", "roundRect")
+            font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(12f).toFloat())
+            addActionListener {
+                try {
+                    Desktop.getDesktop().browse(java.net.URI(FEEDBACK_FORM_URL))
+                } catch (_: Throwable) {
+                    JOptionPane.showMessageDialog(
+                        this@SettingsPanel,
+                        I18n.t(
+                            "브라우저를 열 수 없습니다. 직접 방문해 주세요:\n$FEEDBACK_FORM_URL",
+                            "Could not open browser. Please visit manually:\n$FEEDBACK_FORM_URL"
+                        ),
+                        I18n.t("피드백", "Feedback"),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                }
+            }
+        }
+        feedbackPanel.add(feedbackBtn)
+        feedbackSection.add(feedbackPanel)
+        add(feedbackSection)
         add(Box.createVerticalStrut(JBUI.scale(8)))
 
         // 감지된 도구 경로
