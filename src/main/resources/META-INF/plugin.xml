@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
-    <name>CodingTestKit - Algorithm Problem Solver</name>
+    <name>CodingTestKit</name>
     <version>1.4.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 

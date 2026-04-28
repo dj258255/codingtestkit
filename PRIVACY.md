@@ -1,6 +1,6 @@
 # Privacy Policy — CodingTestKit
 
-_Last updated: 2026-04-14_
+_Last updated: 2026-04-28_
 
 CodingTestKit is an IntelliJ IDE plugin that helps users fetch, test, and submit
 algorithm problems from public competitive programming platforms. This document
@@ -43,6 +43,16 @@ only when the user triggers the corresponding feature:
 
 No other network destinations are contacted. No payload from your machine is
 sent anywhere else.
+
+## Optional feedback form (Google Forms)
+
+The Settings tab includes a "Report Bug / Suggest Feature" button that opens
+a Google Form (<https://forms.gle/Qqi5gDoHSi2HU1Xs5>) in your default
+browser. The plugin itself does **not** transmit any data to Google Forms —
+the form opens only when you click the button, and any data you choose to
+submit is entered manually by you on Google's website. Google's own privacy
+policy applies once you are on the form page. The form supports anonymous
+submission; no personally identifiable information is required.
 
 ## Third-party content
 
