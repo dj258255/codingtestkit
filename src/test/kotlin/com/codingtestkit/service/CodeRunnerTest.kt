@@ -304,6 +304,25 @@ class CodeRunnerTest {
     }
 
     @Test
+    fun `run Java programmers wrapper compiles utf8 source`() {
+        if (!isJavaAvailable()) return
+
+        val code = """
+            class Solution {
+                public String solution(String name) {
+                    return "안녕, " + name;
+                }
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "\"세계\"", expectedOutput = "\"안녕, 세계\"")
+        val result = CodeRunner.runProgrammers(code, Language.JAVA, tc, listOf("name"))
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("\"안녕, 세계\"", result.output.trim())
+    }
+
+    @Test
     fun `run Python with runtime error returns error`() {
         if (!isPythonAvailable()) return
 

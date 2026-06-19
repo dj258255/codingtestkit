@@ -3,6 +3,7 @@ package com.codingtestkit.service
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.TestCase
 import java.io.File
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -606,11 +607,13 @@ else console.log(_result);
             val solutionCode = parts[0].trim()
             val mainCode = parts[1].trim()
 
-            File(dir, "Solution.java").writeText(solutionCode)
-            File(dir, "Main.java").writeText(mainCode)
+            val solutionFile = File(dir, "Solution.java")
+            val mainFile = File(dir, "Main.java")
+            solutionFile.writeText(solutionCode, StandardCharsets.UTF_8)
+            mainFile.writeText(mainCode, StandardCharsets.UTF_8)
 
             val compile = executeProcess(
-                listOf(javacPath, File(dir, "Solution.java").absolutePath, File(dir, "Main.java").absolutePath),
+                javacCommand(solutionFile, mainFile),
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
@@ -626,11 +629,13 @@ else console.log(_result);
             val solutionCode = extractJavaClass(code, "Solution")
             val mainCode = extractJavaClass(code, "Main")
 
-            File(dir, "Solution.java").writeText(solutionCode)
-            File(dir, "Main.java").writeText(mainCode)
+            val solutionFile = File(dir, "Solution.java")
+            val mainFile = File(dir, "Main.java")
+            solutionFile.writeText(solutionCode, StandardCharsets.UTF_8)
+            mainFile.writeText(mainCode, StandardCharsets.UTF_8)
 
             val compile = executeProcess(
-                listOf(javacPath, File(dir, "Solution.java").absolutePath, File(dir, "Main.java").absolutePath),
+                javacCommand(solutionFile, mainFile),
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
@@ -640,14 +645,18 @@ else console.log(_result);
         }
 
         val sourceFile = File(dir, "$className.java")
-        sourceFile.writeText(code)
+        sourceFile.writeText(code, StandardCharsets.UTF_8)
 
-        val compile = executeProcess(listOf(javacPath, sourceFile.absolutePath), dir, "", timeout)
+        val compile = executeProcess(javacCommand(sourceFile), dir, "", timeout)
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
         return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, className), dir, input, timeout)
+    }
+
+    private fun javacCommand(vararg sourceFiles: File): List<String> {
+        return listOf(javacPath, "-encoding", "UTF-8") + sourceFiles.map { it.absolutePath }
     }
 
     private fun extractJavaClass(code: String, className: String): String {
