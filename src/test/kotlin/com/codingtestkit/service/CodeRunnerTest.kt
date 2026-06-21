@@ -404,4 +404,26 @@ class CodeRunnerTest {
             dir.deleteRecursively()
         }
     }
+
+    /**
+     * Regression test for issue #4: the java run command must force UTF-8 standard I/O encoding.
+     *
+     * The runtime garbling only reproduces on a real Windows host (native.encoding = MS949), where
+     * `-Dstdout.encoding` cannot be overridden from the command line on macOS/Linux. So instead of
+     * an unreproducible end-to-end test, we assert the command `javaCommand` builds always carries
+     * the UTF-8 encoding flags — this fails OS-independently if the flags regress.
+     */
+    @Test
+    fun `javaCommand forces UTF-8 standard IO encoding`() {
+        val method = CodeRunner::class.java.getDeclaredMethod("javaCommand", Array<String>::class.java)
+        method.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val cmd = method.invoke(CodeRunner, arrayOf("-cp", "X", "Main")) as List<String>
+
+        assertTrue(cmd.contains("-Dfile.encoding=UTF-8"), "missing file.encoding flag: $cmd")
+        assertTrue(cmd.contains("-Dstdout.encoding=UTF-8"), "missing stdout.encoding flag: $cmd")
+        assertTrue(cmd.contains("-Dstderr.encoding=UTF-8"), "missing stderr.encoding flag: $cmd")
+        // The caller's arguments must be preserved at the end of the command.
+        assertEquals(listOf("-cp", "X", "Main"), cmd.takeLast(3))
+    }
 }
