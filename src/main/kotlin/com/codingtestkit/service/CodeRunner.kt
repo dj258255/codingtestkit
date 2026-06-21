@@ -619,7 +619,7 @@ else console.log(_result);
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
-            return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
 
         val className = detectJavaClassName(code)
@@ -641,7 +641,7 @@ else console.log(_result);
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
-            return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
 
         val sourceFile = File(dir, "$className.java")
@@ -652,11 +652,25 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
-        return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, className), dir, input, timeout)
+        return executeProcess(javaCommand("-cp", dir.absolutePath, className), dir, input, timeout)
     }
 
     private fun javacCommand(vararg sourceFiles: File): List<String> {
         return listOf(javacPath, "-encoding", "UTF-8") + sourceFiles.map { it.absolutePath }
+    }
+
+    /**
+     * java 실행 커맨드. 자식 JVM의 표준 입출력 인코딩을 UTF-8로 강제한다.
+     * Windows 기본 코드페이지(MS949 등)로 인해 한글 결과가 깨지는 것을 방지 (이슈 #4).
+     * stdout/stderr.encoding은 JDK 18+에서 동작하고, 하위 버전에서는 무시되어 무해하다.
+     */
+    private fun javaCommand(vararg args: String): List<String> {
+        return listOf(
+            javaPath,
+            "-Dfile.encoding=UTF-8",
+            "-Dstdout.encoding=UTF-8",
+            "-Dstderr.encoding=UTF-8"
+        ) + args
     }
 
     private fun extractJavaClass(code: String, className: String): String {
@@ -741,7 +755,7 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
-        return executeProcess(listOf(javaPath, "-jar", jarFile.absolutePath), dir, input, timeout)
+        return executeProcess(javaCommand("-jar", jarFile.absolutePath), dir, input, timeout)
     }
 
     private fun runJavaScript(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -768,7 +782,7 @@ else console.log(_result);
             .start()
 
         if (input.isNotBlank()) {
-            process.outputStream.bufferedWriter().use { it.write(input) }
+            process.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(input) }
         }
 
         // 메모리 폴링 스레드 시작
@@ -815,8 +829,8 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("시간 초과 (${timeout}초)", "Time Limit Exceeded (${timeout}s)"), exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
-        val output = process.inputStream.bufferedReader().readText().trimEnd()
-        val error = process.errorStream.bufferedReader().readText().trimEnd()
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
+        val error = process.errorStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
 
         return RunResult(output = output, error = error, exitCode = process.exitValue(), executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
     }
