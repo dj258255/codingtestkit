@@ -196,7 +196,8 @@ object ProblemFileManager {
     }
 
     private fun sanitizeFolderName(name: String): String {
-        return name.replace(Regex("[^a-zA-Z0-9가-힣_\\-() ]"), "_")
+        // 파일/폴더명에 안전한 . 와 + 도 보존한다 (예: 백준 1000 "A+B").
+        return name.replace(Regex("[^a-zA-Z0-9가-힣_.+\\-() ]"), "_")
             .replace(Regex("_+"), "_")
             .trim()
             .take(60)
