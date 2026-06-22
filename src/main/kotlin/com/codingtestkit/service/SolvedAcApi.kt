@@ -261,11 +261,13 @@ object SolvedAcApi {
     private fun toSubscript(s: String): String = s.map { subscriptMap[it] ?: it }.joinToString("")
 
     fun levelToString(level: Int): String {
-        if (level == 0) return "Unrated"
+        // 유효 레벨은 1~30 (Bronze V ~ Ruby I). 그 밖(0, 음수, 31+)은 모두 Unrated.
+        // 범위 밖 입력에서 rankIdx가 음수가 되어 ArrayIndexOutOfBounds가 나던 문제 방지.
+        if (level < 1 || level > 30) return "Unrated"
         val tiers = arrayOf("Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ruby")
         val ranks = arrayOf("V", "IV", "III", "II", "I")
         val tierIdx = (level - 1) / 5
         val rankIdx = (level - 1) % 5
-        return if (tierIdx in tiers.indices) "${tiers[tierIdx]} ${ranks[rankIdx]}" else "Unrated"
+        return "${tiers[tierIdx]} ${ranks[rankIdx]}"
     }
 }

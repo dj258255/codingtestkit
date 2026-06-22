@@ -494,8 +494,13 @@ else console.log(_result);
     }
 
     private fun detectPython(): String {
-        return findExecutable("python3", "/usr/bin/python3", "/usr/local/bin/python3",
-            "/opt/homebrew/bin/python3", "python")
+        // Windows는 python3가 아니라 python 명령이 일반적
+        return if (isWindows) {
+            findExecutable("python", "python3")
+        } else {
+            findExecutable("python3", "/usr/bin/python3", "/usr/local/bin/python3",
+                "/opt/homebrew/bin/python3", "python")
+        }
     }
 
     private fun detectKotlinc(): String {
@@ -560,19 +565,36 @@ else console.log(_result);
         return findExecutable("node", "/usr/local/bin/node", "/opt/homebrew/bin/node")
     }
 
+    private val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
+
     private fun findExecutable(vararg candidates: String): String {
         for (candidate in candidates) {
-            // 절대 경로면 파일 존재 확인
-            if (candidate.startsWith("/") && File(candidate).exists()) return candidate
+            // 절대 경로 후보 (Unix: /usr/..., Windows: C:\...)
+            if (candidate.startsWith("/") || candidate.matches(Regex("^[A-Za-z]:[\\\\/].*"))) {
+                if (File(candidate).exists()) return candidate
+                // Windows 실행파일은 .exe 확장자 보정
+                if (isWindows && !candidate.endsWith(".exe")) {
+                    val withExe = File("$candidate.exe")
+                    if (withExe.exists()) return withExe.absolutePath
+                }
+                continue
+            }
 
-            // PATH에서 찾기
+            // PATH에서 찾기: Windows는 where, 그 외는 which.
+            // (Git Bash의 which는 ProcessBuilder가 실행 못 하는 MSYS 경로 /c/... 를 반환하므로 where 사용)
             try {
-                val proc = ProcessBuilder("which", candidate).start()
-                val result = proc.inputStream.bufferedReader().readText().trim()
-                if (proc.waitFor() == 0 && result.isNotBlank()) return result
+                val locator = if (isWindows) "where" else "which"
+                val proc = ProcessBuilder(locator, candidate).start()
+                val output = proc.inputStream.bufferedReader().readText()
+                val ok = proc.waitFor() == 0
+                // where는 여러 줄을 반환할 수 있으므로 실제로 존재하는 첫 경로를 선택
+                val resolved = output.lineSequence()
+                    .map { it.trim() }
+                    .firstOrNull { it.isNotBlank() && File(it).exists() }
+                if (ok && resolved != null) return resolved
             } catch (_: Exception) {}
         }
-        return candidates.first() // fallback: 원래 이름 그대로
+        return candidates.first() // fallback: 원래 이름 그대로 (PATH 탐색에 맡김)
     }
 
     fun getDetectedPaths(): Map<String, String> = mapOf(

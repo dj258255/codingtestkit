@@ -8,7 +8,11 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,12 +28,24 @@ jobs:
       - name: Build Plugin
         run: ./gradlew buildPlugin
 
+      # 인코딩 회귀 테스트(이슈 #2/#4 포함) 실행.
+      # Windows 매트릭스에서 비-UTF-8 OS 동작까지 검증한다.
+      - name: Run Tests
+        run: ./gradlew test
+
       - name: Verify Plugin (deprecated API + compatibility)
         run: ./gradlew verifyPlugin
+
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.os }}
+          path: build/reports/tests/
 
       - name: Upload Verification Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-verification-report
+          name: plugin-verification-report-${{ matrix.os }}
           path: build/reports/pluginVerifier/
