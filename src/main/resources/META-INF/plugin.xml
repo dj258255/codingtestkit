@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit</name>
-    <version>1.4.2</version>
+    <version>1.4.3</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -155,6 +155,29 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.4.3</h3>
+        <p><b>Windows encoding fixes.</b> Java compilation and execution no longer break from character-encoding mismatches on Windows.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] javac "unmappable character" error on Windows</b> – Generated wrapper sources are written as UTF-8 and compiled with <code>javac -encoding UTF-8</code>, so Korean comments no longer break compilation under the Korean Windows default code page (MS949 / x-windows-949). (#2)</li>
+            <li><b>[Fix] Garbled runtime output on Windows</b> – Java/Kotlin programs are now run with UTF-8 standard I/O (<code>-Dfile.encoding/-Dstdout.encoding/-Dstderr.encoding=UTF-8</code>) and process streams are read as UTF-8, preventing mojibake in non-UTF-8 locales. (#4)</li>
+            <li><b>[Fix] Tool detection on Windows</b> – Executable lookup uses <code>where</code> (not <code>which</code>) and resolves <code>.exe</code>; <code>python</code> is preferred over <code>python3</code>, fixing Java/Python execution failures on Windows.</li>
+            <li><b>[Fix] levelToString crash</b> – Out-of-range tier levels no longer throw ArrayIndexOutOfBounds; invalid levels return "Unrated".</li>
+            <li><b>[Fix] Folder name sanitization</b> – <code>.</code> and <code>+</code> are preserved (e.g. "A+B" titles).</li>
+            <li><b>[CI] Tests now run on ubuntu + windows</b> – The verify workflow runs the full test suite (including encoding regression tests) on both OSes.</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] Windows javac "unmappable character" 오류</b> – 생성되는 래퍼 소스를 UTF-8로 저장하고 <code>javac -encoding UTF-8</code>로 컴파일하여, 한국어 Windows 기본 코드페이지(MS949 / x-windows-949)에서 한글 주석 때문에 컴파일이 깨지던 문제를 해결했습니다. (#2)</li>
+            <li><b>[수정] Windows 실행 결과 한글 깨짐</b> – Java/Kotlin 실행을 UTF-8 표준 입출력(<code>-Dfile.encoding/-Dstdout.encoding/-Dstderr.encoding=UTF-8</code>)으로 수행하고 프로세스 스트림을 UTF-8로 읽어, 비UTF-8 로캘에서 결과가 깨지지 않도록 했습니다. (#4)</li>
+            <li><b>[수정] Windows 도구 탐지</b> – 실행 파일 탐색에 <code>which</code> 대신 <code>where</code>를 사용하고 <code>.exe</code>를 해석하며, <code>python3</code>보다 <code>python</code>을 우선해 Windows에서 Java/Python 실행 실패를 해결했습니다.</li>
+            <li><b>[수정] levelToString 크래시</b> – 범위 밖 레벨에서 ArrayIndexOutOfBounds가 발생하던 문제 수정. 잘못된 레벨은 "Unrated"를 반환합니다.</li>
+            <li><b>[수정] 폴더명 정리</b> – <code>.</code>와 <code>+</code>를 보존합니다(예: "A+B" 제목).</li>
+            <li><b>[CI] ubuntu + windows에서 테스트 실행</b> – verify 워크플로가 두 OS에서 전체 테스트(인코딩 회귀 테스트 포함)를 실행합니다.</li>
+        </ul>
+
         <h3>v1.4.2</h3>
         <p><b>Build configuration alignment with IntelliJ Platform 2024.3 SDK.</b> Compile warnings cleaned up; sinceBuild raised to 243.</p>
 
