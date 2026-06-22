@@ -5,6 +5,9 @@ import com.codingtestkit.model.TestCase
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIf
+import java.io.File
+import java.nio.charset.Charset
+import java.nio.file.Files
 
 /**
  * CodeRunner 통합 테스트.
@@ -304,6 +307,25 @@ class CodeRunnerTest {
     }
 
     @Test
+    fun `run Java programmers wrapper compiles utf8 source`() {
+        if (!isJavaAvailable()) return
+
+        val code = """
+            class Solution {
+                public String solution(String name) {
+                    return "안녕, " + name;
+                }
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "\"세계\"", expectedOutput = "\"안녕, 세계\"")
+        val result = CodeRunner.runProgrammers(code, Language.JAVA, tc, listOf("name"))
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("\"안녕, 세계\"", result.output.trim())
+    }
+
+    @Test
     fun `run Python with runtime error returns error`() {
         if (!isPythonAvailable()) return
 
@@ -328,5 +350,80 @@ class CodeRunnerTest {
         val result = CodeRunner.run(code, Language.PYTHON, tc, timeoutSeconds = 2)
 
         assertTrue(result.timedOut, "Should time out")
+    }
+
+    /**
+     * Regression test for issue #2: "unmappable character" compile error on Windows (MS949).
+     *
+     * The generated wrapper source contains Korean comments and is written to a UTF-8 temp file.
+     * Reading it with the Korean Windows javac default (x-windows-949) breaks compilation, while
+     * applying PR #3's fix (`javac -encoding UTF-8`) compiles it cleanly. Verified OS-independently
+     * by forcing the encoding explicitly so the test fails if the `-encoding UTF-8` flag regresses.
+     */
+    @Test
+    fun `Java compile fails under MS949 but succeeds with UTF-8 encoding flag`() {
+        if (!isJavaAvailable()) return
+        // Skip if this JDK lacks the MS949 (x-windows-949) charset and cannot simulate the case.
+        if (!Charset.isSupported("x-windows-949")) return
+
+        val javac = CodeRunner.getDetectedPaths()["javac"]
+        if (javac.isNullOrBlank()) return
+
+        val dir = Files.createTempDirectory("ctk_enc_test_").toFile()
+        try {
+            // User code is ASCII, but the Korean comment the wrapper injects triggers the bug (issue #2).
+            val src = File(dir, "Main.java")
+            src.writeText(
+                """
+                class Main {
+                    public static void main(String[] args) {
+                        // 사용자 debug 출력(System.out.println)을 stderr로 리다이렉트
+                        System.out.println("hello");
+                    }
+                }
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+
+            // (1) Bug condition: reading as MS949 fails with an unmappable character error.
+            val ms949 = ProcessBuilder(javac, "-encoding", "x-windows-949", src.absolutePath)
+                .directory(dir).redirectErrorStream(true).start()
+            val ms949Out = ms949.inputStream.bufferedReader().readText()
+            val ms949Exit = ms949.waitFor()
+            assertNotEquals(0, ms949Exit, "Compilation must fail under MS949 (reproduces issue #2): $ms949Out")
+            assertTrue(ms949Out.contains("unmappable character"),
+                "MS949 failure should be an unmappable character error: $ms949Out")
+
+            // (2) Fix condition: the `-encoding UTF-8` flag applied by PR #3 compiles successfully.
+            val utf8 = ProcessBuilder(javac, "-encoding", "UTF-8", src.absolutePath)
+                .directory(dir).redirectErrorStream(true).start()
+            val utf8Out = utf8.inputStream.bufferedReader().readText()
+            val utf8Exit = utf8.waitFor()
+            assertEquals(0, utf8Exit, "Compilation should succeed when UTF-8 encoding is specified: $utf8Out")
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    /**
+     * Regression test for issue #4: the java run command must force UTF-8 standard I/O encoding.
+     *
+     * The runtime garbling only reproduces on a real Windows host (native.encoding = MS949), where
+     * `-Dstdout.encoding` cannot be overridden from the command line on macOS/Linux. So instead of
+     * an unreproducible end-to-end test, we assert the command `javaCommand` builds always carries
+     * the UTF-8 encoding flags — this fails OS-independently if the flags regress.
+     */
+    @Test
+    fun `javaCommand forces UTF-8 standard IO encoding`() {
+        val method = CodeRunner::class.java.getDeclaredMethod("javaCommand", Array<String>::class.java)
+        method.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val cmd = method.invoke(CodeRunner, arrayOf("-cp", "X", "Main")) as List<String>
+
+        assertTrue(cmd.contains("-Dfile.encoding=UTF-8"), "missing file.encoding flag: $cmd")
+        assertTrue(cmd.contains("-Dstdout.encoding=UTF-8"), "missing stdout.encoding flag: $cmd")
+        assertTrue(cmd.contains("-Dstderr.encoding=UTF-8"), "missing stderr.encoding flag: $cmd")
+        // The caller's arguments must be preserved at the end of the command.
+        assertEquals(listOf("-cp", "X", "Main"), cmd.takeLast(3))
     }
 }

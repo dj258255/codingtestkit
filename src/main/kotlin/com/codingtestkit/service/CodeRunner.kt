@@ -3,6 +3,7 @@ package com.codingtestkit.service
 import com.codingtestkit.model.Language
 import com.codingtestkit.model.TestCase
 import java.io.File
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
@@ -493,8 +494,13 @@ else console.log(_result);
     }
 
     private fun detectPython(): String {
-        return findExecutable("python3", "/usr/bin/python3", "/usr/local/bin/python3",
-            "/opt/homebrew/bin/python3", "python")
+        // Windows는 python3가 아니라 python 명령이 일반적
+        return if (isWindows) {
+            findExecutable("python", "python3")
+        } else {
+            findExecutable("python3", "/usr/bin/python3", "/usr/local/bin/python3",
+                "/opt/homebrew/bin/python3", "python")
+        }
     }
 
     private fun detectKotlinc(): String {
@@ -559,19 +565,36 @@ else console.log(_result);
         return findExecutable("node", "/usr/local/bin/node", "/opt/homebrew/bin/node")
     }
 
+    private val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
+
     private fun findExecutable(vararg candidates: String): String {
         for (candidate in candidates) {
-            // 절대 경로면 파일 존재 확인
-            if (candidate.startsWith("/") && File(candidate).exists()) return candidate
+            // 절대 경로 후보 (Unix: /usr/..., Windows: C:\...)
+            if (candidate.startsWith("/") || candidate.matches(Regex("^[A-Za-z]:[\\\\/].*"))) {
+                if (File(candidate).exists()) return candidate
+                // Windows 실행파일은 .exe 확장자 보정
+                if (isWindows && !candidate.endsWith(".exe")) {
+                    val withExe = File("$candidate.exe")
+                    if (withExe.exists()) return withExe.absolutePath
+                }
+                continue
+            }
 
-            // PATH에서 찾기
+            // PATH에서 찾기: Windows는 where, 그 외는 which.
+            // (Git Bash의 which는 ProcessBuilder가 실행 못 하는 MSYS 경로 /c/... 를 반환하므로 where 사용)
             try {
-                val proc = ProcessBuilder("which", candidate).start()
-                val result = proc.inputStream.bufferedReader().readText().trim()
-                if (proc.waitFor() == 0 && result.isNotBlank()) return result
+                val locator = if (isWindows) "where" else "which"
+                val proc = ProcessBuilder(locator, candidate).start()
+                val output = proc.inputStream.bufferedReader().readText()
+                val ok = proc.waitFor() == 0
+                // where는 여러 줄을 반환할 수 있으므로 실제로 존재하는 첫 경로를 선택
+                val resolved = output.lineSequence()
+                    .map { it.trim() }
+                    .firstOrNull { it.isNotBlank() && File(it).exists() }
+                if (ok && resolved != null) return resolved
             } catch (_: Exception) {}
         }
-        return candidates.first() // fallback: 원래 이름 그대로
+        return candidates.first() // fallback: 원래 이름 그대로 (PATH 탐색에 맡김)
     }
 
     fun getDetectedPaths(): Map<String, String> = mapOf(
@@ -606,17 +629,19 @@ else console.log(_result);
             val solutionCode = parts[0].trim()
             val mainCode = parts[1].trim()
 
-            File(dir, "Solution.java").writeText(solutionCode)
-            File(dir, "Main.java").writeText(mainCode)
+            val solutionFile = File(dir, "Solution.java")
+            val mainFile = File(dir, "Main.java")
+            solutionFile.writeText(solutionCode, StandardCharsets.UTF_8)
+            mainFile.writeText(mainCode, StandardCharsets.UTF_8)
 
             val compile = executeProcess(
-                listOf(javacPath, File(dir, "Solution.java").absolutePath, File(dir, "Main.java").absolutePath),
+                javacCommand(solutionFile, mainFile),
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
-            return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
 
         val className = detectJavaClassName(code)
@@ -626,28 +651,48 @@ else console.log(_result);
             val solutionCode = extractJavaClass(code, "Solution")
             val mainCode = extractJavaClass(code, "Main")
 
-            File(dir, "Solution.java").writeText(solutionCode)
-            File(dir, "Main.java").writeText(mainCode)
+            val solutionFile = File(dir, "Solution.java")
+            val mainFile = File(dir, "Main.java")
+            solutionFile.writeText(solutionCode, StandardCharsets.UTF_8)
+            mainFile.writeText(mainCode, StandardCharsets.UTF_8)
 
             val compile = executeProcess(
-                listOf(javacPath, File(dir, "Solution.java").absolutePath, File(dir, "Main.java").absolutePath),
+                javacCommand(solutionFile, mainFile),
                 dir, "", timeout
             )
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
             }
-            return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
 
         val sourceFile = File(dir, "$className.java")
-        sourceFile.writeText(code)
+        sourceFile.writeText(code, StandardCharsets.UTF_8)
 
-        val compile = executeProcess(listOf(javacPath, sourceFile.absolutePath), dir, "", timeout)
+        val compile = executeProcess(javacCommand(sourceFile), dir, "", timeout)
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
-        return executeProcess(listOf(javaPath, "-cp", dir.absolutePath, className), dir, input, timeout)
+        return executeProcess(javaCommand("-cp", dir.absolutePath, className), dir, input, timeout)
+    }
+
+    private fun javacCommand(vararg sourceFiles: File): List<String> {
+        return listOf(javacPath, "-encoding", "UTF-8") + sourceFiles.map { it.absolutePath }
+    }
+
+    /**
+     * java 실행 커맨드. 자식 JVM의 표준 입출력 인코딩을 UTF-8로 강제한다.
+     * Windows 기본 코드페이지(MS949 등)로 인해 한글 결과가 깨지는 것을 방지 (이슈 #4).
+     * stdout/stderr.encoding은 JDK 18+에서 동작하고, 하위 버전에서는 무시되어 무해하다.
+     */
+    private fun javaCommand(vararg args: String): List<String> {
+        return listOf(
+            javaPath,
+            "-Dfile.encoding=UTF-8",
+            "-Dstdout.encoding=UTF-8",
+            "-Dstderr.encoding=UTF-8"
+        ) + args
     }
 
     private fun extractJavaClass(code: String, className: String): String {
@@ -732,7 +777,7 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
 
-        return executeProcess(listOf(javaPath, "-jar", jarFile.absolutePath), dir, input, timeout)
+        return executeProcess(javaCommand("-jar", jarFile.absolutePath), dir, input, timeout)
     }
 
     private fun runJavaScript(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -759,7 +804,7 @@ else console.log(_result);
             .start()
 
         if (input.isNotBlank()) {
-            process.outputStream.bufferedWriter().use { it.write(input) }
+            process.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(input) }
         }
 
         // 메모리 폴링 스레드 시작
@@ -806,8 +851,8 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("시간 초과 (${timeout}초)", "Time Limit Exceeded (${timeout}s)"), exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
-        val output = process.inputStream.bufferedReader().readText().trimEnd()
-        val error = process.errorStream.bufferedReader().readText().trimEnd()
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
+        val error = process.errorStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
 
         return RunResult(output = output, error = error, exitCode = process.exitValue(), executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
     }
