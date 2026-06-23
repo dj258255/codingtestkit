@@ -171,18 +171,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     return object : CefResourceRequestHandlerAdapter() {
                         override fun getResourceHandler(browser: CefBrowser, frame: CefFrame, request: CefRequest): CefResourceHandler? {
                             return when {
-                                path == "/problem.html" -> panel.DynamicHtmlHandler()
-                                path == "/katex.min.css" -> KaTeXResourceHandler("/katex/katex.min.css", "text/css")
-                                path == "/katex.min.js" -> KaTeXResourceHandler("/katex/katex.min.js", "text/javascript")
-                                path == "/auto-render.min.js" -> KaTeXResourceHandler("/katex/auto-render.min.js", "text/javascript")
+                                path == "/problem.html" -> panel.createDynamicHtmlHandler()
+                                path == "/katex.min.css" -> panel.createKatexResourceHandler("/katex/katex.min.css", "text/css")
+                                path == "/katex.min.js" -> panel.createKatexResourceHandler("/katex/katex.min.js", "text/javascript")
+                                path == "/auto-render.min.js" -> panel.createKatexResourceHandler("/katex/auto-render.min.js", "text/javascript")
                                 path.startsWith("/fonts/") && path.endsWith(".woff2") ->
-                                    KaTeXResourceHandler("/katex$path", "font/woff2")
+                                    panel.createKatexResourceHandler("/katex$path", "font/woff2")
                                 path.startsWith("/img_") -> {
                                     val folder = currentProblemFolder
                                     if (folder != null) {
                                         val fileName = path.removePrefix("/")
                                         val file = java.io.File(folder, fileName)
-                                        if (file.exists()) LocalImageHandler(file) else null
+                                        if (file.exists()) panel.createLocalImageHandler(file) else null
                                     } else null
                                 }
                                 else -> null
@@ -1014,127 +1014,126 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     /**
      * 로컬 이미지 파일을 http://localhost/img_* 로 서빙하는 CEF 리소스 핸들러
      */
-    private class LocalImageHandler(private val file: java.io.File) : CefResourceHandler {
-        private var stream: InputStream? = null
-        private var responseLength = 0
+    // ─── CEF 리소스 핸들러 (버전 호환 Proxy) ───
+    // JCEF의 CefResourceHandler 인터페이스는 IntelliJ 2026.2(빌드 262)에서
+    // processRequest/readResponse → open/read/skip 으로 바뀐다. 정적 구현은
+    // 한 버전에만 묶이므로, java.lang.reflect.Proxy 로 런타임 인터페이스에 맞춰
+    // 메서드 이름 기준으로 디스패치한다. 이렇게 하면 옛/새 API 모두 호환된다.
 
-        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
-            val bytes = file.readBytes()
-            stream = ByteArrayInputStream(bytes)
-            responseLength = bytes.size
-            callback.Continue()
-            return true
-        }
+    private fun createDynamicHtmlHandler(): CefResourceHandler =
+        createCefResourceHandler(
+            loadBytes = { currentProblemHtml.toByteArray(Charsets.UTF_8) },
+            mimeType = { "text/html" },
+            configureResponse = { it.setHeaderByName("Content-Type", "text/html; charset=utf-8", true) }
+        )
 
-        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
-            response.mimeType = when {
-                file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") -> "image/jpeg"
-                file.name.endsWith(".gif") -> "image/gif"
-                file.name.endsWith(".webp") -> "image/webp"
-                else -> "image/png"
+    private fun createKatexResourceHandler(resourcePath: String, mimeType: String): CefResourceHandler =
+        createCefResourceHandler(
+            loadBytes = { ProblemPanel::class.java.getResourceAsStream(resourcePath)?.readBytes() },
+            mimeType = { mimeType }
+        )
+
+    private fun createLocalImageHandler(file: java.io.File): CefResourceHandler =
+        createCefResourceHandler(
+            loadBytes = { file.readBytes() },
+            mimeType = {
+                when {
+                    file.name.endsWith(".jpg") || file.name.endsWith(".jpeg") -> "image/jpeg"
+                    file.name.endsWith(".gif") -> "image/gif"
+                    file.name.endsWith(".webp") -> "image/webp"
+                    else -> "image/png"
+                }
             }
-            response.status = 200
-            responseLength.set(this.responseLength)
-        }
-
-        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
-            val s = stream ?: return false
-            val available = s.available()
-            if (available == 0) {
-                bytesRead.set(0)
-                return false
-            }
-            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
-            bytesRead.set(read)
-            return true
-        }
-
-        override fun cancel() {
-            stream?.close()
-            stream = null
-        }
-    }
+        )
 
     /**
-     * JAR 리소스를 http://localhost/ 로 서빙하는 CEF 리소스 핸들러
+     * CefResourceHandler 를 reflection Proxy 로 생성한다. 런타임의 실제 인터페이스
+     * (옛: processRequest/readResponse, 새: open/read/skip)에 맞춰 메서드가 생성되고
+     * InvocationHandler 가 이름으로 디스패치한다. 새 타입(LongRef 등)은 reflection 처리.
      */
-    private class KaTeXResourceHandler(private val resourcePath: String, private val mimeType: String) : CefResourceHandler {
-        private var stream: InputStream? = null
-        private var responseLength = 0
+    private fun createCefResourceHandler(
+        loadBytes: () -> ByteArray?,
+        mimeType: () -> String,
+        configureResponse: (CefResponse) -> Unit = {}
+    ): CefResourceHandler {
+        var stream: InputStream? = null
+        var length = 0
 
-        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
-            val bytes = ProblemPanel::class.java.getResourceAsStream(resourcePath)?.readBytes()
-            if (bytes != null) {
-                stream = ByteArrayInputStream(bytes)
-                responseLength = bytes.size
-                callback.Continue()
-                return true
+        val handler = java.lang.reflect.InvocationHandler { proxy, method, args ->
+            when (method.name) {
+                // 옛: processRequest(CefRequest, CefCallback) / 새: open(CefRequest, BoolRef, CefCallback)
+                "processRequest", "open" -> {
+                    val bytes = loadBytes()
+                    if (bytes == null) {
+                        false
+                    } else {
+                        stream = ByteArrayInputStream(bytes)
+                        length = bytes.size
+                        if (method.name == "open") {
+                            (args[1] as BoolRef).set(true) // 동기 처리
+                        } else {
+                            (args[1] as CefCallback).Continue()
+                        }
+                        true
+                    }
+                }
+                "getResponseHeaders" -> {
+                    val response = args[0] as CefResponse
+                    val responseLength = args[1] as org.cef.misc.IntRef
+                    response.mimeType = mimeType()
+                    configureResponse(response)
+                    response.status = 200
+                    responseLength.set(length)
+                    null
+                }
+                // 옛: readResponse(...) / 새: read(...) — 시그니처(byte[], int, IntRef, callback) 동일
+                "readResponse", "read" -> {
+                    val dataOut = args[0] as ByteArray
+                    val bytesToRead = args[1] as Int
+                    val bytesRead = args[2] as org.cef.misc.IntRef
+                    val s = stream
+                    if (s == null) {
+                        false
+                    } else {
+                        val available = s.available()
+                        if (available == 0) {
+                            bytesRead.set(0)
+                            false
+                        } else {
+                            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
+                            bytesRead.set(read)
+                            true
+                        }
+                    }
+                }
+                // 새 API 전용: skip(long, LongRef, CefResourceSkipCallback)
+                "skip" -> {
+                    val toSkip = args[0] as Long
+                    val skipped = stream?.skip(toSkip) ?: 0L
+                    runCatching {
+                        val ref = args[1]
+                        ref.javaClass.getMethod("set", Long::class.javaPrimitiveType).invoke(ref, skipped)
+                    }
+                    true
+                }
+                "cancel" -> {
+                    stream?.close()
+                    stream = null
+                    null
+                }
+                // Object 기본 메서드 (Proxy 가 위임)
+                "toString" -> "CefResourceHandlerProxy"
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.getOrNull(0)
+                else -> null
             }
-            return false
         }
 
-        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
-            response.mimeType = mimeType
-            response.status = 200
-            responseLength.set(this.responseLength)
-        }
-
-        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
-            val s = stream ?: return false
-            val available = s.available()
-            if (available == 0) {
-                bytesRead.set(0)
-                return false
-            }
-            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
-            bytesRead.set(read)
-            return true
-        }
-
-        override fun cancel() {
-            stream?.close()
-            stream = null
-        }
-    }
-
-    /**
-     * 동적 HTML 콘텐츠를 서빙하는 CEF 리소스 핸들러
-     */
-    private inner class DynamicHtmlHandler : CefResourceHandler {
-        private var stream: InputStream? = null
-        private var responseLength = 0
-
-        override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
-            val bytes = currentProblemHtml.toByteArray(Charsets.UTF_8)
-            stream = ByteArrayInputStream(bytes)
-            responseLength = bytes.size
-            callback.Continue()
-            return true
-        }
-
-        override fun getResponseHeaders(response: CefResponse, responseLength: org.cef.misc.IntRef, redirectUrl: StringRef) {
-            response.mimeType = "text/html"
-            response.setHeaderByName("Content-Type", "text/html; charset=utf-8", true)
-            response.status = 200
-            responseLength.set(this.responseLength)
-        }
-
-        override fun readResponse(dataOut: ByteArray, bytesToRead: Int, bytesRead: org.cef.misc.IntRef, callback: CefCallback): Boolean {
-            val s = stream ?: return false
-            val available = s.available()
-            if (available == 0) {
-                bytesRead.set(0)
-                return false
-            }
-            val read = s.read(dataOut, 0, minOf(bytesToRead, available))
-            bytesRead.set(read)
-            return true
-        }
-
-        override fun cancel() {
-            stream?.close()
-            stream = null
-        }
+        return java.lang.reflect.Proxy.newProxyInstance(
+            CefResourceHandler::class.java.classLoader,
+            arrayOf(CefResourceHandler::class.java),
+            handler
+        ) as CefResourceHandler
     }
 
     /**
