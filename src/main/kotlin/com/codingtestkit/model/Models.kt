@@ -63,6 +63,17 @@ enum class Language(
     GO("Go", "go", -1),
     RUBY("Ruby", "rb", -1);
 
+    /**
+     * 해당 플랫폼에 코드를 제출할 수 있는 언어인지.
+     * 로컬 테스트 실행은 언어·플랫폼 무관 항상 가능하며, 제출만 플랫폼 제약을 받는다.
+     */
+    fun isSubmittable(source: ProblemSource): Boolean = when (source) {
+        ProblemSource.PROGRAMMERS -> this != RUST // 프로그래머스는 Rust 채점 미지원
+        ProblemSource.SWEA -> sweaId >= 0
+        ProblemSource.LEETCODE -> true
+        ProblemSource.CODEFORCES -> true
+    }
+
     fun defaultCode(source: ProblemSource): String {
         return when (this) {
             JAVA -> when (source) {

@@ -68,6 +68,23 @@ class ModelsTest {
     }
 
     @Test
+    fun `isSubmittable matrix matches platform support`() {
+        // 리트코드/코드포스는 전 언어 제출 가능
+        for (lang in Language.entries) {
+            assertTrue(lang.isSubmittable(ProblemSource.LEETCODE))
+            assertTrue(lang.isSubmittable(ProblemSource.CODEFORCES))
+        }
+        // 프로그래머스는 Rust만 미지원
+        assertFalse(Language.RUST.isSubmittable(ProblemSource.PROGRAMMERS))
+        assertTrue(Language.GO.isSubmittable(ProblemSource.PROGRAMMERS))
+        assertTrue(Language.RUBY.isSubmittable(ProblemSource.PROGRAMMERS))
+        // SWEA는 sweaId 기반
+        assertTrue(Language.JAVA.isSubmittable(ProblemSource.SWEA))
+        assertFalse(Language.KOTLIN.isSubmittable(ProblemSource.SWEA))
+        assertFalse(Language.RUST.isSubmittable(ProblemSource.SWEA))
+    }
+
+    @Test
     fun `Java defaultCode for Programmers has Solution class`() {
         val code = Language.JAVA.defaultCode(ProblemSource.PROGRAMMERS)
         assertTrue(code.contains("class Solution"))

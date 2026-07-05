@@ -50,6 +50,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         preferredSize = Dimension(JBUI.scale(90), preferredSize.height)
         renderer = createComboRenderer()
     }
+    private val submitSupportLabel = JLabel().apply {
+        font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
+        foreground = JBColor(Color(0xB0, 0x6A, 0x00), Color(0xE0, 0xA0, 0x50))
+        isVisible = false
+    }
     private val problemIdField = JTextField().apply {
         toolTipText = I18n.t("문제 번호 또는 URL을 입력하세요", "Enter problem number or URL")
     }
@@ -119,6 +124,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         row1.add(languageCombo)
         row1.add(loginButton)
         row1.add(githubLoginButton)
+        row1.add(submitSupportLabel)
         topPanel.add(row1)
 
         // Row 2: 문제번호 입력 + 가져오기 (WrapLayout으로 반응형)
@@ -255,7 +261,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         sourceCombo.addActionListener {
             updateLoginButton()
             updatePlaceholder()
+            updateSubmitSupportHint()
         }
+        languageCombo.addActionListener { updateSubmitSupportHint() }
         fetchButton.addActionListener { fetchProblem() }
         randomButton.addActionListener { openRandomDialog() }
         searchButton2.addActionListener { openSearchDialog() }
@@ -267,12 +275,30 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         githubLoginButton.addActionListener { handleGitHubLogin() }
         problemIdField.addActionListener { fetchProblem() }
         updatePlaceholder()
+        updateSubmitSupportHint()
 
         // 키보드 단축키 액션 등록
         CodingTestKitActionService.getInstance(project).apply {
             fetchAction = { fetchButton.doClick() }
             submitAction = { submitButton.doClick() }
             translateAction = { translateButton.doClick() }
+        }
+    }
+
+    /**
+     * 선택한 (플랫폼, 언어) 조합이 제출 미지원이면 콤보 옆에 즉시 경고 표시.
+     * 문제를 다 푼 뒤 제출 시점에야 미지원을 알게 되는 상황을 방지한다.
+     */
+    private fun updateSubmitSupportHint() {
+        val source = getSelectedSource()
+        val language = getSelectedLanguage()
+        val submittable = language.isSubmittable(source)
+        submitSupportLabel.isVisible = !submittable
+        if (!submittable) {
+            submitSupportLabel.text = I18n.t(
+                "⚠ ${language.displayName} — ${source.localizedName()} 제출 미지원 (로컬 테스트만 가능)",
+                "⚠ ${language.displayName} — cannot submit to ${source.localizedName()} (local testing only)"
+            )
         }
     }
 
