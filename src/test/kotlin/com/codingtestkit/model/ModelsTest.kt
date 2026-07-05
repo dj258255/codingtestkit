@@ -47,6 +47,24 @@ class ModelsTest {
         assertEquals("py", Language.PYTHON.extension)
         assertEquals("cpp", Language.CPP.extension)
         assertEquals("kt", Language.KOTLIN.extension)
+        assertEquals("js", Language.JAVASCRIPT.extension)
+        assertEquals("rs", Language.RUST.extension)
+        assertEquals("go", Language.GO.extension)
+        assertEquals("rb", Language.RUBY.extension)
+    }
+
+    @Test
+    fun `Rust Go Ruby defaultCode for Programmers has solution function`() {
+        assertTrue(Language.RUST.defaultCode(ProblemSource.PROGRAMMERS).contains("fn solution"))
+        assertTrue(Language.GO.defaultCode(ProblemSource.PROGRAMMERS).contains("func solution"))
+        assertTrue(Language.RUBY.defaultCode(ProblemSource.PROGRAMMERS).contains("def solution"))
+    }
+
+    @Test
+    fun `Rust Go Ruby are not submittable to SWEA`() {
+        assertTrue(Language.RUST.sweaId < 0)
+        assertTrue(Language.GO.sweaId < 0)
+        assertTrue(Language.RUBY.sweaId < 0)
     }
 
     @Test

@@ -426,4 +426,169 @@ class CodeRunnerTest {
         // The caller's arguments must be preserved at the end of the command.
         assertEquals(listOf("-cp", "X", "Main"), cmd.takeLast(3))
     }
+
+    // ── Rust / Go / Ruby (이슈 #7) ──
+
+    private fun isToolAvailable(vararg command: String): Boolean {
+        return try {
+            ProcessBuilder(*command).start().waitFor() == 0
+        } catch (_: Exception) { false }
+    }
+
+    @Test
+    fun `hasMainFunction detects Rust Go Ruby main`() {
+        val method = CodeRunner::class.java.getDeclaredMethod(
+            "hasMainFunction", String::class.java, Language::class.java
+        )
+        method.isAccessible = true
+
+        assertTrue(method.invoke(CodeRunner, "fn main() { }", Language.RUST) as Boolean)
+        assertFalse(method.invoke(CodeRunner, "fn solution() -> i32 { 0 }", Language.RUST) as Boolean)
+        assertTrue(method.invoke(CodeRunner, "func main() { }", Language.GO) as Boolean)
+        assertFalse(method.invoke(CodeRunner, "func solution() int { return 0 }", Language.GO) as Boolean)
+        // Ruby는 stdin 사용 여부로 스크립트 스타일 판별
+        assertTrue(method.invoke(CodeRunner, "n = gets.to_i", Language.RUBY) as Boolean)
+        assertFalse(method.invoke(CodeRunner, "def solution()\n  0\nend", Language.RUBY) as Boolean)
+    }
+
+    @Test
+    fun `run Rust hello world`() {
+        if (!isToolAvailable("rustc", "--version")) return
+
+        val code = """
+            use std::io::{self, Read};
+
+            fn main() {
+                let mut input = String::new();
+                io::stdin().read_to_string(&mut input).unwrap();
+                let mut it = input.split_whitespace();
+                let a: i64 = it.next().unwrap().parse().unwrap();
+                let b: i64 = it.next().unwrap().parse().unwrap();
+                println!("{}", a + b);
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "1 2", expectedOutput = "3")
+        val result = CodeRunner.run(code, Language.RUST, tc)
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("3", result.output.trim())
+    }
+
+    @Test
+    fun `run Go hello world`() {
+        if (!isToolAvailable("go", "version")) return
+
+        val code = """
+            package main
+
+            import "fmt"
+
+            func main() {
+                var a, b int
+                fmt.Scan(&a, &b)
+                fmt.Println(a + b)
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "3 4", expectedOutput = "7")
+        val result = CodeRunner.run(code, Language.GO, tc)
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("7", result.output.trim())
+    }
+
+    @Test
+    fun `run Ruby hello world`() {
+        if (!isToolAvailable("ruby", "--version")) return
+
+        val code = """
+            a, b = gets.split.map(&:to_i)
+            puts a + b
+        """.trimIndent()
+
+        val tc = TestCase(input = "5 6", expectedOutput = "11")
+        val result = CodeRunner.run(code, Language.RUBY, tc)
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("11", result.output.trim())
+    }
+
+    @Test
+    fun `run Rust programmers wrapper with vec argument`() {
+        if (!isToolAvailable("rustc", "--version")) return
+
+        val code = """
+            fn solution(arr: Vec<i32>) -> i32 {
+                arr.iter().sum()
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "[1,2,3]", expectedOutput = "6")
+        val result = CodeRunner.runProgrammers(code, Language.RUST, tc, listOf("arr"))
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("6", result.output.trim())
+    }
+
+    @Test
+    fun `run Go programmers wrapper returns compact array`() {
+        if (!isToolAvailable("go", "version")) return
+
+        val code = """
+            func solution(arr []int) []int {
+                doubled := make([]int, len(arr))
+                for i, v := range arr {
+                    doubled[i] = v * 2
+                }
+                return doubled
+            }
+        """.trimIndent()
+
+        val tc = TestCase(input = "[1,2,3]", expectedOutput = "[2,4,6]")
+        val result = CodeRunner.runProgrammers(code, Language.GO, tc, listOf("arr"))
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("[2,4,6]", result.output.trim())
+    }
+
+    @Test
+    fun `run Ruby programmers wrapper redirects user output`() {
+        if (!isToolAvailable("ruby", "--version")) return
+
+        val code = """
+            def solution(arr)
+                puts "debug output"
+                arr.map { |x| x * 2 }
+            end
+        """.trimIndent()
+
+        val tc = TestCase(input = "[1, 2, 3]", expectedOutput = "[2,4,6]")
+        val result = CodeRunner.runProgrammers(code, Language.RUBY, tc, listOf("arr"))
+
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        // 사용자 puts는 stderr로 리다이렉트되고 stdout에는 리턴값만 출력
+        assertEquals("[2,4,6]", result.output.trim())
+    }
+
+    /**
+     * 빈 입력이어도 자식 프로세스의 stdin이 닫혀 EOF가 전달되어야 한다.
+     * 닫지 않으면 stdin을 읽는 코드가 타임아웃까지 블로킹되어 허위 시간 초과가 발생한다.
+     */
+    @Test
+    fun `run with blank input closes stdin so child sees EOF`() {
+        if (!isPythonAvailable()) return
+
+        val code = """
+            import sys
+            print(len(sys.stdin.read()))
+        """.trimIndent()
+
+        val tc = TestCase(input = "", expectedOutput = "0")
+        val result = CodeRunner.run(code, Language.PYTHON, tc, timeoutSeconds = 3)
+
+        assertFalse(result.timedOut, "Should not time out on blank input: ${result.error}")
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertEquals("0", result.output.trim())
+    }
 }

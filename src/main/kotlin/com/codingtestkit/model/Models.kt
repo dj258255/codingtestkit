@@ -58,7 +58,10 @@ enum class Language(
     PYTHON("Python", "py", 5),
     CPP("C++", "cpp", 1),
     KOTLIN("Kotlin", "kt", -1),
-    JAVASCRIPT("JavaScript", "js", -1);
+    JAVASCRIPT("JavaScript", "js", -1),
+    RUST("Rust", "rs", -1),
+    GO("Go", "go", -1),
+    RUBY("Ruby", "rb", -1);
 
     fun defaultCode(source: ProblemSource): String {
         return when (this) {
@@ -184,6 +187,102 @@ enum class Language(
                     |rl.on('close', () => {
                     |
                     |});
+                """.trimMargin()
+            }
+            RUST -> when (source) {
+                ProblemSource.PROGRAMMERS -> """
+                    |fn solution() -> i32 {
+                    |    let answer = 0;
+                    |    answer
+                    |}
+                """.trimMargin()
+                ProblemSource.SWEA -> """
+                    |use std::io::{self, BufRead};
+                    |
+                    |fn main() {
+                    |    let stdin = io::stdin();
+                    |    let mut lines = stdin.lock().lines();
+                    |    let t: usize = lines.next().unwrap().unwrap().trim().parse().unwrap();
+                    |    for tc in 1..=t {
+                    |        println!("#{} ", tc);
+                    |    }
+                    |}
+                """.trimMargin()
+                ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |use std::io::{self, Read};
+                    |
+                    |fn main() {
+                    |    let mut input = String::new();
+                    |    io::stdin().read_to_string(&mut input).unwrap();
+                    |    let mut it = input.split_whitespace();
+                    |
+                    |}
+                """.trimMargin()
+            }
+            GO -> when (source) {
+                ProblemSource.PROGRAMMERS -> """
+                    |func solution() int {
+                    |    answer := 0
+                    |    return answer
+                    |}
+                """.trimMargin()
+                ProblemSource.SWEA -> """
+                    |package main
+                    |
+                    |import (
+                    |    "bufio"
+                    |    "fmt"
+                    |    "os"
+                    |)
+                    |
+                    |func main() {
+                    |    reader := bufio.NewReader(os.Stdin)
+                    |    var T int
+                    |    fmt.Fscan(reader, &T)
+                    |    for tc := 1; tc <= T; tc++ {
+                    |        fmt.Printf("#%d \n", tc)
+                    |    }
+                    |}
+                """.trimMargin()
+                ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |package main
+                    |
+                    |import (
+                    |    "bufio"
+                    |    "fmt"
+                    |    "os"
+                    |)
+                    |
+                    |func main() {
+                    |    reader := bufio.NewReader(os.Stdin)
+                    |    writer := bufio.NewWriter(os.Stdout)
+                    |    defer writer.Flush()
+                    |
+                    |    var n int
+                    |    fmt.Fscan(reader, &n)
+                    |    fmt.Fprintln(writer, n)
+                    |}
+                """.trimMargin()
+            }
+            RUBY -> when (source) {
+                ProblemSource.PROGRAMMERS -> """
+                    |def solution()
+                    |    answer = 0
+                    |    answer
+                    |end
+                """.trimMargin()
+                ProblemSource.SWEA -> """
+                    |T = gets.to_i
+                    |(1..T).each do |tc|
+                    |    puts "##{tc} "
+                    |end
+                """.trimMargin()
+                ProblemSource.LEETCODE -> ""
+                ProblemSource.CODEFORCES -> """
+                    |lines = STDIN.read.split("\n")
+                    |
                 """.trimMargin()
             }
         }

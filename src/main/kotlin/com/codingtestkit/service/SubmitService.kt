@@ -39,7 +39,10 @@ object SubmitService {
         Language.PYTHON to "python3",
         Language.CPP to "cpp",
         Language.KOTLIN to "kotlin",
-        Language.JAVASCRIPT to "javascript"
+        Language.JAVASCRIPT to "javascript",
+        // Rust는 프로그래머스 미지원 → 맵에서 제외 (미지원 안내 처리)
+        Language.GO to "go",
+        Language.RUBY to "ruby"
     )
 
     private fun submitProgrammers(

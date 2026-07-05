@@ -309,6 +309,9 @@ object LeetCodeApi {
         "c++", "cpp" -> "cpp"
         "kotlin", "kt" -> "kotlin"
         "javascript", "js" -> "javascript"
+        "rust", "rs" -> "rust"
+        "go", "golang" -> "golang"
+        "ruby", "rb" -> "ruby"
         else -> "java"
     }
 
