@@ -242,12 +242,19 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
-        updateLoginButton()
-        updateGitHubButton()
 
-        // 백그라운드에서 저장된 쿠키 유효성 검증
+        // 첫 서비스 접근은 PasswordSafe(키체인)를 읽으므로 EDT 금지 —
+        // 백그라운드에서 캐시를 예열한 뒤 버튼 상태를 갱신하고, 이어서 쿠키 유효성 검증
         ApplicationManager.getApplication().executeOnPooledThread {
             val auth = AuthService.getInstance()
+            val github = GitHubService.getInstance()
+            for (source in ProblemSource.entries) auth.getCookies(source)
+            github.token
+            SwingUtilities.invokeLater {
+                updateLoginButton()
+                updateGitHubButton()
+            }
+
             for (source in ProblemSource.entries) {
                 if (auth.isLoggedIn(source)) {
                     if (!auth.validateSession(source)) {
@@ -685,7 +692,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val problem = when (source) {
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
                     ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
-                    ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id)
+                    ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id, cookies)
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 
