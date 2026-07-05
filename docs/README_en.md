@@ -42,6 +42,12 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | Python | O | O | O | O |
 | C++ | O | O | O | O |
 | Kotlin | O | X | O | O |
+| JavaScript | O | X | O | O |
+| Rust | X | X | O | O |
+| Go | O | X | O | O |
+| Ruby | O | X | O | O |
+
+> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby).
 
 ---
 
@@ -49,7 +55,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 
 ### Internationalization (i18n)
 
-Switch between **Korean / English** in settings. All UI text is displayed in the selected language. The language change note is shown in both languages simultaneously.
+Switch between **Korean / English** in settings. All UI text is displayed in the selected language. A note reminds you to reopen the tool window to apply changes.
 
 ### Fetch Problems
 
@@ -227,11 +233,12 @@ Practice under conditions identical to real coding tests.
 
 - **Auto Complete ON/OFF**: Toggle code auto-completion popups
 - **Inspections ON/OFF**: Enable power save mode to stop background analysis
+- **Code Vision ON/OFF**: Hide "N usages" and other Code Vision hints in the editor
 - **Paste Block**: Block pasting text copied from external programs (internal copy/paste works normally)
 - **Focus Alert**: Show alert when IDE window loses focus (same as cheating detection in real tests)
-- **Language**: Switch between Korean / English (bilingual note)
+- **Language**: Switch between Korean / English (a note reminds you to reopen the tool window to apply changes)
 
-One-click **Exam Mode** enables all 4 restrictions; **Normal Mode** disables them all.
+One-click **Exam Mode** enables all 5 restrictions; **Normal Mode** disables them all.
 
 <p align="center">
   <img src="screenshots/settings.png" width="600" alt="Settings"/>
@@ -321,8 +328,8 @@ Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repo
 
 ## Requirements
 
-- IntelliJ IDEA 2024.1+
-- JDK 17+ (for Java execution)
+- IntelliJ IDEA 2024.3+
+- JDK 17+ (for Java execution) — building the plugin from source requires JDK 21
 - Language compilers (for respective language tests)
 
 ## Build

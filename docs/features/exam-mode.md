@@ -16,10 +16,11 @@ Simulate real coding test environments by restricting IDE features.
 |---------|-------------|
 | **Auto Complete OFF** | Disables code auto-completion popups |
 | **Inspections OFF** | Enables power save mode to stop background analysis |
+| **Code Vision OFF** | Hides "N usages" and other Code Vision hints in the editor |
 | **Paste Block** | Blocks pasting text copied from external programs |
 | **Focus Alert** | Shows alert when IDE window loses focus |
 
-One-click **Exam Mode** enables all 4 restrictions simultaneously.
+One-click **Exam Mode** enables all 5 restrictions simultaneously.
 One-click **Normal Mode** disables them all.
 
 <p align="center">
@@ -52,10 +53,11 @@ One-click **Normal Mode** disables them all.
 |------|------|
 | **자동완성 OFF** | 코드 자동완성 팝업을 끕니다 |
 | **코드 검사 OFF** | 절전 모드를 활성화하여 백그라운드 분석을 중지합니다 |
+| **사용 위치 힌트 끄기 (Code Vision OFF)** | 에디터의 'N개 사용 위치' 등 Code Vision 힌트를 숨깁니다 |
 | **외부 붙여넣기 차단** | 외부 프로그램에서 복사한 텍스트의 붙여넣기를 차단합니다 |
 | **포커스 이탈 감지** | IDE 창에서 포커스가 벗어나면 경고를 표시합니다 |
 
-**시험 모드** 버튼 → 4가지 설정 한 번에 적용
+**시험 모드** 버튼 → 5가지 설정 한 번에 적용
 **일반 모드** 버튼 → 모두 해제
 
 ### 기타 설정

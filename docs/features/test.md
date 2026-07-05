@@ -56,6 +56,9 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 | C++ | `g++` | C++17 standard |
 | Kotlin | `kotlinc` + `kotlin` | JVM-based execution |
 | JavaScript | `node` | Node.js runtime |
+| Rust | `rustc` | Install via rustup — auto-detects `~/.cargo/bin` |
+| Go | `go` | Install from go.dev/dl — auto-detects `/usr/local/go/bin`, `/opt/homebrew` |
+| Ruby | `ruby` | Install via `brew install ruby` or rbenv — auto-detects `/opt/homebrew`, rbenv shims |
 
 ### Comparison Logic
 
@@ -96,6 +99,9 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 | C++ | `g++` | C++17 표준 |
 | Kotlin | `kotlinc` + `kotlin` | JVM 기반 실행 |
 | JavaScript | `node` | Node.js 런타임 |
+| Rust | `rustc` | rustup으로 설치 — `~/.cargo/bin` 자동 감지 |
+| Go | `go` | go.dev/dl에서 설치 — `/usr/local/go/bin`, `/opt/homebrew` 자동 감지 |
+| Ruby | `ruby` | `brew install ruby` 또는 rbenv로 설치 — `/opt/homebrew`, rbenv shims 자동 감지 |
 
 ### 비교 로직
 
