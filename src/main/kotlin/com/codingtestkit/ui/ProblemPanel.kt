@@ -100,6 +100,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private var currentProblemHtml = ""
 
     var onProblemFetched: ((Problem) -> Unit)? = null
+
+    /** 언어 선택 변경 알림 (Tests 탭과 양방향 동기화용) */
+    var onLanguageChanged: ((Language) -> Unit)? = null
     private var currentProblem: Problem? = null
     private var currentProblemFolder: java.io.File? = null
     private var isTranslated = false
@@ -270,7 +273,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             updatePlaceholder()
             updateSubmitSupportHint()
         }
-        languageCombo.addActionListener { updateSubmitSupportHint() }
+        languageCombo.addActionListener {
+            updateSubmitSupportHint()
+            onLanguageChanged?.invoke(getSelectedLanguage())
+        }
         fetchButton.addActionListener { fetchProblem() }
         randomButton.addActionListener { openRandomDialog() }
         searchButton2.addActionListener { openSearchDialog() }
@@ -366,6 +372,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private fun getSelectedSource(): ProblemSource = ProblemSource.entries[sourceCombo.selectedIndex]
     private fun getSelectedLanguage(): Language = Language.entries[languageCombo.selectedIndex]
+
+    /** 외부(Tests 탭)에서 언어 동기화. 같은 값이면 무시해 콜백 루프를 끊는다. */
+    fun setLanguage(language: Language) {
+        val idx = Language.entries.indexOf(language)
+        if (idx >= 0 && languageCombo.selectedIndex != idx) {
+            languageCombo.selectedIndex = idx
+        }
+    }
 
     private fun updateLoginButton() {
         val source = getSelectedSource()

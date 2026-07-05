@@ -48,6 +48,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private var problemSource = ProblemSource.PROGRAMMERS
     private var parameterNames = listOf<String>()
 
+    /** 언어 선택 변경 알림 (Problems 탭과 양방향 동기화용) */
+    var onLanguageChanged: ((Language) -> Unit)? = null
+
+    /** 외부(Problems 탭)에서 언어 동기화. 같은 값이면 무시해 콜백 루프를 끊는다. */
+    fun setLanguage(language: Language) {
+        val idx = Language.entries.indexOf(language)
+        if (idx >= 0 && languageCombo.selectedIndex != idx) {
+            languageCombo.selectedIndex = idx
+        }
+    }
+
     init {
         border = JBUI.Borders.empty()
 
@@ -65,6 +76,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             foreground = JBColor.GRAY
         })
         buttonRow.add(languageCombo)
+        languageCombo.addActionListener { onLanguageChanged?.invoke(getSelectedLanguage()) }
         buttonRow.add(runButton)
         buttonRow.add(addButton)
         topPanel.add(buttonRow)
