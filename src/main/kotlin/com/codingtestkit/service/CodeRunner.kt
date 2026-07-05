@@ -9,6 +9,13 @@ import java.util.concurrent.atomic.AtomicLong
 
 object CodeRunner {
 
+    /**
+     * 컴파일 단계 전용 타임아웃.
+     * 컴파일 시간은 문제의 실행 시간 제한과 무관하며, 저사양·콜드 캐시 환경(CI 등)에서는
+     * rustc/go/kotlinc가 10초를 훌쩍 넘길 수 있어 넉넉하게 잡는다.
+     */
+    private const val COMPILE_TIMEOUT_SECONDS = 60L
+
     data class RunResult(
         val output: String,
         val error: String,
@@ -822,7 +829,7 @@ end
 
             val compile = executeProcess(
                 javacCommand(solutionFile, mainFile),
-                dir, "", timeout
+                dir, "", COMPILE_TIMEOUT_SECONDS
             )
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
@@ -844,7 +851,7 @@ end
 
             val compile = executeProcess(
                 javacCommand(solutionFile, mainFile),
-                dir, "", timeout
+                dir, "", COMPILE_TIMEOUT_SECONDS
             )
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
@@ -855,7 +862,7 @@ end
         val sourceFile = File(dir, "$className.java")
         sourceFile.writeText(code, StandardCharsets.UTF_8)
 
-        val compile = executeProcess(javacCommand(sourceFile), dir, "", timeout)
+        val compile = executeProcess(javacCommand(sourceFile), dir, "", COMPILE_TIMEOUT_SECONDS)
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
         }
@@ -935,7 +942,7 @@ end
 
         val compile = executeProcess(
             listOf(gppPath, "-std=c++17", "-O2", "-o", outputFile.absolutePath, sourceFile.absolutePath),
-            dir, "", timeout
+            dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
@@ -959,7 +966,7 @@ end
         // Windows에서 kotlinc가 구버전 JDK(<18)로 실행되면 MS949로 소스를 읽어 한글이 깨지는 것을 방지.
         val compile = executeProcess(
             listOf(kotlincPath, "-J-Dfile.encoding=UTF-8", sourceFile.absolutePath, "-include-runtime", "-d", jarFile.absolutePath),
-            dir, "", timeout * 2
+            dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
@@ -994,7 +1001,7 @@ end
 
         val compile = executeProcess(
             listOf(rustcPath, "-O", "--edition", "2021", "-o", outputFile.absolutePath, sourceFile.absolutePath),
-            dir, "", timeout * 2
+            dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
@@ -1016,7 +1023,7 @@ end
 
         val compile = executeProcess(
             listOf(goPath, "build", "-o", outputFile.absolutePath, sourceFile.absolutePath),
-            dir, "", timeout * 2
+            dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
