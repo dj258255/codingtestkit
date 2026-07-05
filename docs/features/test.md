@@ -47,6 +47,10 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
   <img src="../screenshots/programmers-test.png" width="700" alt="Programmers Test"/>
 </p>
 
+### Language Selection
+
+The language selector in the Tests tab is synchronized with the one in the Problems tab — changing either one automatically updates the other.
+
 ### Supported Languages
 
 | Language | Compiler/Runtime | Notes |
@@ -89,6 +93,10 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 - **프로그래머스 / LeetCode**: solution 함수를 자동으로 테스트 하네스로 래핑
   - 클래스 기반(LeetCode)과 순수 함수(프로그래머스) 패턴 자동 감지
   - 각 언어에 맞는 드라이버 코드 자동 생성
+
+### 언어 선택
+
+테스트 탭의 언어 콤보는 문제 탭의 언어 콤보와 양방향으로 동기화됩니다 — 한쪽에서 언어를 바꾸면 다른 쪽도 자동으로 바뀝니다.
 
 ### 지원 언어
 

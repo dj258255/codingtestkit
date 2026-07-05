@@ -47,7 +47,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | Go | O | X | O | O |
 | Ruby | O | X | O | O |
 
-> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby).
+> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). Selecting an unsupported combination shows a warning next to the platform/language selectors immediately.
 
 ---
 
@@ -65,6 +65,8 @@ Select the platform and language, enter a problem number, and the problem descri
 - **SWEA**: Enter problem number or paste URL
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
 - **Codeforces**: contestId+letter (e.g., `1234A`) or URL
+
+> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to the built-in JCEF browser (may take ~5–20 seconds longer).
 
 <p align="center">
   <img src="screenshots/main-panel.png" width="500" alt="Main Panel"/>

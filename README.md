@@ -73,7 +73,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | Go | O | X | O | O |
 | Ruby | O | X | O | O |
 
-> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby).
+> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). Selecting an unsupported combination shows a warning next to the platform/language selectors immediately.
 
 ---
 
@@ -107,6 +107,8 @@ Select the platform and language, enter a problem number, and the problem descri
 - **SWEA**: Enter problem number or paste URL
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
 - **Codeforces**: contestId+letter (e.g., `1234A`) or URL
+
+> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to the built-in JCEF browser (may take ~5–20 seconds longer).
 
 <p align="center">
   <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="Fetch, Test & Submit"/>
@@ -414,7 +416,7 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 | Go | O | X | O | O |
 | Ruby | O | X | O | O |
 
-> X = 해당 플랫폼 제출 미지원. 로컬 테스트 실행은 모든 언어 지원 (컴파일러/런타임 설치 필요: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby).
+> X = 해당 플랫폼 제출 미지원. 로컬 테스트 실행은 모든 언어 지원 (컴파일러/런타임 설치 필요: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). 제출 미지원 조합을 선택하면 플랫폼/언어 콤보 옆에 즉시 경고가 표시됩니다.
 
 ---
 
@@ -448,6 +450,8 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 - **SWEA**: 문제 번호 또는 URL 붙여넣기
 - **LeetCode**: 문제 번호, slug, 또는 URL 입력 (예: `1`, `two-sum`, URL)
 - **Codeforces**: 콘테스트번호+문제번호 (예: `1234A`) 또는 URL
+
+> Codeforces: Cloudflare가 요청을 차단하면 내장 JCEF 브라우저로 자동 폴백합니다 (약 5~20초 더 걸릴 수 있음).
 
 <p align="center">
   <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="문제 가져오기 & 테스트 & 제출"/>

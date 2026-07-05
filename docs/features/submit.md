@@ -26,6 +26,14 @@ Click the **Login** button for any platform. A built-in browser opens the platfo
 4. **Language** dropdown is automatically selected to match your code
 5. Verify and click the platform's submit button
 
+### Unsupported Combination Warning
+
+Some (platform, language) combinations cannot be submitted (e.g., Rust on Programmers; Kotlin, JavaScript, Rust, Go, or Ruby on SWEA). When you select such a combination, a warning appears next to the platform/language selectors immediately:
+
+> ⚠ Rust — cannot submit to Programmers (local testing only)
+
+Local test execution still works for every combination — only submission is restricted.
+
 ### Auto Language Selection
 
 The language dropdown is automatically set on all platforms:
@@ -66,6 +74,14 @@ After submitting, the plugin monitors the page for verdict:
 3. **코드**가 에디터에 자동 입력
 4. **언어** 드롭다운이 코드 작성 언어에 맞춰 자동 선택
 5. 확인 후 플랫폼의 제출 버튼 클릭
+
+### 제출 미지원 조합 경고
+
+일부 (플랫폼, 언어) 조합은 제출이 불가능합니다 (예: 프로그래머스 × Rust, SWEA × Kotlin/JavaScript/Rust/Go/Ruby). 이런 조합을 선택하면 플랫폼/언어 콤보 옆에 즉시 경고가 표시됩니다:
+
+> ⚠ Rust — 프로그래머스 제출 미지원 (로컬 테스트만 가능)
+
+로컬 테스트 실행은 모든 조합에서 가능하며, 제출만 제한됩니다.
 
 ### 언어 자동 선택
 
