@@ -40,6 +40,11 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
 
         add(tabbedPane, BorderLayout.CENTER)
 
+        // Problems ↔ Tests 언어 선택 양방향 동기화
+        // (setLanguage가 같은 값이면 무시하므로 콜백이 무한 순환하지 않음)
+        problemPanel.onLanguageChanged = { testPanel.setLanguage(it) }
+        testPanel.onLanguageChanged = { problemPanel.setLanguage(it) }
+
         // 문제를 가져오면 테스트 패널에 테스트 케이스 전달
         problemPanel.onProblemFetched = { problem ->
             testPanel.setProblemSource(problem.source)

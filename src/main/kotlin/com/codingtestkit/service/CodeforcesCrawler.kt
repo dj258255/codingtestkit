@@ -21,14 +21,29 @@ object CodeforcesCrawler {
         return match.groupValues[1] to match.groupValues[2].uppercase()
     }
 
-    fun fetchProblem(problemId: String): Problem {
+    fun fetchProblem(problemId: String, cookies: String = ""): Problem {
         val (contestId, letter) = parseProblemId(problemId)
 
-        val doc = Jsoup.connect("${BASE_URL}$contestId/$letter?locale=en")
-            .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        // 로그인 쿠키(cf_clearance 포함)를 함께 보내면 Cloudflare 챌린지를 통과할 수 있음.
+        // cf_clearance는 User-Agent에 바인딩되므로 JCEF(Chrome)와 유사한 UA를 사용.
+        val connection = Jsoup.connect("${BASE_URL}$contestId/$letter?locale=en")
+            .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
             .timeout(30000)
-            .get()
+        if (cookies.isNotBlank()) connection.header("Cookie", cookies)
+        val doc = connection.get()
+        return parseProblemDoc(doc, contestId, letter)
+    }
 
+    /**
+     * JCEF 폴백 경로: 브라우저가 렌더링한 HTML을 동일한 파서로 처리.
+     * Cloudflare가 Jsoup의 TLS 지문을 차단할 때 사용된다.
+     */
+    fun parseProblemHtml(html: String, problemId: String): Problem {
+        val (contestId, letter) = parseProblemId(problemId)
+        return parseProblemDoc(Jsoup.parse(html, "https://codeforces.com"), contestId, letter)
+    }
+
+    private fun parseProblemDoc(doc: org.jsoup.nodes.Document, contestId: String, letter: String): Problem {
         // 이미지: 상대 경로 → 절대 경로, 고정 크기 제거
         doc.select("img[src]").forEach { img ->
             val src = img.attr("src")

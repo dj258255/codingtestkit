@@ -17,14 +17,12 @@ class DuplicateClassHighlightFilter : HighlightInfoFilter {
         if (file == null) return true
         if (info.severity != HighlightSeverity.ERROR) return true
         val desc = info.description ?: return true
-        val filePath = file.virtualFile?.path ?: return true
+        if (file.virtualFile == null) return true
 
-        // src 파일에서 problems/ 내 파일을 가리키는 중복 클래스 오류 숨김
+        // 중복 클래스 오류 메시지가 problems/ 내 파일을 가리키면 숨김
         // 예: "파일 '/path/problems/.../Main.java'에서 중복된 클래스가 발견되었습니다"
-        if (desc.contains("/problems/")) return false
-
-        // problems 파일에서 외부 파일을 가리키는 중복 클래스 오류 숨김
-        if (filePath.contains("/problems/") && desc.contains("\\problems\\")) return false
+        // Windows는 메시지의 경로가 \ 구분자로 나오므로 통일 후 비교
+        if (desc.replace('\\', '/').contains("/problems/")) return false
 
         return true
     }

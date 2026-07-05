@@ -163,7 +163,9 @@ class CodeSubmitDialog(
         Language.PYTHON to "python3",
         Language.CPP to "cpp",
         Language.KOTLIN to "kotlin",
-        Language.JAVASCRIPT to "javascript"
+        Language.JAVASCRIPT to "javascript",
+        Language.GO to "go",
+        Language.RUBY to "ruby"
     )
 
     private fun handleProgrammersLoad(cefBrowser: CefBrowser?, url: String) {
@@ -190,12 +192,16 @@ class CodeSubmitDialog(
         Language.CPP -> "C++"
         Language.KOTLIN -> "Kotlin"
         Language.JAVASCRIPT -> "JavaScript"
+        Language.RUST -> "Rust" // 프로그래머스 미지원 — 드롭다운에 없으므로 언어 전환 없이 코드만 입력됨
+        Language.GO -> "Go"
+        Language.RUBY -> "Ruby"
     }
 
     private fun injectProgrammersCode(cefBrowser: CefBrowser?) {
         if (cefBrowser == null) return
         val escaped = escapeForJs(code)
-        val langValue = programmersLangMap[language] ?: "java"
+        // 맵에 없는 언어(프로그래머스 미지원)는 드롭다운과 매칭되지 않는 값으로 두어 언어 전환을 건너뜀
+        val langValue = programmersLangMap[language] ?: language.displayName.lowercase()
         val langDisplay = getProgrammersLangDisplayName()
 
         val js = """
@@ -420,6 +426,9 @@ class CodeSubmitDialog(
         Language.CPP -> "C++"
         Language.KOTLIN -> "Kotlin"
         Language.JAVASCRIPT -> "JavaScript"
+        Language.RUST -> "Rust"
+        Language.GO -> "Go"
+        Language.RUBY -> "Ruby"
     }
 
     private fun injectLeetCodeCode(cefBrowser: CefBrowser?) {
@@ -514,6 +523,9 @@ class CodeSubmitDialog(
         Language.CPP -> "GNU C++20"
         Language.KOTLIN -> "Kotlin"
         Language.JAVASCRIPT -> "Node.js"
+        Language.RUST -> "Rust"
+        Language.GO -> "Go"
+        Language.RUBY -> "Ruby"
     }
 
     private fun handleCodeforcesLoad(cefBrowser: CefBrowser?, url: String) {

@@ -68,6 +68,12 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | Python | O | O | O | O |
 | C++ | O | O | O | O |
 | Kotlin | O | X | O | O |
+| JavaScript | O | X | O | O |
+| Rust | X | X | O | O |
+| Go | O | X | O | O |
+| Ruby | O | X | O | O |
+
+> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). Selecting an unsupported combination shows a warning next to the platform/language selectors immediately.
 
 ---
 
@@ -83,12 +89,13 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | 4 | [**Login & Submit**](docs/features/submit.md) | Submit code directly via built-in browser with auto language selection |
 | 5 | [**Problem Search**](docs/features/search.md) | Search problems on LeetCode, Codeforces, Programmers, and SWEA |
 | 6 | [**Random Problem Picker**](docs/features/random.md) | Pick random problems with tier/difficulty/tag filters |
-| 7 | [**Code Editor**](#code-editor) | Auto-generated boilerplate code per platform & language |
-| 8 | [**Code Templates**](docs/features/templates.md) | Save & reuse frequently used code snippets |
-| 9 | [**Timer**](docs/features/timer.md) | Stopwatch with laps + countdown with circular dial, progress bar, digital clock |
-| 10 | [**Settings & Exam Mode**](docs/features/exam-mode.md) | One-click exam mode: block paste, disable autocomplete, focus alert |
-| 11 | [**GitHub Integration**](docs/features/github.md) | Auto-push accepted solutions to GitHub |
-| 12 | [**Internationalization**](#internationalization-i18n) | Full Korean / English UI support |
+| 7 | **My Solved** | List your solved problems on LeetCode & Codeforces |
+| 8 | [**Code Editor**](#code-editor) | Auto-generated boilerplate code per platform & language |
+| 9 | [**Code Templates**](docs/features/templates.md) | Save & reuse frequently used code snippets |
+| 10 | [**Timer**](docs/features/timer.md) | Stopwatch with laps + countdown with circular dial, progress bar, digital clock |
+| 11 | [**Settings & Exam Mode**](docs/features/exam-mode.md) | One-click exam mode: block paste, disable autocomplete, focus alert |
+| 12 | [**GitHub Integration**](docs/features/github.md) | Auto-push accepted solutions to GitHub |
+| 13 | [**Internationalization**](#internationalization-i18n) | Full Korean / English UI support |
 
 ---
 
@@ -100,6 +107,8 @@ Select the platform and language, enter a problem number, and the problem descri
 - **SWEA**: Enter problem number or paste URL
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
 - **Codeforces**: contestId+letter (e.g., `1234A`) or URL
+
+> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to the built-in JCEF browser (may take ~5–20 seconds longer).
 
 <p align="center">
   <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="Fetch, Test & Submit"/>
@@ -122,7 +131,7 @@ When a problem is fetched, a folder is automatically created with a code file an
 ### Problem View & Translation
 
 <p align="center">
-  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="Fetch Example"/>
+  <img src="docs/screenshots/problem-view-1.png" width="700" alt="Fetch Example"/>
 </p>
 
 View the problem description, I/O format, and examples directly in the plugin panel.
@@ -193,18 +202,10 @@ Programmers and LeetCode solution functions are automatically wrapped for testin
 Log in to each platform via the built-in JCEF browser and submit your code directly. The language dropdown is **automatically selected** to match your code.
 
 <p align="center">
-  <img src="docs/screenshots/boj-login.png" width="600" alt="Platform Login"/>
+  <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="Fetch → Test → Submit"/>
 </p>
 
 Click **Submit**, confirm the dialog, and your code & language are auto-filled.
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
-</p>
 
 <p align="right"><a href="#features">Back to Features</a></p>
 
@@ -297,11 +298,12 @@ Provides a **Stopwatch** and a **Countdown Timer**.
 
 - **Auto Complete ON/OFF**: Toggle code auto-completion popups
 - **Inspections ON/OFF**: Enable power save mode to stop background analysis
+- **Code Vision ON/OFF**: Hide "N usages" and other Code Vision hints in the editor
 - **Paste Block**: Block pasting text copied from external programs
 - **Focus Alert**: Show alert when IDE window loses focus
 - **Language**: Switch between Korean / English
 
-One-click **Exam Mode** enables all 4 restrictions; **Normal Mode** disables them all.
+One-click **Exam Mode** enables all 5 restrictions; **Normal Mode** disables them all.
 
 <p align="center">
   <img src="docs/screenshots/settings.gif" width="700" alt="Settings"/>
@@ -357,8 +359,8 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 
 ## Requirements
 
-- IntelliJ IDEA 2024.1+
-- JDK 17+ (for Java execution)
+- IntelliJ IDEA 2024.3+
+- JDK 17+ (for Java execution) — building the plugin from source requires JDK 21
 - Language compilers (for respective language tests)
 
 ## Build
@@ -409,6 +411,12 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 | Python | O | O | O | O |
 | C++ | O | O | O | O |
 | Kotlin | O | X | O | O |
+| JavaScript | O | X | O | O |
+| Rust | X | X | O | O |
+| Go | O | X | O | O |
+| Ruby | O | X | O | O |
+
+> X = 해당 플랫폼 제출 미지원. 로컬 테스트 실행은 모든 언어 지원 (컴파일러/런타임 설치 필요: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). 제출 미지원 조합을 선택하면 플랫폼/언어 콤보 옆에 즉시 경고가 표시됩니다.
 
 ---
 
@@ -424,12 +432,13 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 | 4 | [**로그인 & 제출**](docs/features/submit.md) | 내장 브라우저로 코드 제출 + 언어 자동 선택 |
 | 5 | [**문제 검색**](docs/features/search.md) | LeetCode, Codeforces, 프로그래머스, SWEA 문제 검색 |
 | 6 | [**랜덤 문제 뽑기**](docs/features/random.md) | 티어/난이도/태그 필터로 랜덤 문제 추천 |
-| 7 | [**코드 에디터**](#코드-에디터) | 플랫폼 & 언어별 보일러플레이트 코드 자동 생성 |
-| 8 | [**코드 템플릿**](docs/features/templates.md) | 자주 쓰는 코드 스니펫 저장 & 재사용 |
-| 9 | [**타이머**](docs/features/timer.md) | 스톱워치 + 원형 다이얼/프로그레스 바/디지털 시계 카운트다운 |
-| 10 | [**설정 & 시험 모드**](docs/features/exam-mode.md) | 원클릭 시험 모드: 붙여넣기 차단, 자동완성 끄기, 포커스 감지 |
-| 11 | [**GitHub 연동**](docs/features/github.md) | 맞은 문제 자동 GitHub 푸시 |
-| 12 | [**다국어 지원**](#다국어-지원-i18n) | 한국어 / English UI 완전 지원 |
+| 7 | **내 풀이** | LeetCode & Codeforces에서 내가 푼 문제 목록 확인 |
+| 8 | [**코드 에디터**](#코드-에디터) | 플랫폼 & 언어별 보일러플레이트 코드 자동 생성 |
+| 9 | [**코드 템플릿**](docs/features/templates.md) | 자주 쓰는 코드 스니펫 저장 & 재사용 |
+| 10 | [**타이머**](docs/features/timer.md) | 스톱워치 + 원형 다이얼/프로그레스 바/디지털 시계 카운트다운 |
+| 11 | [**설정 & 시험 모드**](docs/features/exam-mode.md) | 원클릭 시험 모드: 붙여넣기 차단, 자동완성 끄기, 포커스 감지 |
+| 12 | [**GitHub 연동**](docs/features/github.md) | 맞은 문제 자동 GitHub 푸시 |
+| 13 | [**다국어 지원**](#다국어-지원-i18n) | 한국어 / English UI 완전 지원 |
 
 ---
 
@@ -441,6 +450,8 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 - **SWEA**: 문제 번호 또는 URL 붙여넣기
 - **LeetCode**: 문제 번호, slug, 또는 URL 입력 (예: `1`, `two-sum`, URL)
 - **Codeforces**: 콘테스트번호+문제번호 (예: `1234A`) 또는 URL
+
+> Codeforces: Cloudflare가 요청을 차단하면 내장 JCEF 브라우저로 자동 폴백합니다 (약 5~20초 더 걸릴 수 있음).
 
 <p align="center">
   <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="문제 가져오기 & 테스트 & 제출"/>
@@ -463,7 +474,7 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 ### 문제 보기 & 번역
 
 <p align="center">
-  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="문제 가져오기 예시"/>
+  <img src="docs/screenshots/problem-view-1.png" width="700" alt="문제 가져오기 예시"/>
 </p>
 
 플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다.
@@ -534,18 +545,10 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 내장 JCEF 브라우저를 통해 각 플랫폼에 로그인하고, 코드를 직접 제출할 수 있습니다. 제출 시 코드 작성 언어에 맞춰 **언어 드롭다운이 자동 선택**됩니다.
 
 <p align="center">
-  <img src="docs/screenshots/boj-login.png" width="600" alt="플랫폼 로그인"/>
+  <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="가져오기 → 테스트 → 제출"/>
 </p>
 
 **제출** 버튼을 누르면 제출 확인 다이얼로그가 표시되고, 코드와 언어가 자동으로 입력됩니다.
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="제출 확인"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="코드 자동 입력"/>
-</p>
 
 <p align="right"><a href="#주요-기능">기능 목록으로</a></p>
 
@@ -638,11 +641,12 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 - **자동완성 ON/OFF**: 코드 자동완성 팝업을 끄고 켤 수 있습니다
 - **코드 검사 ON/OFF**: 절전 모드를 활성화하여 백그라운드 분석을 중지합니다
+- **사용 위치 힌트 끄기 (Code Vision)**: 에디터의 'N개 사용 위치' 등 Code Vision 힌트를 숨깁니다
 - **외부 붙여넣기 차단**: 외부 프로그램에서 복사한 텍스트의 붙여넣기를 차단합니다
 - **포커스 이탈 감지**: IDE 창에서 포커스가 벗어나면 경고를 표시합니다
 - **언어 설정**: 한국어 / English 전환 가능
 
-**시험 모드** 버튼을 누르면 4가지 설정이 한 번에 적용되고, **일반 모드** 버튼을 누르면 모두 해제됩니다.
+**시험 모드** 버튼을 누르면 5가지 설정이 한 번에 적용되고, **일반 모드** 버튼을 누르면 모두 해제됩니다.
 
 <p align="center">
   <img src="docs/screenshots/settings.gif" width="700" alt="설정"/>
@@ -698,8 +702,8 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 ## 요구 사항
 
-- IntelliJ IDEA 2024.1 이상
-- JDK 17 이상 (Java 실행용)
+- IntelliJ IDEA 2024.3 이상
+- JDK 17 이상 (Java 실행용) — 플러그인을 소스에서 직접 빌드하려면 JDK 21 필요
 - 각 언어 컴파일러 (해당 언어 테스트 시)
 
 ## 빌드

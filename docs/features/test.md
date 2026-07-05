@@ -47,6 +47,10 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
   <img src="../screenshots/programmers-test.png" width="700" alt="Programmers Test"/>
 </p>
 
+### Language Selection
+
+The language selector in the Tests tab is synchronized with the one in the Problems tab — changing either one automatically updates the other.
+
 ### Supported Languages
 
 | Language | Compiler/Runtime | Notes |
@@ -56,6 +60,9 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 | C++ | `g++` | C++17 standard |
 | Kotlin | `kotlinc` + `kotlin` | JVM-based execution |
 | JavaScript | `node` | Node.js runtime |
+| Rust | `rustc` | Install via rustup — auto-detects `~/.cargo/bin` |
+| Go | `go` | Install from go.dev/dl — auto-detects `/usr/local/go/bin`, `/opt/homebrew` |
+| Ruby | `ruby` | Install via `brew install ruby` or rbenv — auto-detects `/opt/homebrew`, rbenv shims |
 
 ### Comparison Logic
 
@@ -87,6 +94,10 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
   - 클래스 기반(LeetCode)과 순수 함수(프로그래머스) 패턴 자동 감지
   - 각 언어에 맞는 드라이버 코드 자동 생성
 
+### 언어 선택
+
+테스트 탭의 언어 콤보는 문제 탭의 언어 콤보와 양방향으로 동기화됩니다 — 한쪽에서 언어를 바꾸면 다른 쪽도 자동으로 바뀝니다.
+
 ### 지원 언어
 
 | 언어 | 컴파일러/런타임 | 비고 |
@@ -96,6 +107,9 @@ Failed cases are highlighted in red and auto-expanded for easy debugging.
 | C++ | `g++` | C++17 표준 |
 | Kotlin | `kotlinc` + `kotlin` | JVM 기반 실행 |
 | JavaScript | `node` | Node.js 런타임 |
+| Rust | `rustc` | rustup으로 설치 — `~/.cargo/bin` 자동 감지 |
+| Go | `go` | go.dev/dl에서 설치 — `/usr/local/go/bin`, `/opt/homebrew` 자동 감지 |
+| Ruby | `ruby` | `brew install ruby` 또는 rbenv로 설치 — `/opt/homebrew`, rbenv shims 자동 감지 |
 
 ### 비교 로직
 

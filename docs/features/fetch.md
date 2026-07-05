@@ -21,8 +21,8 @@ Select the platform and language, enter a problem number, and the problem descri
 
 ### What Happens After Fetch
 
-1. A **folder** is created under your project: `[Platform] ProblemNumber - Title/`
-2. A **code file** with boilerplate is generated (e.g., `Main.java`, `solution.py`)
+1. A **folder** is created under your project: `problems/{platform}/{difficulty}/{id}. {title}/` (e.g., `problems/LeetCode/Medium/1. Two Sum/`; `Unrated` is used when the difficulty is unknown)
+2. A **code file** with boilerplate is generated — `Solution.java` / `Solution.py` etc. for Programmers, SWEA, and LeetCode; `Main.*` for Codeforces
 3. A **README.md** with the problem description is optionally created (toggle in Settings)
 4. **Test cases** are automatically extracted and ready to run
 
@@ -55,6 +55,11 @@ Select the platform and language, enter a problem number, and the problem descri
 - Extracts code snippets, example test cases, and metadata
 - Supports number (`1`), slug (`two-sum`), and full URL input
 
+#### Codeforces
+- Fetches via HTTP crawling first; if Cloudflare blocks the request (e.g., 403), automatically falls back to the built-in offscreen JCEF browser, which passes the challenge and extracts the page
+- When the fallback engages, fetching may take about 5–20 seconds longer
+- Requires an IDE with JCEF support (all recent IntelliJ versions)
+
 ---
 
 ## 한국어
@@ -72,8 +77,8 @@ Select the platform and language, enter a problem number, and the problem descri
 
 ### 가져오기 후 결과
 
-1. 프로젝트 내에 **폴더**가 생성됩니다: `[플랫폼] 문제번호 - 제목/`
-2. 보일러플레이트가 포함된 **코드 파일**이 생성됩니다 (예: `Main.java`, `solution.py`)
+1. 프로젝트 내에 **폴더**가 생성됩니다: `problems/{플랫폼}/{난이도}/{문제번호}. {제목}/` (예: `problems/LeetCode/Medium/1. Two Sum/`, 난이도를 알 수 없으면 `Unrated`)
+2. 보일러플레이트가 포함된 **코드 파일**이 생성됩니다 — 프로그래머스·SWEA·LeetCode는 `Solution.java` / `Solution.py` 등, Codeforces는 `Main.*`
 3. 문제 설명이 담긴 **README.md**가 선택적으로 생성됩니다 (설정에서 토글 가능)
 4. **테스트 케이스**가 자동 추출되어 바로 실행 가능합니다
 
@@ -93,3 +98,8 @@ Select the platform and language, enter a problem number, and the problem descri
 - GraphQL API로 가져옴
 - 코드 스니펫, 예제 테스트 케이스, 메타데이터 추출
 - 번호(`1`), slug(`two-sum`), 전체 URL 입력 지원
+
+#### Codeforces
+- HTTP 크롤링으로 먼저 가져오고, Cloudflare에 차단(403 등)되면 내장 오프스크린 JCEF 브라우저로 자동 폴백하여 챌린지를 통과한 뒤 페이지를 추출
+- 폴백이 동작하면 가져오기가 약 5~20초 더 걸릴 수 있음
+- JCEF를 지원하는 IDE 필요 (최근 IntelliJ 버전은 모두 지원)

@@ -47,6 +47,41 @@ class ModelsTest {
         assertEquals("py", Language.PYTHON.extension)
         assertEquals("cpp", Language.CPP.extension)
         assertEquals("kt", Language.KOTLIN.extension)
+        assertEquals("js", Language.JAVASCRIPT.extension)
+        assertEquals("rs", Language.RUST.extension)
+        assertEquals("go", Language.GO.extension)
+        assertEquals("rb", Language.RUBY.extension)
+    }
+
+    @Test
+    fun `Rust Go Ruby defaultCode for Programmers has solution function`() {
+        assertTrue(Language.RUST.defaultCode(ProblemSource.PROGRAMMERS).contains("fn solution"))
+        assertTrue(Language.GO.defaultCode(ProblemSource.PROGRAMMERS).contains("func solution"))
+        assertTrue(Language.RUBY.defaultCode(ProblemSource.PROGRAMMERS).contains("def solution"))
+    }
+
+    @Test
+    fun `Rust Go Ruby are not submittable to SWEA`() {
+        assertTrue(Language.RUST.sweaId < 0)
+        assertTrue(Language.GO.sweaId < 0)
+        assertTrue(Language.RUBY.sweaId < 0)
+    }
+
+    @Test
+    fun `isSubmittable matrix matches platform support`() {
+        // 리트코드/코드포스는 전 언어 제출 가능
+        for (lang in Language.entries) {
+            assertTrue(lang.isSubmittable(ProblemSource.LEETCODE))
+            assertTrue(lang.isSubmittable(ProblemSource.CODEFORCES))
+        }
+        // 프로그래머스는 Rust만 미지원
+        assertFalse(Language.RUST.isSubmittable(ProblemSource.PROGRAMMERS))
+        assertTrue(Language.GO.isSubmittable(ProblemSource.PROGRAMMERS))
+        assertTrue(Language.RUBY.isSubmittable(ProblemSource.PROGRAMMERS))
+        // SWEA는 sweaId 기반
+        assertTrue(Language.JAVA.isSubmittable(ProblemSource.SWEA))
+        assertFalse(Language.KOTLIN.isSubmittable(ProblemSource.SWEA))
+        assertFalse(Language.RUST.isSubmittable(ProblemSource.SWEA))
     }
 
     @Test

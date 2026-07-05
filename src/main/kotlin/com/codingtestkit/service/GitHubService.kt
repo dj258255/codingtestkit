@@ -45,12 +45,33 @@ class GitHubService : PersistentStateComponent<GitHubService.GitHubState> {
     private val tokenCredentialAttributes: CredentialAttributes =
         CredentialAttributes(generateServiceName("CodingTestKit", "github.token"))
 
+    /**
+     * PasswordSafe(OS 키체인) 접근은 느려서 EDT에서 호출하면 SlowOperations 위반.
+     * AuthService와 동일하게 메모리 캐시로 읽고, 쓰기는 백그라운드로 영속화한다.
+     */
+    @Volatile
+    private var cachedToken: String? = null
+    private val persistExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "CodingTestKit-GitHubPersist").apply { isDaemon = true }
+    }
+
+    init {
+        persistExecutor.execute {
+            if (cachedToken == null) {
+                cachedToken = PasswordSafe.instance.getPassword(tokenCredentialAttributes) ?: ""
+            }
+        }
+    }
+
     private fun writeToken(value: String) {
-        PasswordSafe.instance.setPassword(tokenCredentialAttributes, value.ifBlank { null })
+        cachedToken = value
+        persistExecutor.execute {
+            PasswordSafe.instance.setPassword(tokenCredentialAttributes, value.ifBlank { null })
+        }
     }
 
     private fun readToken(): String =
-        PasswordSafe.instance.getPassword(tokenCredentialAttributes) ?: ""
+        cachedToken ?: (PasswordSafe.instance.getPassword(tokenCredentialAttributes) ?: "").also { cachedToken = it }
 
     val token: String get() = readToken()
     val repoFullName: String get() = state.repoFullName

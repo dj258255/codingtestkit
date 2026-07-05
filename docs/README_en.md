@@ -42,6 +42,12 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | Python | O | O | O | O |
 | C++ | O | O | O | O |
 | Kotlin | O | X | O | O |
+| JavaScript | O | X | O | O |
+| Rust | X | X | O | O |
+| Go | O | X | O | O |
+| Ruby | O | X | O | O |
+
+> X = submission not supported on that platform. Local test execution works for all languages (compiler/runtime must be installed: JDK, python3, g++, kotlinc, Node.js, rustc, go, ruby). Selecting an unsupported combination shows a warning next to the platform/language selectors immediately.
 
 ---
 
@@ -49,7 +55,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 
 ### Internationalization (i18n)
 
-Switch between **Korean / English** in settings. All UI text is displayed in the selected language. The language change note is shown in both languages simultaneously.
+Switch between **Korean / English** in settings. All UI text is displayed in the selected language. A note reminds you to reopen the tool window to apply changes.
 
 ### Fetch Problems
 
@@ -59,6 +65,8 @@ Select the platform and language, enter a problem number, and the problem descri
 - **SWEA**: Enter problem number or paste URL
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
 - **Codeforces**: contestId+letter (e.g., `1234A`) or URL
+
+> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to the built-in JCEF browser (may take ~5–20 seconds longer).
 
 <p align="center">
   <img src="screenshots/main-panel.png" width="500" alt="Main Panel"/>
@@ -82,7 +90,7 @@ When a problem is fetched, a folder is automatically created with a code file an
 ### Problem View & Translation
 
 <p align="center">
-  <img src="screenshots/boj-submit-success.png" width="700" alt="Fetch Example"/>
+  <img src="screenshots/problem-view-1.png" width="700" alt="Fetch Example"/>
 </p>
 
 View the problem description, I/O format, and examples directly in the plugin panel.
@@ -146,11 +154,7 @@ Log in to each platform via the built-in JCEF browser and submit your code direc
 Click **Submit**, confirm the dialog, and your code & language are auto-filled.
 
 <p align="center">
-  <img src="screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
-</p>
-
-<p align="center">
-  <img src="screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
+  <img src="screenshots/fetch-test-submit.gif" width="700" alt="Fetch → Test → Submit"/>
 </p>
 
 Login and submission work the same way for Programmers, SWEA, LeetCode, and Codeforces.
@@ -227,11 +231,12 @@ Practice under conditions identical to real coding tests.
 
 - **Auto Complete ON/OFF**: Toggle code auto-completion popups
 - **Inspections ON/OFF**: Enable power save mode to stop background analysis
+- **Code Vision ON/OFF**: Hide "N usages" and other Code Vision hints in the editor
 - **Paste Block**: Block pasting text copied from external programs (internal copy/paste works normally)
 - **Focus Alert**: Show alert when IDE window loses focus (same as cheating detection in real tests)
-- **Language**: Switch between Korean / English (bilingual note)
+- **Language**: Switch between Korean / English (a note reminds you to reopen the tool window to apply changes)
 
-One-click **Exam Mode** enables all 4 restrictions; **Normal Mode** disables them all.
+One-click **Exam Mode** enables all 5 restrictions; **Normal Mode** disables them all.
 
 <p align="center">
   <img src="screenshots/settings.png" width="600" alt="Settings"/>
@@ -321,8 +326,8 @@ Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repo
 
 ## Requirements
 
-- IntelliJ IDEA 2024.1+
-- JDK 17+ (for Java execution)
+- IntelliJ IDEA 2024.3+
+- JDK 17+ (for Java execution) — building the plugin from source requires JDK 21
 - Language compilers (for respective language tests)
 
 ## Build

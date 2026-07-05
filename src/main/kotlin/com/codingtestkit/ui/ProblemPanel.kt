@@ -50,6 +50,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         preferredSize = Dimension(JBUI.scale(90), preferredSize.height)
         renderer = createComboRenderer()
     }
+    private val submitSupportLabel = JLabel().apply {
+        font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
+        foreground = JBColor(Color(0xB0, 0x6A, 0x00), Color(0xE0, 0xA0, 0x50))
+        isVisible = false
+    }
     private val problemIdField = JTextField().apply {
         toolTipText = I18n.t("문제 번호 또는 URL을 입력하세요", "Enter problem number or URL")
     }
@@ -95,6 +100,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private var currentProblemHtml = ""
 
     var onProblemFetched: ((Problem) -> Unit)? = null
+
+    /** 언어 선택 변경 알림 (Tests 탭과 양방향 동기화용) */
+    var onLanguageChanged: ((Language) -> Unit)? = null
     private var currentProblem: Problem? = null
     private var currentProblemFolder: java.io.File? = null
     private var isTranslated = false
@@ -119,6 +127,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         row1.add(languageCombo)
         row1.add(loginButton)
         row1.add(githubLoginButton)
+        row1.add(submitSupportLabel)
         topPanel.add(row1)
 
         // Row 2: 문제번호 입력 + 가져오기 (WrapLayout으로 반응형)
@@ -236,12 +245,19 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
-        updateLoginButton()
-        updateGitHubButton()
 
-        // 백그라운드에서 저장된 쿠키 유효성 검증
+        // 첫 서비스 접근은 PasswordSafe(키체인)를 읽으므로 EDT 금지 —
+        // 백그라운드에서 캐시를 예열한 뒤 버튼 상태를 갱신하고, 이어서 쿠키 유효성 검증
         ApplicationManager.getApplication().executeOnPooledThread {
             val auth = AuthService.getInstance()
+            val github = GitHubService.getInstance()
+            for (source in ProblemSource.entries) auth.getCookies(source)
+            github.token
+            SwingUtilities.invokeLater {
+                updateLoginButton()
+                updateGitHubButton()
+            }
+
             for (source in ProblemSource.entries) {
                 if (auth.isLoggedIn(source)) {
                     if (!auth.validateSession(source)) {
@@ -255,6 +271,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         sourceCombo.addActionListener {
             updateLoginButton()
             updatePlaceholder()
+            updateSubmitSupportHint()
+        }
+        languageCombo.addActionListener {
+            updateSubmitSupportHint()
+            onLanguageChanged?.invoke(getSelectedLanguage())
         }
         fetchButton.addActionListener { fetchProblem() }
         randomButton.addActionListener { openRandomDialog() }
@@ -267,12 +288,30 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         githubLoginButton.addActionListener { handleGitHubLogin() }
         problemIdField.addActionListener { fetchProblem() }
         updatePlaceholder()
+        updateSubmitSupportHint()
 
         // 키보드 단축키 액션 등록
         CodingTestKitActionService.getInstance(project).apply {
             fetchAction = { fetchButton.doClick() }
             submitAction = { submitButton.doClick() }
             translateAction = { translateButton.doClick() }
+        }
+    }
+
+    /**
+     * 선택한 (플랫폼, 언어) 조합이 제출 미지원이면 콤보 옆에 즉시 경고 표시.
+     * 문제를 다 푼 뒤 제출 시점에야 미지원을 알게 되는 상황을 방지한다.
+     */
+    private fun updateSubmitSupportHint() {
+        val source = getSelectedSource()
+        val language = getSelectedLanguage()
+        val submittable = language.isSubmittable(source)
+        submitSupportLabel.isVisible = !submittable
+        if (!submittable) {
+            submitSupportLabel.text = I18n.t(
+                "⚠ ${language.displayName} — ${source.localizedName()} 제출 미지원 (로컬 테스트만 가능)",
+                "⚠ ${language.displayName} — cannot submit to ${source.localizedName()} (local testing only)"
+            )
         }
     }
 
@@ -333,6 +372,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     private fun getSelectedSource(): ProblemSource = ProblemSource.entries[sourceCombo.selectedIndex]
     private fun getSelectedLanguage(): Language = Language.entries[languageCombo.selectedIndex]
+
+    /** 외부(Tests 탭)에서 언어 동기화. 같은 값이면 무시해 콜백 루프를 끊는다. */
+    fun setLanguage(language: Language) {
+        val idx = Language.entries.indexOf(language)
+        if (idx >= 0 && languageCombo.selectedIndex != idx) {
+            languageCombo.selectedIndex = idx
+        }
+    }
 
     private fun updateLoginButton() {
         val source = getSelectedSource()
@@ -659,7 +706,15 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val problem = when (source) {
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
                     ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
-                    ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id)
+                    ProblemSource.CODEFORCES -> try {
+                        CodeforcesCrawler.fetchProblem(id, cookies)
+                    } catch (e: Exception) {
+                        // Cloudflare가 Jsoup을 차단(403)하면 실브라우저(JCEF)로 폴백
+                        if (CodeforcesJcefFetcher.isAvailable()) {
+                            CodeforcesJcefFetcher.fetchProblem(id)
+                                ?: throw IllegalStateException("${e.message}\nJCEF fallback: ${CodeforcesJcefFetcher.lastError}")
+                        } else throw e
+                    }
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 

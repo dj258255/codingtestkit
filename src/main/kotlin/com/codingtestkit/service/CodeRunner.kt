@@ -35,6 +35,9 @@ object CodeRunner {
                 Language.CPP -> runCpp(code, testCase.input, tempDir, timeoutSeconds)
                 Language.KOTLIN -> runKotlin(code, testCase.input, tempDir, timeoutSeconds)
                 Language.JAVASCRIPT -> runJavaScript(code, testCase.input, tempDir, timeoutSeconds)
+                Language.RUST -> runRust(code, testCase.input, tempDir, timeoutSeconds)
+                Language.GO -> runGo(code, testCase.input, tempDir, timeoutSeconds)
+                Language.RUBY -> runRuby(code, testCase.input, tempDir, timeoutSeconds)
             }
         } catch (e: Exception) {
             RunResult(output = "", error = e.message ?: "Unknown error", exitCode = -1)
@@ -69,6 +72,9 @@ object CodeRunner {
             Language.CPP -> wrapCpp(code, inputValues, parameterNames)
             Language.KOTLIN -> wrapKotlin(code, inputValues, parameterNames)
             Language.JAVASCRIPT -> wrapJavaScript(code, inputValues, parameterNames)
+            Language.RUST -> wrapRust(code, inputValues, parameterNames)
+            Language.GO -> wrapGo(code, inputValues, parameterNames)
+            Language.RUBY -> wrapRuby(code, inputValues, parameterNames)
         }
 
         val tempDir = createTempDir()
@@ -79,6 +85,9 @@ object CodeRunner {
                 Language.CPP -> runCpp(wrappedCode, "", tempDir, timeoutSeconds)
                 Language.KOTLIN -> runKotlin(wrappedCode, "", tempDir, timeoutSeconds)
                 Language.JAVASCRIPT -> runJavaScript(wrappedCode, "", tempDir, timeoutSeconds)
+                Language.RUST -> runRust(wrappedCode, "", tempDir, timeoutSeconds)
+                Language.GO -> runGo(wrappedCode, "", tempDir, timeoutSeconds)
+                Language.RUBY -> runRuby(wrappedCode, "", tempDir, timeoutSeconds)
             }
         } catch (e: Exception) {
             RunResult(output = "", error = e.message ?: "Unknown error", exitCode = -1)
@@ -94,6 +103,10 @@ object CodeRunner {
             Language.CPP -> code.contains("int main")
             Language.KOTLIN -> code.contains("fun main")
             Language.JAVASCRIPT -> code.contains("readline") || code.contains("process.stdin")
+            Language.RUST -> code.contains("fn main")
+            Language.GO -> code.contains("func main")
+            // Ruby는 main이 없으므로 stdin 사용 여부로 스크립트/함수 스타일을 구분
+            Language.RUBY -> code.contains("gets") || code.contains("STDIN")
         }
     }
 
@@ -447,6 +460,160 @@ else console.log(_result);
 """.trimIndent()
     }
 
+    /**
+     * Rust 배열 변환: [1,2,3] → vec![1,2,3], 문자열 → String::from("...")
+     */
+    private fun toRustLiteral(value: String): String {
+        val v = value.trim()
+        if (v.startsWith("\"")) return "String::from($v)"
+        if (!v.startsWith("[")) return v
+
+        if (v.startsWith("[[")) {
+            val inner = v.removePrefix("[").removeSuffix("]")
+            val arrays = mutableListOf<String>()
+            var depth = 0
+            var current = StringBuilder()
+            for (c in inner) {
+                if (c == '[') depth++
+                if (c == ']') depth--
+                current.append(c)
+                if (depth == 0 && current.isNotBlank()) {
+                    val arr = current.toString().trim().removePrefix(",").trim()
+                    if (arr.isNotBlank()) arrays.add(arr)
+                    current = StringBuilder()
+                }
+            }
+            val converted = arrays.joinToString(", ") { toRustLiteral(it) }
+            return "vec![$converted]"
+        }
+
+        val content = v.removePrefix("[").removeSuffix("]").trim()
+        if (content.isEmpty()) return "vec![]"
+        val first = content.split(",").firstOrNull()?.trim() ?: ""
+        return if (first.startsWith("\"")) {
+            val items = content.split(",").joinToString(", ") { "String::from(${it.trim()})" }
+            "vec![$items]"
+        } else {
+            "vec![$content]"
+        }
+    }
+
+    /**
+     * Go 배열 변환: [1,2,3] → []int{1,2,3}, [[1,2],[3,4]] → [][]int{{1,2},{3,4}}
+     */
+    private fun toGoLiteral(value: String): String {
+        val v = value.trim()
+        if (!v.startsWith("[")) return v
+
+        if (v.startsWith("[[")) {
+            // 첫 내부 배열의 원소로 타입 감지: [[1,2],[3,4]] → [][]int{{1,2},{3,4}}
+            val firstInner = v.removePrefix("[").substringAfter("[").substringBefore("]")
+            val elemType = detectGoElementType(firstInner)
+            return "[][]$elemType" + v.replace('[', '{').replace(']', '}')
+        }
+
+        val content = v.removePrefix("[").removeSuffix("]").trim()
+        if (content.isEmpty()) return "[]int{}"
+        val elemType = detectGoElementType(content)
+        return "[]$elemType{$content}"
+    }
+
+    private fun detectGoElementType(content: String): String {
+        val first = content.split(",").firstOrNull()?.trim() ?: ""
+        return when {
+            first.startsWith("\"") -> "string"
+            first == "true" || first == "false" -> "bool"
+            first.contains(".") -> "float64"
+            first.toLongOrNull() != null && (first.toLong() > Int.MAX_VALUE || first.toLong() < Int.MIN_VALUE) -> "int64"
+            else -> "int"
+        }
+    }
+
+    private fun wrapRust(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+        val args = inputValues.joinToString(", ") { toRustLiteral(it) }
+
+        // fn 메서드명 추출 (solution 우선, 없으면 마지막)
+        val rsFns = Regex("""fn\s+(\w+)\s*\(""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it != "main" }.toList()
+        val methodName = rsFns.find { it == "solution" } ?: rsFns.lastOrNull() ?: "solution"
+
+        // LeetCode 스타일(impl Solution)이면 struct 선언 보충 후 연관 함수로 호출
+        val hasImpl = code.contains("impl Solution")
+        val structDecl = if (hasImpl && !code.contains("struct Solution")) "struct Solution;\n\n" else ""
+        val callExpr = if (hasImpl) "Solution::$methodName($args)" else "$methodName($args)"
+
+        return """
+$structDecl$code
+
+fn main() {
+    let _result = $callExpr;
+    // {:?}는 문자열을 "따옴표 포함"으로, 벡터를 [a, b]로 출력 → 공백 제거로 [a,b] 형태 통일
+    let _s = format!("{:?}", _result).replace(", ", ",");
+    println!("{}", _s);
+}
+""".trimIndent()
+    }
+
+    private fun wrapGo(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+        val args = inputValues.joinToString(", ") { toGoLiteral(it) }
+
+        val goFuncs = Regex("""func\s+(\w+)\s*\(""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it != "main" }.toList()
+        val methodName = goFuncs.find { it == "solution" } ?: goFuncs.lastOrNull() ?: "solution"
+
+        // 사용자 코드에 package 선언이 있으면 제거 (래퍼가 package main을 제공)
+        val body = code.lines().filterNot { it.trim().startsWith("package ") }.joinToString("\n")
+
+        // fmt 대신 json/os만 import: 사용자 코드의 import "fmt"와 충돌 방지
+        return """
+package main
+
+import (
+	"encoding/json"
+	"os"
+)
+
+$body
+
+func main() {
+	_result := $methodName($args)
+	_b, _ := json.Marshal(_result)
+	os.Stdout.Write(append(_b, '\n'))
+}
+""".trimIndent()
+    }
+
+    private fun wrapRuby(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+        val args = inputValues.joinToString(", ")
+
+        val rbMethods = Regex("""def\s+(\w+)""").findAll(code)
+            .map { it.groupValues[1] }
+            .filter { it != "initialize" }.toList()
+        val methodName = rbMethods.find { it == "solution" } ?: rbMethods.lastOrNull() ?: "solution"
+
+        return """
+require 'json'
+
+$code
+
+# 사용자 puts를 stderr로 리다이렉트
+_orig_stdout = ${'$'}stdout
+${'$'}stdout = ${'$'}stderr
+_result = $methodName($args)
+# stdout 복원 후 리턴값만 출력
+${'$'}stdout = _orig_stdout
+if _result.is_a?(String)
+  puts "\"#{_result}\""
+elsif _result.is_a?(Array)
+  puts _result.to_json
+else
+  puts _result
+end
+""".trimIndent()
+    }
+
     // ─── 도구 경로 자동 감지 ───
 
     private val javaHome: String by lazy { detectJavaHome() }
@@ -456,6 +623,22 @@ else console.log(_result);
     private val gppPath: String by lazy { findExecutable("g++", "/usr/bin/g++", "/usr/local/bin/g++", "/opt/homebrew/bin/g++") }
     private val kotlincPath: String by lazy { detectKotlinc() }
     private val nodePath: String by lazy { detectNode() }
+    private val rustcPath: String by lazy {
+        findExecutable("rustc",
+            "${System.getProperty("user.home")}/.cargo/bin/rustc",
+            "/usr/local/bin/rustc", "/opt/homebrew/bin/rustc")
+    }
+    private val goPath: String by lazy {
+        findExecutable("go",
+            "/usr/local/go/bin/go", "/opt/homebrew/bin/go", "/usr/local/bin/go",
+            "${System.getProperty("user.home")}/go/bin/go")
+    }
+    private val rubyPath: String by lazy {
+        findExecutable("ruby",
+            "${System.getProperty("user.home")}/.rbenv/shims/ruby",
+            "/opt/homebrew/opt/ruby/bin/ruby", "/usr/local/opt/ruby/bin/ruby",
+            "/usr/bin/ruby")
+    }
 
     private fun detectJavaHome(): String {
         // 1. JAVA_HOME 환경변수
@@ -604,7 +787,10 @@ else console.log(_result);
         "python" to pythonPath,
         "node" to nodePath,
         "g++" to gppPath,
-        "kotlinc" to kotlincPath
+        "kotlinc" to kotlincPath,
+        "rustc" to rustcPath,
+        "go" to goPath,
+        "ruby" to rubyPath
     )
 
     // ─── 언어별 컴파일 & 실행 ───
@@ -769,8 +955,10 @@ else console.log(_result);
         sourceFile.writeText(code)
 
         val jarFile = File(dir, "solution.jar")
+        // -J-Dfile.encoding: javac의 -encoding UTF-8과 동일한 목적 (이슈 #2).
+        // Windows에서 kotlinc가 구버전 JDK(<18)로 실행되면 MS949로 소스를 읽어 한글이 깨지는 것을 방지.
         val compile = executeProcess(
-            listOf(kotlincPath, sourceFile.absolutePath, "-include-runtime", "-d", jarFile.absolutePath),
+            listOf(kotlincPath, "-J-Dfile.encoding=UTF-8", sourceFile.absolutePath, "-include-runtime", "-d", jarFile.absolutePath),
             dir, "", timeout * 2
         )
         if (compile.exitCode != 0) {
@@ -792,6 +980,63 @@ else console.log(_result);
         return executeProcess(listOf(nodePath, sourceFile.absolutePath), dir, input, timeout)
     }
 
+    private fun runRust(code: String, input: String, dir: File, timeout: Long): RunResult {
+        if (rustcPath.isBlank()) {
+            return RunResult(output = "", error = I18n.t(
+                "rustc를 찾을 수 없습니다.\nhttps://rustup.rs 에서 Rust를 설치하세요.",
+                "rustc not found.\nPlease install Rust via https://rustup.rs"
+            ), exitCode = -1)
+        }
+        val sourceFile = File(dir, "solution.rs")
+        // rustc/go build는 g++(MinGW)와 달리 Windows에서 .exe를 자동으로 붙이지 않음
+        val outputFile = File(dir, if (isWindows) "solution.exe" else "solution")
+        sourceFile.writeText(code, StandardCharsets.UTF_8)
+
+        val compile = executeProcess(
+            listOf(rustcPath, "-O", "--edition", "2021", "-o", outputFile.absolutePath, sourceFile.absolutePath),
+            dir, "", timeout * 2
+        )
+        if (compile.exitCode != 0) {
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+        }
+
+        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
+    }
+
+    private fun runGo(code: String, input: String, dir: File, timeout: Long): RunResult {
+        if (goPath.isBlank()) {
+            return RunResult(output = "", error = I18n.t(
+                "Go를 찾을 수 없습니다.\nhttps://go.dev/dl 에서 Go를 설치하세요.",
+                "Go not found.\nPlease install Go via https://go.dev/dl"
+            ), exitCode = -1)
+        }
+        val sourceFile = File(dir, "solution.go")
+        val outputFile = File(dir, if (isWindows) "solution.exe" else "solution")
+        sourceFile.writeText(code, StandardCharsets.UTF_8)
+
+        val compile = executeProcess(
+            listOf(goPath, "build", "-o", outputFile.absolutePath, sourceFile.absolutePath),
+            dir, "", timeout * 2
+        )
+        if (compile.exitCode != 0) {
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+        }
+
+        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
+    }
+
+    private fun runRuby(code: String, input: String, dir: File, timeout: Long): RunResult {
+        if (rubyPath.isBlank()) {
+            return RunResult(output = "", error = I18n.t(
+                "Ruby를 찾을 수 없습니다.\nbrew install ruby 또는 rbenv로 설치하세요.",
+                "Ruby not found.\nPlease install via: brew install ruby"
+            ), exitCode = -1)
+        }
+        val sourceFile = File(dir, "solution.rb")
+        sourceFile.writeText(code, StandardCharsets.UTF_8)
+        return executeProcess(listOf(rubyPath, sourceFile.absolutePath), dir, input, timeout)
+    }
+
     private fun executeProcess(
         command: List<String>,
         dir: File,
@@ -803,8 +1048,12 @@ else console.log(_result);
             .redirectErrorStream(false)
             .start()
 
+        // 입력이 없어도 stdin을 닫아 EOF를 전달해야 함.
+        // 닫지 않으면 stdin을 읽는 코드가 타임아웃까지 블로킹되어 허위 시간 초과가 발생하고 파이프 FD가 누수됨.
         if (input.isNotBlank()) {
             process.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(input) }
+        } else {
+            process.outputStream.close()
         }
 
         // 메모리 폴링 스레드 시작
@@ -851,8 +1100,8 @@ else console.log(_result);
             return RunResult(output = "", error = I18n.t("시간 초과 (${timeout}초)", "Time Limit Exceeded (${timeout}s)"), exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
-        val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
-        val error = process.errorStream.bufferedReader(Charsets.UTF_8).readText().trimEnd()
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trimEnd()
+        val error = process.errorStream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trimEnd()
 
         return RunResult(output = output, error = error, exitCode = process.exitValue(), executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
     }
