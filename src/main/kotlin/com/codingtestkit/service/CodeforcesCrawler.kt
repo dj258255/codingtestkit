@@ -31,7 +31,19 @@ object CodeforcesCrawler {
             .timeout(30000)
         if (cookies.isNotBlank()) connection.header("Cookie", cookies)
         val doc = connection.get()
+        return parseProblemDoc(doc, contestId, letter)
+    }
 
+    /**
+     * JCEF 폴백 경로: 브라우저가 렌더링한 HTML을 동일한 파서로 처리.
+     * Cloudflare가 Jsoup의 TLS 지문을 차단할 때 사용된다.
+     */
+    fun parseProblemHtml(html: String, problemId: String): Problem {
+        val (contestId, letter) = parseProblemId(problemId)
+        return parseProblemDoc(Jsoup.parse(html, "https://codeforces.com"), contestId, letter)
+    }
+
+    private fun parseProblemDoc(doc: org.jsoup.nodes.Document, contestId: String, letter: String): Problem {
         // 이미지: 상대 경로 → 절대 경로, 고정 크기 제거
         doc.select("img[src]").forEach { img ->
             val src = img.attr("src")

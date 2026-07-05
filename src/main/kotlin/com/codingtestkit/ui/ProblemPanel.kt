@@ -692,7 +692,15 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val problem = when (source) {
                     ProblemSource.PROGRAMMERS -> ProgrammersCrawler.fetchProblem(id, cookies)
                     ProblemSource.LEETCODE -> LeetCodeApi.fetchProblem(id, language.extension, cookies)
-                    ProblemSource.CODEFORCES -> CodeforcesCrawler.fetchProblem(id, cookies)
+                    ProblemSource.CODEFORCES -> try {
+                        CodeforcesCrawler.fetchProblem(id, cookies)
+                    } catch (e: Exception) {
+                        // Cloudflare가 Jsoup을 차단(403)하면 실브라우저(JCEF)로 폴백
+                        if (CodeforcesJcefFetcher.isAvailable()) {
+                            CodeforcesJcefFetcher.fetchProblem(id)
+                                ?: throw IllegalStateException("${e.message}\nJCEF fallback: ${CodeforcesJcefFetcher.lastError}")
+                        } else throw e
+                    }
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
 
