@@ -33,11 +33,31 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
 
     private var authState = AuthState()
 
+    /**
+     * PasswordSafe(OS 키체인) 접근은 느려서 EDT에서 호출하면 SlowOperations 위반.
+     * 읽기는 메모리 캐시로 즉시 응답하고, 쓰기는 캐시 갱신 후 단일 스레드로 영속화한다
+     * (단일 스레드 executor라 쓰기 순서가 보장됨).
+     */
+    private val cookieCache = java.util.concurrent.ConcurrentHashMap<ProblemSource, String>()
+    private val persistExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "CodingTestKit-AuthPersist").apply { isDaemon = true }
+    }
+
+    init {
+        // 캐시 예열: 이후 EDT에서의 readCookies가 키체인을 건드리지 않게 함
+        persistExecutor.execute {
+            for (source in ProblemSource.entries) {
+                val stored = PasswordSafe.instance.getPassword(credentialAttributes(source)) ?: ""
+                cookieCache.putIfAbsent(source, stored)
+            }
+        }
+    }
+
     override fun getState(): AuthState = authState
 
     override fun loadState(state: AuthState) {
         authState = state
-        migrateLegacyCookies()
+        persistExecutor.execute { migrateLegacyCookies() }
     }
 
     private fun migrateLegacyCookies() {
@@ -63,11 +83,17 @@ class AuthService : PersistentStateComponent<AuthService.AuthState> {
         CredentialAttributes(generateServiceName("CodingTestKit", "cookie.${source.name}"))
 
     private fun writeCookies(source: ProblemSource, cookies: String) {
-        PasswordSafe.instance.setPassword(credentialAttributes(source), cookies.ifBlank { null })
+        cookieCache[source] = cookies
+        persistExecutor.execute {
+            PasswordSafe.instance.setPassword(credentialAttributes(source), cookies.ifBlank { null })
+        }
     }
 
     private fun readCookies(source: ProblemSource): String =
-        PasswordSafe.instance.getPassword(credentialAttributes(source)) ?: ""
+        cookieCache.getOrPut(source) {
+            // 캐시 예열 전에 호출된 경우의 폴백 (드묾)
+            PasswordSafe.instance.getPassword(credentialAttributes(source)) ?: ""
+        }
 
     fun getCookies(source: ProblemSource): String = readCookies(source)
 
