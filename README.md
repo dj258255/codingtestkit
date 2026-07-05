@@ -129,7 +129,7 @@ When a problem is fetched, a folder is automatically created with a code file an
 ### Problem View & Translation
 
 <p align="center">
-  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="Fetch Example"/>
+  <img src="docs/screenshots/problem-view-1.png" width="700" alt="Fetch Example"/>
 </p>
 
 View the problem description, I/O format, and examples directly in the plugin panel.
@@ -200,18 +200,10 @@ Programmers and LeetCode solution functions are automatically wrapped for testin
 Log in to each platform via the built-in JCEF browser and submit your code directly. The language dropdown is **automatically selected** to match your code.
 
 <p align="center">
-  <img src="docs/screenshots/boj-login.png" width="600" alt="Platform Login"/>
+  <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="Fetch → Test → Submit"/>
 </p>
 
 Click **Submit**, confirm the dialog, and your code & language are auto-filled.
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
-</p>
 
 <p align="right"><a href="#features">Back to Features</a></p>
 
@@ -478,7 +470,7 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 ### 문제 보기 & 번역
 
 <p align="center">
-  <img src="docs/screenshots/boj-submit-success.png" width="700" alt="문제 가져오기 예시"/>
+  <img src="docs/screenshots/problem-view-1.png" width="700" alt="문제 가져오기 예시"/>
 </p>
 
 플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다.
@@ -549,18 +541,10 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 내장 JCEF 브라우저를 통해 각 플랫폼에 로그인하고, 코드를 직접 제출할 수 있습니다. 제출 시 코드 작성 언어에 맞춰 **언어 드롭다운이 자동 선택**됩니다.
 
 <p align="center">
-  <img src="docs/screenshots/boj-login.png" width="600" alt="플랫폼 로그인"/>
+  <img src="docs/screenshots/fetch-test-submit.gif" width="700" alt="가져오기 → 테스트 → 제출"/>
 </p>
 
 **제출** 버튼을 누르면 제출 확인 다이얼로그가 표시되고, 코드와 언어가 자동으로 입력됩니다.
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-confirm.png" width="700" alt="제출 확인"/>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/boj-submit-code.png" width="700" alt="코드 자동 입력"/>
-</p>
 
 <p align="right"><a href="#주요-기능">기능 목록으로</a></p>
 

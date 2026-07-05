@@ -15,7 +15,7 @@ Log in to each platform via the built-in JCEF browser and submit your code direc
 Click the **Login** button for any platform. A built-in browser opens the platform's login page.
 
 <p align="center">
-  <img src="../screenshots/boj-login.png" width="600" alt="Platform Login"/>
+  <img src="../screenshots/fetch-test-submit.gif" width="700" alt="Fetch → Test → Submit"/>
 </p>
 
 ### Submit Flow
@@ -25,14 +25,6 @@ Click the **Login** button for any platform. A built-in browser opens the platfo
 3. **Code** is auto-injected into the editor
 4. **Language** dropdown is automatically selected to match your code
 5. Verify and click the platform's submit button
-
-<p align="center">
-  <img src="../screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
-</p>
-
-<p align="center">
-  <img src="../screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
-</p>
 
 ### Auto Language Selection
 

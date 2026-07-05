@@ -88,7 +88,7 @@ When a problem is fetched, a folder is automatically created with a code file an
 ### Problem View & Translation
 
 <p align="center">
-  <img src="screenshots/boj-submit-success.png" width="700" alt="Fetch Example"/>
+  <img src="screenshots/problem-view-1.png" width="700" alt="Fetch Example"/>
 </p>
 
 View the problem description, I/O format, and examples directly in the plugin panel.
@@ -152,11 +152,7 @@ Log in to each platform via the built-in JCEF browser and submit your code direc
 Click **Submit**, confirm the dialog, and your code & language are auto-filled.
 
 <p align="center">
-  <img src="screenshots/boj-submit-confirm.png" width="700" alt="Submit Confirmation"/>
-</p>
-
-<p align="center">
-  <img src="screenshots/boj-submit-code.png" width="700" alt="Code Auto-Fill"/>
+  <img src="screenshots/fetch-test-submit.gif" width="700" alt="Fetch → Test → Submit"/>
 </p>
 
 Login and submission work the same way for Programmers, SWEA, LeetCode, and Codeforces.

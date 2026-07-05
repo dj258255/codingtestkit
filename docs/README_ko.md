@@ -90,7 +90,7 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
 ### 문제 보기 & 번역
 
 <p align="center">
-  <img src="screenshots/boj-submit-success.png" width="700" alt="문제 가져오기 예시"/>
+  <img src="screenshots/problem-view-1.png" width="700" alt="문제 가져오기 예시"/>
 </p>
 
 플러그인 패널에서 문제 설명, 입출력 형식, 예제를 바로 확인할 수 있습니다.
@@ -152,6 +152,10 @@ LeetCode 문제를 키워드, 난이도, 알고리즘 태그로 검색합니다.
 내장 JCEF 브라우저를 통해 각 플랫폼에 로그인하고, 코드를 직접 제출할 수 있습니다.
 
 **제출** 버튼을 누르면 내장 브라우저에서 제출 페이지가 열리고, 코드와 언어가 자동으로 입력됩니다. 사용자는 스크롤만 내려서 **제출** 버튼을 누르면 끝입니다.
+
+<p align="center">
+  <img src="screenshots/fetch-test-submit.gif" width="700" alt="가져오기 → 테스트 → 제출"/>
+</p>
 
 **프로그래머스**, **SWEA**, **LeetCode**, **Codeforces** 모두 동일한 방식으로 로그인과 제출이 가능합니다.
 
