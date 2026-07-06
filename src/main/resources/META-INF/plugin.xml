@@ -675,10 +675,12 @@
     <extensions defaultExtensionNs="com.intellij">
         <editorActionHandler action="EditorPaste"
                              implementationClass="com.codingtestkit.service.PasteBlockHandler"/>
+        <!-- anchor=left + secondary=false: 프로젝트 뷰와 같은 상단 그룹에서 토글 (이슈 #14).
+             secondary=true(하단 그룹)로 왼쪽에 두면 프로젝트 뷰와 세로 분할되어 비좁아짐. -->
         <toolWindow id="CodingTestKit"
-                    secondary="true"
+                    secondary="false"
                     icon="/icons/ctk-toolwindow.svg"
-                    anchor="right"
+                    anchor="left"
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
         <projectService serviceImplementation="com.codingtestkit.service.CodingTestKitActionService"/>
