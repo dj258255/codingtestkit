@@ -242,11 +242,16 @@ object ProblemFileManager {
                 }
             }
             val paramNames = json.getAsJsonArray("parameterNames")?.map { it.asString } ?: emptyList()
+            // 수정 이전 버전에서 JCEF 폴백으로 저장된 코드포스 문제는 MathJax
+            // 렌더링 잔여물이 본문에 남아 있어 로드 시점에 정리 (이슈 #25)
+            val rawDescription = json.get("description")?.asString ?: ""
+            val description = if (source == ProblemSource.CODEFORCES)
+                CodeforcesCrawler.stripMathJaxArtifacts(rawDescription) else rawDescription
             Problem(
                 source = source,
                 id = json.get("id")?.asString ?: "",
                 title = json.get("title")?.asString ?: "",
-                description = json.get("description")?.asString ?: "",
+                description = description,
                 testCases = testCases,
                 timeLimit = json.get("timeLimit")?.asString ?: "",
                 memoryLimit = json.get("memoryLimit")?.asString ?: "",

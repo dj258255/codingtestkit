@@ -13,10 +13,43 @@ object TranslateService {
     fun translate(text: String, sourceLang: String = "auto", targetLang: String = "ko"): String {
         if (text.isBlank()) return text
 
-        // <pre> 블록을 번역에서 보호: 분리 → 나머지만 번역 → 재조립
+        // 보호 구간(<pre>, 수식)을 플레이스홀더로 치환해 한 번에 번역한 뒤 복원.
+        // 구간별로 API를 호출하면 수식이 많은 문제에서 호출이 수십 회로 폭증함 (이슈 #25).
+        val protectedContents = mutableListOf<String>()
+        val masked = buildString {
+            for ((content, isProtected) in splitProtected(text)) {
+                if (isProtected) {
+                    append(" __CTK${protectedContents.size}__ ")
+                    protectedContents.add(content)
+                } else {
+                    append(content)
+                }
+            }
+        }
+
+        val translated = translateText(masked, sourceLang, targetLang)
+
+        // 번역기가 플레이스홀더 주변에 공백을 끼워넣거나 대소문자를 바꿀 수 있어 유연하게 복원
+        return Regex("__\\s*CTK\\s*(\\d+)\\s*__", RegexOption.IGNORE_CASE).replace(translated) { m ->
+            protectedContents.getOrNull(m.groupValues[1].toIntOrNull() ?: -1) ?: m.value
+        }
+    }
+
+    /**
+     * 번역에서 보호할 구간을 분리해 (내용, 보호 여부) 리스트로 반환.
+     * - <pre> 블록: 테스트 케이스 입출력이 번역되며 깨지는 것 방지
+     * - 수식 구간 ($$...$$, $...$): KaTeX 소스가 번역되며 깨지는 것 방지 (이슈 #25)
+     */
+    internal fun splitProtected(text: String): List<Pair<String, Boolean>> {
+        val protectedPattern = Regex(
+            "<pre[^>]*>[\\s\\S]*?</pre>" +      // <pre> 블록
+                "|\\$\\$[^$]+\\$\\$" +             // display 수식 $$...$$
+                "|\\$[^$\\n]+\\$",                  // inline 수식 $...$
+            RegexOption.IGNORE_CASE
+        )
         val parts = mutableListOf<Pair<String, Boolean>>() // (content, isProtected)
         var lastEnd = 0
-        for (match in Regex("<pre[^>]*>[\\s\\S]*?</pre>", RegexOption.IGNORE_CASE).findAll(text)) {
+        for (match in protectedPattern.findAll(text)) {
             if (match.range.first > lastEnd) {
                 parts.add(Pair(text.substring(lastEnd, match.range.first), false))
             }
@@ -26,18 +59,7 @@ object TranslateService {
         if (lastEnd < text.length) {
             parts.add(Pair(text.substring(lastEnd), false))
         }
-
-        return buildString {
-            for ((i, pair) in parts.withIndex()) {
-                val (content, isProtected) = pair
-                if (isProtected) {
-                    append(content)
-                } else {
-                    if (i > 0 && !parts[i - 1].second) Thread.sleep(300)
-                    append(translateText(content, sourceLang, targetLang))
-                }
-            }
-        }
+        return parts
     }
 
     private fun translateText(text: String, sourceLang: String, targetLang: String): String {
