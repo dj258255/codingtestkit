@@ -15,9 +15,19 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBTabbedPane
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.Dimension
 import javax.swing.JPanel
 
 class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
+
+    /**
+     * 다른 툴윈도우(예: 프로젝트 뷰)와 같은 쪽에 세로 분할될 때,
+     * IDE 분할선은 콘텐츠의 minimum size 아래로 내려가지 않는다.
+     * 탭 콘텐츠에서 계산된 최소 높이(좁은 도크에서는 WrapLayout 줄바꿈으로 더 커짐)를
+     * 그대로 보고하면 창을 줄일 수 없으므로, 작은 고정값을 보고해
+     * 분할 비율 조절 권한을 사용자에게 둔다. (이슈 #12)
+     */
+    override fun getMinimumSize(): Dimension = Dimension(JBUI.scale(120), JBUI.scale(80))
 
     private val problemPanel = ProblemPanel(project)
     private val testPanel = TestPanel(project)
