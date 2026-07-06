@@ -26,12 +26,30 @@ object CodeforcesCrawler {
 
         // 로그인 쿠키(cf_clearance 포함)를 함께 보내면 Cloudflare 챌린지를 통과할 수 있음.
         // cf_clearance는 User-Agent에 바인딩되므로 JCEF(Chrome)와 유사한 UA를 사용.
+        // 이전 JCEF 폴백 세션이 챌린지를 통과했다면 그 쿠키도 재사용 (이슈 #21).
+        // 같은 이름의 쿠키는 호출자(로그인) 쿠키가 우선.
+        val merged = mergeCookieHeaders(CodeforcesJcefFetcher.getCloudflareCookies(), cookies)
         val connection = Jsoup.connect("${BASE_URL}$contestId/$letter?locale=en")
             .userAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
             .timeout(30000)
-        if (cookies.isNotBlank()) connection.header("Cookie", cookies)
+        if (merged.isNotBlank()) connection.header("Cookie", merged)
         val doc = connection.get()
         return parseProblemDoc(doc, contestId, letter)
+    }
+
+    /**
+     * "a=1; b=2" 형태의 Cookie 헤더 두 개를 병합. 같은 이름이면 override 쪽이 우선.
+     */
+    internal fun mergeCookieHeaders(base: String, override: String): String {
+        val map = LinkedHashMap<String, String>()
+        for (part in base.split(";") + override.split(";")) {
+            val p = part.trim()
+            if (p.isEmpty()) continue
+            val i = p.indexOf('=')
+            if (i <= 0) continue
+            map[p.substring(0, i).trim()] = p.substring(i + 1).trim()
+        }
+        return map.entries.joinToString("; ") { "${it.key}=${it.value}" }
     }
 
     /**

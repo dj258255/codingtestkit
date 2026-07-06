@@ -43,6 +43,46 @@ object CodeforcesJcefFetcher {
     }
 
     /**
+     * JCEF 전역 쿠키 저장소에서 codeforces.com 쿠키(cf_clearance 포함)를 꺼낸다 (이슈 #21).
+     *
+     * JCEF 폴백이 Cloudflare 챌린지를 한 번 통과하면 그 쿠키가 전역 컨텍스트에 남는다.
+     * 이후 Jsoup 요청의 Cookie 헤더에 실으면 챌린지 없이 빠른 경로로 통과하므로,
+     * 차단 환경에서도 첫 문제만 느리고 다음 문제부터는 ~1초에 가져온다.
+     * 쿠키가 만료·거부되면 403 → JCEF 폴백이 다시 돌며 새 쿠키가 저장되는 자가 회복 구조.
+     *
+     * CEF가 아직 시작되지 않았으면 빈 문자열을 반환한다 (쿠키를 읽으려고 CEF를 기동하지 않음).
+     * 백그라운드 스레드에서 호출할 것.
+     */
+    fun getCloudflareCookies(timeoutMs: Long = 2000): String {
+        try {
+            if (!JBCefApp.isSupported() || !JBCefApp.isStarted()) return ""
+        } catch (_: Exception) {
+            return ""
+        }
+        return try {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            val sb = StringBuilder()
+            val started = org.cef.network.CefCookieManager.getGlobalManager().visitUrlCookies(
+                "https://codeforces.com/", true
+            ) { cookie, count, total, _ ->
+                synchronized(sb) {
+                    if (sb.isNotEmpty()) sb.append("; ")
+                    sb.append(cookie.name).append('=').append(cookie.value)
+                }
+                if (count == total - 1) latch.countDown()
+                true
+            }
+            if (!started) return ""
+            // 쿠키가 하나도 없으면 visitor가 불리지 않아 타임아웃까지 대기
+            latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+            synchronized(sb) { sb.toString() }
+        } catch (e: Exception) {
+            LOG.info("[CodingTestKit] Codeforces cookie read failed: ${e.message}")
+            ""
+        }
+    }
+
+    /**
      * 백그라운드 스레드에서 호출할 것 (EDT에서 호출하면 deadlock).
      */
     fun fetchProblem(problemId: String): Problem? {
