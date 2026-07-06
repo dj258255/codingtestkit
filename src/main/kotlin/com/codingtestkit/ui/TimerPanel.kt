@@ -1,6 +1,7 @@
 package com.codingtestkit.ui
 
 import com.codingtestkit.service.I18n
+import com.codingtestkit.service.TimerService
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
@@ -13,14 +14,14 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-class TimerPanel : JPanel(BorderLayout()) {
+class TimerPanel(timerService: TimerService) : JPanel(BorderLayout()) {
 
     init {
         val tabbedPane = JTabbedPane().apply {
             border = JBUI.Borders.empty()
         }
-        tabbedPane.addTab(I18n.t("스톱워치", "Stopwatch"), AllIcons.Debugger.Db_muted_breakpoint, StopwatchPanel())
-        tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Actions.StartDebugger, CountdownPanel())
+        tabbedPane.addTab(I18n.t("스톱워치", "Stopwatch"), AllIcons.Debugger.Db_muted_breakpoint, StopwatchPanel(timerService))
+        tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Actions.StartDebugger, CountdownPanel(timerService))
         add(tabbedPane, BorderLayout.CENTER)
     }
 
@@ -205,12 +206,10 @@ class TimerPanel : JPanel(BorderLayout()) {
 
     // ─── 스톱워치 ───
 
-    private class StopwatchPanel : JPanel(BorderLayout()) {
+    private class StopwatchPanel(private val timerService: TimerService) : JPanel(BorderLayout()) {
 
-        private var startTime: Long = 0
-        private var accumulatedMs: Long = 0
-        private var running = false
-        private var timer: Timer? = null
+        // 스톱워치 상태(경과 시간·실행 여부)는 TimerService가 소유하고,
+        // 이 패널은 서비스 리스너로 표시만 동기화한다 (이슈 #16).
         private var lapCount = 0
         private var lastLapMs: Long = 0
 
@@ -292,54 +291,25 @@ class TimerPanel : JPanel(BorderLayout()) {
             }
             add(lapScroll, BorderLayout.CENTER)
 
-            startButton.addActionListener { start() }
-            stopButton.addActionListener { stop() }
+            startButton.addActionListener { timerService.stopwatchStart() }
+            stopButton.addActionListener { timerService.stopwatchPause() }
             resetButton.addActionListener { reset() }
             lapButton.addActionListener { lap() }
-        }
 
-        private fun getElapsedMs(): Long {
-            return if (running) accumulatedMs + (System.currentTimeMillis() - startTime)
-            else accumulatedMs
-        }
-
-        private fun start() {
-            if (running) return
-            running = true
-            startTime = System.currentTimeMillis()
-            startButton.isEnabled = false
-            stopButton.isEnabled = true
-            lapButton.isEnabled = true
-            timer = Timer(33) { updateDisplay() }
-            timer?.start()
-        }
-
-        private fun stop() {
-            if (!running) return
-            accumulatedMs += System.currentTimeMillis() - startTime
-            running = false
-            timer?.stop()
-            startButton.isEnabled = true
-            startButton.text = I18n.t("재개", "Resume")
-            stopButton.isEnabled = false
-            lapButton.isEnabled = false
-            updateDisplay()
+            // 문제 탭 하단 바에서 조작해도 이 패널이 따라가도록 서비스 구독
+            timerService.addListener { syncFromService() }
+            syncFromService()
         }
 
         private fun reset() {
-            if (running) { timer?.stop(); running = false }
-            accumulatedMs = 0; lapCount = 0; lastLapMs = 0
+            lapCount = 0; lastLapMs = 0
             lapRecords.clear()
             lapTableModel.fireTableDataChanged()
-            startButton.isEnabled = true
-            startButton.text = I18n.t("시작", "Start")
-            stopButton.isEnabled = false
-            lapButton.isEnabled = false
-            updateDisplay()
+            timerService.stopwatchReset()
         }
 
         private fun lap() {
-            val elapsed = getElapsedMs()
+            val elapsed = timerService.stopwatchElapsedMs
             lapCount++
             val diff = elapsed - lastLapMs
             lastLapMs = elapsed
@@ -347,20 +317,24 @@ class TimerPanel : JPanel(BorderLayout()) {
             lapTableModel.fireTableRowsInserted(lapRecords.size - 1, lapRecords.size - 1)
         }
 
-        private fun updateDisplay() {
-            timeLabel.text = formatTime(getElapsedMs())
+        /** 서비스 상태에서 버튼·표시를 유도 — 어디서 조작해도 일관됨 */
+        private fun syncFromService() {
+            val running = timerService.isStopwatchRunning
+            val pausedMidway = !running && timerService.stopwatchElapsedMs > 0
+            startButton.isEnabled = !running
+            stopButton.isEnabled = running
+            lapButton.isEnabled = running
+            startButton.text = if (pausedMidway) I18n.t("재개", "Resume") else I18n.t("시작", "Start")
+            timeLabel.text = formatTime(timerService.stopwatchElapsedMs)
         }
     }
 
     // ─── 카운트다운 타이머 ───
 
-    private class CountdownPanel : JPanel(BorderLayout()) {
+    private class CountdownPanel(private val timerService: TimerService) : JPanel(BorderLayout()) {
 
-        private var remainingMs: Long = 0
-        private var totalMs: Long = 0
-        private var running = false
-        private var timer: Timer? = null
-        private var endTime: Long = 0
+        // 타이머 상태(남은 시간·실행 여부)는 TimerService가 소유하고,
+        // 이 패널은 서비스 리스너로 표시만 동기화한다 (이슈 #16).
 
         // 표시 요소
         private val circularTimer = CircularTimerView()
@@ -486,12 +460,17 @@ class TimerPanel : JPanel(BorderLayout()) {
             secField.document.addDocumentListener(docListener)
 
             startButton.addActionListener { start() }
-            stopButton.addActionListener { stop() }
+            stopButton.addActionListener { timerService.pause() }
             resetButton.addActionListener { reset() }
 
-            circularTimer.onCenterClick = { if (running) stop() else start() }
+            circularTimer.onCenterClick = { if (timerService.isRunning) timerService.pause() else start() }
+
+            // 어느 화면(문제 탭 바, 상태바)에서 조작해도 이 패널이 따라가도록 서비스 구독
+            timerService.addListener { syncFromService() }
+            timerService.addTimeUpListener { onTimeUp() }
 
             onTimeFieldChanged()
+            syncFromService()
         }
 
         private fun createUnitLabel(text: String): JLabel {
@@ -506,13 +485,11 @@ class TimerPanel : JPanel(BorderLayout()) {
         }
 
         private fun onTimeFieldChanged() {
-            if (!running) {
+            if (!timerService.isRunning) {
                 val h = getFieldValue(hourField)
                 val m = getFieldValue(minField)
                 val s = getFieldValue(secField)
-                totalMs = ((h * 3600L) + (m * 60L) + s) * 1000
-                remainingMs = totalMs
-                updateDisplay()
+                timerService.setTotal(((h * 3600L) + (m * 60L) + s) * 1000)
             }
         }
 
@@ -523,56 +500,24 @@ class TimerPanel : JPanel(BorderLayout()) {
         }
 
         private fun start() {
-            if (running) return
-            if (remainingMs <= 0) {
+            if (timerService.isRunning) return
+            if (timerService.remainingMs <= 0) {
                 onTimeFieldChanged()
-                if (totalMs <= 0) {
+                if (timerService.totalMs <= 0) {
                     JOptionPane.showMessageDialog(this, I18n.t("시간을 설정하세요.", "Please set a time."), "CodingTestKit", JOptionPane.WARNING_MESSAGE)
                     return
                 }
             }
-            running = true
-            endTime = System.currentTimeMillis() + remainingMs
-            startButton.isEnabled = false
-            stopButton.isEnabled = true
-            setFieldsEnabled(false)
-            timer = Timer(33) {
-                remainingMs = (endTime - System.currentTimeMillis()).coerceAtLeast(0)
-                if (remainingMs <= 0) timeUp()
-                updateDisplay()
-            }
-            timer?.start()
-        }
-
-        private fun stop() {
-            if (!running) return
-            remainingMs = (endTime - System.currentTimeMillis()).coerceAtLeast(0)
-            running = false
-            timer?.stop()
-            startButton.isEnabled = true
-            startButton.text = I18n.t("재개", "Resume")
-            stopButton.isEnabled = false
-            updateDisplay()
+            timerService.start()
         }
 
         private fun reset() {
-            if (running) { timer?.stop(); running = false }
-            startButton.isEnabled = true
-            startButton.text = I18n.t("시작", "Start")
-            stopButton.isEnabled = false
-            setFieldsEnabled(true)
             digitalLabel.foreground = JBColor.foreground()
             onTimeFieldChanged()
+            timerService.reset()
         }
 
-        private fun timeUp() {
-            timer?.stop()
-            running = false
-            remainingMs = 0
-            startButton.isEnabled = true
-            startButton.text = I18n.t("시작", "Start")
-            stopButton.isEnabled = false
-            setFieldsEnabled(true)
+        private fun onTimeUp() {
             digitalLabel.foreground = JBColor(Color.RED, Color(230, 80, 80))
             Toolkit.getDefaultToolkit().beep()
             JOptionPane.showMessageDialog(this, I18n.t("시간이 종료되었습니다!", "Time's up!"), I18n.t("타이머 종료", "Timer Ended"), JOptionPane.INFORMATION_MESSAGE)
@@ -584,16 +529,26 @@ class TimerPanel : JPanel(BorderLayout()) {
             secField.isEnabled = enabled
         }
 
+        /** 서비스 상태에서 버튼·필드·표시를 유도 — 어디서 조작해도 일관됨 */
+        private fun syncFromService() {
+            val running = timerService.isRunning
+            val pausedMidway = timerService.isPausedMidway
+            startButton.isEnabled = !running
+            stopButton.isEnabled = running
+            startButton.text = if (pausedMidway) I18n.t("재개", "Resume") else I18n.t("시작", "Start")
+            setFieldsEnabled(!running && !pausedMidway)
+            updateDisplay()
+        }
+
         private fun updateDisplay() {
+            val remainingMs = timerService.remainingMs
+            val totalMs = timerService.totalMs
+            val running = timerService.isRunning
+
             circularTimer.update(remainingMs, totalMs, running)
 
             // 디지털 시계
-            val totalSec = remainingMs / 1000
-            val h = totalSec / 3600
-            val m = (totalSec % 3600) / 60
-            val s = totalSec % 60
-            digitalLabel.text = if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-            else String.format("%d:%02d", m, s)
+            digitalLabel.text = timerService.formatRemaining()
 
             if (remainingMs in 1..59999 && running) {
                 digitalLabel.foreground = JBColor(Color.RED, Color(230, 80, 80))
