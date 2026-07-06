@@ -33,6 +33,14 @@ Provides a **Stopwatch** and a **Countdown Timer** to help you practice under ti
 - Preset buttons: 30min, 1hr, 2hr, 3hr
 - Notification alert when time's up
 
+### Problems Tab Mini Bar & Status Bar
+
+The timer is not locked inside the Timer tab:
+
+- **Problems tab bottom bar**: countdown (left) and stopwatch (right), each with start/pause and reset buttons, plus a thin remaining-time progress bar on top — always visible while reading the problem
+- **IDE status bar**: remaining time appears next to `CTK: ...`, visible from any tab or layout
+- All three views (Timer tab, mini bar, status bar) share the same timer — controlling it from any one of them keeps the others in sync
+
 <p align="center">
   <img src="../screenshots/countdown-running.png" width="500" alt="Countdown Running"/>
 </p>
@@ -61,3 +69,11 @@ Provides a **Stopwatch** and a **Countdown Timer** to help you practice under ti
 
 - 프리셋 버튼: 30분, 1시간, 2시간, 3시간
 - 시간 종료 시 알림
+
+### 문제 탭 미니 바 & 상태바
+
+타이머는 타이머 탭 안에만 있지 않습니다:
+
+- **문제 탭 하단 바**: 왼쪽에 카운트다운, 오른쪽에 스톱워치 (각각 시작/일시정지·초기화 버튼), 상단에 남은 시간 프로그레스 바 — 문제를 읽는 동안 항상 표시
+- **IDE 상태바**: `CTK: ...` 옆에 남은 시간 표시 — 어떤 탭·레이아웃에서든 보임
+- 세 화면(타이머 탭·미니 바·상태바)은 같은 타이머를 공유하며, 어디서 조작해도 서로 동기화됩니다

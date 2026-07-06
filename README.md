@@ -46,7 +46,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 
 - **Exam Mode**: Disable autocomplete & inspections, block external paste, detect focus loss — practice under real test conditions
 - **Performance Metrics**: Show execution time (ms) and memory usage per test case
-- **Timer**: Stopwatch, circular dial countdown timer, progress bar, digital clock
+- **Timer**: Stopwatch, circular dial countdown timer, progress bar, digital clock — plus an always-visible mini bar in the Problems tab and the IDE status bar
 - **All-in-One**: Fetch, code, test, and submit without leaving the IDE
 - **Problem Translation**: One-click Korean ↔ English translation with caching and rate limit protection
 - **GitHub Push**: Auto-push accepted solutions to GitHub
@@ -92,7 +92,7 @@ CodingTestKit was built to **replicate the real exam environment inside your IDE
 | 7 | **My Solved** | List your solved problems on LeetCode & Codeforces |
 | 8 | [**Code Editor**](#code-editor) | Auto-generated boilerplate code per platform & language |
 | 9 | [**Code Templates**](docs/features/templates.md) | Save & reuse frequently used code snippets |
-| 10 | [**Timer**](docs/features/timer.md) | Stopwatch with laps + countdown with circular dial, progress bar, digital clock |
+| 10 | [**Timer**](docs/features/timer.md) | Stopwatch with laps + countdown with circular dial, progress bar, digital clock; mini bar in the Problems tab & status bar |
 | 11 | [**Settings & Exam Mode**](docs/features/exam-mode.md) | One-click exam mode: block paste, disable autocomplete, focus alert |
 | 12 | [**GitHub Integration**](docs/features/github.md) | Auto-push accepted solutions to GitHub |
 | 13 | [**Internationalization**](#internationalization-i18n) | Full Korean / English UI support |
@@ -285,6 +285,8 @@ Provides a **Stopwatch** and a **Countdown Timer**.
   - **Progress Bar**: Linear progress indicator
 - Preset buttons for 30min, 1hr, 2hr, 3hr
 - Notification when time's up
+- **Problems tab bottom bar**: timer and stopwatch (start/pause/reset) with a thin remaining-time progress bar, always visible at the bottom of the Problems tab — check the clock while reading the problem
+- **Status bar**: remaining time also appears next to `CTK: ...` in the IDE status bar, visible from any tab or layout
 
 <p align="center">
   <img src="docs/screenshots/timer.gif" width="700" alt="Timer"/>
@@ -351,7 +353,7 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 
 ## Quick Start
 
-1. Open **CodingTestKit** from the right sidebar
+1. Open **CodingTestKit** from the left sidebar (docked alongside the Project view — the two toggle; drag to another side if you prefer)
 2. Select platform and language
 3. Enter problem ID and click **Fetch**
 4. Write code, click **Run All**
@@ -362,6 +364,8 @@ Switch between **Korean / English** in settings. All UI text is displayed in the
 - IntelliJ IDEA 2024.3+
 - JDK 17+ (for Java execution) — building the plugin from source requires JDK 21
 - Language compilers (for respective language tests)
+
+> **Windows + C++**: install MinGW-w64 (or MSYS2), add its `bin` folder to PATH, then **fully restart the IDE** — a running IDE does not pick up PATH changes (restart JetBrains Toolbox too if you use it).
 
 ## Build
 
@@ -389,7 +393,7 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 
 - **시험 모드**: 자동완성과 코드 검사를 끄고, 외부 붙여넣기 차단과 포커스 이탈 감지까지 실전과 동일한 환경에서 연습
 - **실행 시간 & 메모리 측정**: 테스트 케이스별 실행 시간(ms)과 메모리 사용량(KB/MB)을 표시
-- **타이머**: 스톱워치, 원형 다이얼 카운트다운 타이머, 프로그레스 바, 디지털 시계
+- **타이머**: 스톱워치, 원형 다이얼 카운트다운 타이머, 프로그레스 바, 디지털 시계 — 문제 탭 하단 미니 바와 IDE 상태바에도 항상 표시
 - **올인원**: 문제 읽기, 코드 작성, 테스트, 제출까지 IDE를 벗어나지 않고 전부 해결
 - **문제 번역**: 한 클릭으로 한국어 ↔ 영어 번역 (캐싱 및 rate limit 보호 내장)
 - **GitHub 연동**: 채점 통과 시 자동으로 GitHub에 푸시
@@ -435,7 +439,7 @@ CodingTestKit은 **실제 시험 환경을 IDE 안에서 그대로 재현**하�
 | 7 | **내 풀이** | LeetCode & Codeforces에서 내가 푼 문제 목록 확인 |
 | 8 | [**코드 에디터**](#코드-에디터) | 플랫폼 & 언어별 보일러플레이트 코드 자동 생성 |
 | 9 | [**코드 템플릿**](docs/features/templates.md) | 자주 쓰는 코드 스니펫 저장 & 재사용 |
-| 10 | [**타이머**](docs/features/timer.md) | 스톱워치 + 원형 다이얼/프로그레스 바/디지털 시계 카운트다운 |
+| 10 | [**타이머**](docs/features/timer.md) | 스톱워치 + 원형 다이얼/프로그레스 바/디지털 시계 카운트다운, 문제 탭 하단 미니 바 & 상태바 표시 |
 | 11 | [**설정 & 시험 모드**](docs/features/exam-mode.md) | 원클릭 시험 모드: 붙여넣기 차단, 자동완성 끄기, 포커스 감지 |
 | 12 | [**GitHub 연동**](docs/features/github.md) | 맞은 문제 자동 GitHub 푸시 |
 | 13 | [**다국어 지원**](#다국어-지원-i18n) | 한국어 / English UI 완전 지원 |
@@ -628,6 +632,8 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
   - **프로그레스 바**: 막대형 진행률 표시
 - 30분, 1시간, 2시간, 3시간 프리셋 버튼
 - 시간 종료 시 알림
+- **문제 탭 하단 바**: 타이머와 스톱워치(시작/일시정지/초기화), 남은 시간 프로그레스 바가 문제 탭 하단에 항상 표시 — 문제를 읽으면서 시간 확인 가능
+- **상태바 표시**: IDE 하단 상태바의 `CTK: ...` 옆에도 남은 시간이 표시되어 어떤 탭·레이아웃에서든 보임
 
 <p align="center">
   <img src="docs/screenshots/timer.gif" width="700" alt="타이머"/>
@@ -694,7 +700,7 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 
 ## 빠른 시작
 
-1. 우측 사이드바에서 **CodingTestKit** 열기
+1. 좌측 사이드바에서 **CodingTestKit** 열기 (프로젝트 뷰와 같은 자리에서 토글되며, 원하면 드래그로 다른 쪽에 배치 가능)
 2. 플랫폼과 언어 선택
 3. 문제 번호 입력 후 **가져오기** 클릭
 4. 코드 작성 후 **전체 실행** 클릭
@@ -705,6 +711,8 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 - IntelliJ IDEA 2024.3 이상
 - JDK 17 이상 (Java 실행용) — 플러그인을 소스에서 직접 빌드하려면 JDK 21 필요
 - 각 언어 컴파일러 (해당 언어 테스트 시)
+
+> **Windows + C++**: MinGW-w64(또는 MSYS2)를 설치하고 `bin` 폴더를 PATH에 등록한 뒤 **IDE를 완전히 재시작**하세요 — 실행 중인 IDE에는 PATH 변경이 반영되지 않습니다 (JetBrains Toolbox 사용 시 Toolbox도 재시작).
 
 ## 빌드
 
