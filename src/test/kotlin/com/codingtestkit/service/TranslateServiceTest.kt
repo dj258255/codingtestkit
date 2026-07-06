@@ -48,6 +48,42 @@ class TranslateServiceTest {
         assertEquals("ko", TranslateService.detectLanguage("ㅎㅎㅎㅎㅎㅎㅎㅎㅎㅎ"))
     }
 
+    // ── splitProtected (이슈 #25: 수식·pre 번역 보호) ──
+
+    @Test
+    fun `splitProtected protects pre blocks`() {
+        val parts = TranslateService.splitProtected("before <pre>1 2\n3</pre> after")
+        assertEquals(listOf("before " to false, "<pre>1 2\n3</pre>" to true, " after" to false), parts)
+    }
+
+    @Test
+    fun `splitProtected protects inline and display math`() {
+        val parts = TranslateService.splitProtected("Given \$n\$ vertices and \$\$a_i \\le 10^6\$\$ done")
+        assertEquals(
+            listOf(
+                "Given " to false,
+                "\$n\$" to true,
+                " vertices and " to false,
+                "\$\$a_i \\le 10^6\$\$" to true,
+                " done" to false
+            ),
+            parts
+        )
+    }
+
+    @Test
+    fun `splitProtected returns whole text when nothing to protect`() {
+        val parts = TranslateService.splitProtected("plain text only")
+        assertEquals(listOf("plain text only" to false), parts)
+    }
+
+    @Test
+    fun `splitProtected does not treat lone dollar as math`() {
+        // 짝이 없는 $ 하나는 수식이 아님 (개행을 넘어 매칭하지 않음)
+        val parts = TranslateService.splitProtected("price is \$5 and\nthat is all")
+        assertTrue(parts.all { !it.second })
+    }
+
     // ── splitHtml (리플렉션 테스트) ──
 
     @Test
