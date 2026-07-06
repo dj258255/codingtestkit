@@ -1354,6 +1354,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     append("th { background: #2b2d30; color: #ccc; font-weight: bold; }")
                     append("img { max-width: 100%; height: auto; }")
                     append("img[src^='data:'] { filter: invert(1); }")
+                    // 코드포스 구식 수식 이미지(espresso 호스트, 검은 글씨 + 투명 배경)는
+                    // 다크 테마에서 배경에 묻히므로 본문 텍스트 밝기에 맞춰 반전 (이슈 #27).
+                    // 일반 삽화(codeforces.com 호스트)는 반전 대상에서 제외.
+                    append("img[src*='espresso.'] { filter: invert(0.85); }")
                     append("hr { border: none; border-top: 1px solid #3c3f41; margin: 12px 0; }")
                     append("pre { background: #1a1a1a; color: #c5c8c6; padding: 12px; border: 1px solid #3c3f41; font-family: 'JetBrains Mono', monospace; border-radius: 6px; white-space: pre-wrap; line-height: 1.5; }")
                     append("code { background: #2b2d30; color: #c5c8c6; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }")

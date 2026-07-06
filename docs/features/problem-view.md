@@ -16,6 +16,8 @@ View the problem description, I/O format, and examples directly in the plugin pa
 - Input/Output format and constraints
 - Example test cases with expected I/O
 - Programmers problems show I/O example tables
+- **Follows the IDE theme** (dark/light) — text, tables, and code blocks are styled per theme
+- LaTeX formulas rendered with KaTeX in theme-appropriate colors; legacy Codeforces image formulas (black text on transparent background) are auto-inverted in dark theme
 
 <p align="center">
   <img src="../screenshots/problem-view-1.png" width="420" alt="Problem View - Top"/>
@@ -35,6 +37,7 @@ Translate problem descriptions between Korean and English with one click.
 | **Toggle Translation** | Click the Translate button to switch between original and translated text |
 | **Auto Language Detection** | Automatically detects Korean/English and translates to the other |
 | **Translation Caching** | Results are cached — no repeated API calls for the same problem |
+| **Math & sample protection** | LaTeX formulas and sample I/O (`<pre>`) are kept verbatim, never translated |
 | **Rate Limit Protection** | Built-in request throttling and exponential backoff retry |
 
 - Uses the same Google Translate unofficial API used by popular IntelliJ translation plugins (e.g., YiiGuxing Translation Plugin)
@@ -59,6 +62,8 @@ When a problem is fetched, a README.md is optionally generated. You can preview 
 - 입출력 형식 및 제약 조건
 - 예제 테스트 케이스와 기대 입출력
 - 프로그래머스 문제는 입출력 예 테이블과 함께 표시
+- **IDE 테마를 따라감** (다크/라이트) — 본문·표·코드 블록이 테마에 맞게 스타일링
+- LaTeX 수식은 KaTeX로 테마에 맞는 색상으로 렌더링. 코드포스 구식 문제의 이미지 수식(투명 배경 + 검은 글씨)은 다크 테마에서 자동 반전 표시
 
 ### 문제 번역 (한 ↔ 영)
 
@@ -69,6 +74,7 @@ When a problem is fetched, a README.md is optionally generated. You can preview 
 | **토글 번역** | 번역 버튼 클릭으로 원문/번역 전환 |
 | **자동 언어 감지** | 한국어/영어를 자동 감지하여 반대 언어로 번역 |
 | **번역 캐싱** | 번역 결과를 캐시하여 같은 문제를 다시 번역하지 않음 |
+| **수식·예제 보호** | LaTeX 수식과 예제 입출력(`<pre>`)은 번역하지 않고 원형 유지 |
 | **Rate Limit 보호** | 요청 간 딜레이 및 exponential backoff 재시도로 IP 차단 방지 |
 
 - IntelliJ 번역 플러그인(YiiGuxing Translation Plugin 등)과 동일한 Google Translate 비공식 API 사용
