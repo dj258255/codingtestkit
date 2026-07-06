@@ -68,7 +68,7 @@ CodingTestKit은 이런 **실제 시험 환경을 IDE 안에서 그대로 재현
 - **LeetCode**: 문제 번호, slug, 또는 URL 입력 (예: `1`, `two-sum`, URL)
 - **Codeforces**: 콘테스트번호+문제번호 (예: `1234A`) 또는 URL
 
-> Codeforces: Cloudflare가 요청을 차단하면 내장 JCEF 브라우저로 자동 폴백합니다 (약 5~20초 더 걸릴 수 있음).
+> Codeforces: Cloudflare가 요청을 차단하면 내장 브라우저(화면에 보이지 않음)로 자동 폴백합니다. 첫 문제만 약 5~20초 더 걸리고, 챌린지를 한 번 통과하면 쿠키를 재사용해 다음 문제부터는 빠르게 가져옵니다.
 
 <p align="center">
   <img src="screenshots/main-panel.png" width="500" alt="메인 패널"/>
@@ -297,7 +297,7 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 ## 사용법
 
 ### 1. 문제 가져오기
-1. 우측 사이드바에서 **CodingTestKit** 열기
+1. 좌측 사이드바에서 **CodingTestKit** 열기 (프로젝트 뷰와 같은 자리에서 토글)
 2. 플랫폼과 언어 선택
 3. 문제 번호 입력 후 **가져오기** 클릭
    - 프로그래머스: `12947` (URL의 `/lessons/` 뒤 숫자)
@@ -331,6 +331,8 @@ FAIL인 케이스는 빨간색으로 표시되어 한눈에 확인할 수 있습
 - IntelliJ IDEA 2024.3 이상
 - JDK 17 이상 (Java 실행용) — 플러그인을 소스에서 직접 빌드하려면 JDK 21 필요
 - 각 언어 컴파일러 (해당 언어 테스트 시)
+
+> **Windows + C++**: MinGW-w64(또는 MSYS2)를 설치하고 `bin` 폴더를 PATH에 등록한 뒤 **IDE를 완전히 재시작**하세요 — 실행 중인 IDE에는 PATH 변경이 반영되지 않습니다.
 
 ## 빌드
 

@@ -66,7 +66,7 @@ Select the platform and language, enter a problem number, and the problem descri
 - **LeetCode**: Enter number, slug, or URL (e.g., `1`, `two-sum`, full URL)
 - **Codeforces**: contestId+letter (e.g., `1234A`) or URL
 
-> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to the built-in JCEF browser (may take ~5–20 seconds longer).
+> Codeforces: if Cloudflare blocks the request, fetching automatically falls back to a built-in browser (invisible, no window appears). Only the first problem takes ~5–20 seconds longer — once the challenge is passed, its cookies are reused and subsequent fetches are fast.
 
 <p align="center">
   <img src="screenshots/main-panel.png" width="500" alt="Main Panel"/>
@@ -295,7 +295,7 @@ Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repo
 ## Usage
 
 ### 1. Fetch a Problem
-1. Open **CodingTestKit** from the right sidebar
+1. Open **CodingTestKit** from the left sidebar (docked alongside the Project view — the two toggle)
 2. Select platform and language
 3. Enter problem ID and click **Fetch**
    - Programmers: `12947`
@@ -329,6 +329,8 @@ Setup: Settings > GitHub Integration > Click "GitHub Login" and select your repo
 - IntelliJ IDEA 2024.3+
 - JDK 17+ (for Java execution) — building the plugin from source requires JDK 21
 - Language compilers (for respective language tests)
+
+> **Windows + C++**: install MinGW-w64 (or MSYS2), add its `bin` folder to PATH, then **fully restart the IDE** — a running IDE does not pick up PATH changes.
 
 ## Build
 
