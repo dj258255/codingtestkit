@@ -3,6 +3,7 @@ package com.codingtestkit.ui
 import com.codingtestkit.service.CodingTestKitActionService
 import com.codingtestkit.service.I18n
 import com.codingtestkit.service.ProblemFileManager
+import com.codingtestkit.service.TimerService
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.Disposable
@@ -22,7 +23,7 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private val problemPanel = ProblemPanel(project)
     private val testPanel = TestPanel(project)
     private val templatePanel = TemplatePanel(project).also { Disposer.register(this, it) }
-    private val timerPanel = TimerPanel()
+    private val timerPanel = TimerPanel(TimerService.getInstance(project))
     private val referencePanel = ReferencePanel()
     private val settingsPanel = SettingsPanel(project)
     private var lastLoadedFolder: String? = null

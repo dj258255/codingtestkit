@@ -682,6 +682,7 @@
                     factoryClass="com.codingtestkit.ui.CodingTestKitToolWindowFactory"/>
         <projectService serviceImplementation="com.codingtestkit.service.TemplateService"/>
         <projectService serviceImplementation="com.codingtestkit.service.CodingTestKitActionService"/>
+        <projectService serviceImplementation="com.codingtestkit.service.TimerService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.AuthService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.GitHubService"/>
         <applicationService serviceImplementation="com.codingtestkit.service.PluginSettingsService"/>

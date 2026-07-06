@@ -86,6 +86,22 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
         iconTextGap = 0
     }
+    // ─── 하단 타이머 바 (이슈 #16): 문제를 보면서 남은 시간 확인·조작 ───
+    private val timerService = TimerService.getInstance(project)
+    private val timerBarLabel = JLabel("30:00", AllIcons.Vcs.History, SwingConstants.LEFT).apply {
+        font = Font("JetBrains Mono", Font.BOLD, JBUI.scale(13))
+    }
+    private val timerBarToggle = JButton(AllIcons.Actions.Execute).apply {
+        toolTipText = I18n.t("타이머 시작/일시정지", "Start/pause timer")
+        preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
+    }
+    private val timerBarReset = JButton(AllIcons.Actions.Restart).apply {
+        toolTipText = I18n.t("타이머 초기화", "Reset timer")
+        preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
+    }
+    private var timerBarLastText = ""
+    private var timerBarLastRunning = false
+
     private val problemDisplay = JEditorPane().apply {
         contentType = "text/html"
         isEditable = false
@@ -243,6 +259,28 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             add(scrollPane, BorderLayout.CENTER)
         }
 
+        // 하단 타이머 바 — 타이머 탭·상태바와 같은 TimerService를 공유
+        val timerBar = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.compound(
+                JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0),
+                JBUI.Borders.empty(2, 8, 2, 4)
+            )
+            add(timerBarLabel, BorderLayout.WEST)
+            add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
+                isOpaque = false
+                add(timerBarToggle)
+                add(timerBarReset)
+            }, BorderLayout.EAST)
+        }
+        add(timerBar, BorderLayout.SOUTH)
+
+        timerBarToggle.addActionListener {
+            if (timerService.isRunning) timerService.pause() else timerService.start()
+        }
+        timerBarReset.addActionListener { timerService.reset() }
+        timerService.addListener { syncTimerBar() }
+        syncTimerBar()
+
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
 
@@ -349,6 +387,20 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             ProblemSource.PROGRAMMERS -> I18n.t("프로그래머스에서 문제를 검색합니다", "Search problems on Programmers")
             ProblemSource.SWEA -> I18n.t("SWEA에서 문제를 검색합니다", "Search problems on SWEA")
         }
+    }
+
+    /** 타이머 바 표시 동기화 — 33ms 틱마다 불리므로 표시 문자열이 바뀔 때만 갱신 */
+    private fun syncTimerBar() {
+        val running = timerService.isRunning
+        val text = timerService.formatRemaining()
+        if (text == timerBarLastText && running == timerBarLastRunning) return
+        timerBarLastText = text
+        timerBarLastRunning = running
+
+        timerBarLabel.text = text
+        timerBarToggle.icon = if (running) AllIcons.Actions.Suspend else AllIcons.Actions.Execute
+        timerBarLabel.foreground = if (timerService.remainingMs in 1..59999 && running)
+            JBColor(Color.RED, Color(230, 80, 80)) else JBColor.foreground()
     }
 
     private fun createComboRenderer(): ListCellRenderer<Any?> {
