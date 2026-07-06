@@ -4,8 +4,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 
 /**
- * 카운트다운 타이머 상태 서비스 (이슈 #16).
- * 타이머 탭, 문제 탭 하단 타이머 바, 상태바 위젯이 같은 타이머를 공유·관찰한다.
+ * 카운트다운 타이머·스톱워치 상태 서비스 (이슈 #16).
+ * 타이머 탭, 문제 탭 하단 타이머 바, 상태바 위젯이 같은 상태를 공유·관찰한다.
  * Swing Timer 기반이므로 모든 호출과 콜백은 EDT에서 일어난다.
  */
 @Service(Service.Level.PROJECT)
@@ -75,6 +75,48 @@ class TimerService {
         isRunning = false
     }
 
+    // ─── 스톱워치 (스톱워치 탭과 문제 탭 하단 바가 공유) ───
+
+    var isStopwatchRunning: Boolean = false
+        private set
+
+    private var swStartTime: Long = 0
+    private var swAccumulatedMs: Long = 0
+    private var swTicker: javax.swing.Timer? = null
+
+    val stopwatchElapsedMs: Long
+        get() = if (isStopwatchRunning) swAccumulatedMs + (System.currentTimeMillis() - swStartTime)
+        else swAccumulatedMs
+
+    fun stopwatchStart() {
+        if (isStopwatchRunning) return
+        isStopwatchRunning = true
+        swStartTime = System.currentTimeMillis()
+        swTicker = javax.swing.Timer(33) { notifyListeners() }.apply { start() }
+        notifyListeners()
+    }
+
+    fun stopwatchPause() {
+        if (!isStopwatchRunning) return
+        swAccumulatedMs += System.currentTimeMillis() - swStartTime
+        stopStopwatchTicker()
+        notifyListeners()
+    }
+
+    fun stopwatchReset() {
+        stopStopwatchTicker()
+        swAccumulatedMs = 0
+        notifyListeners()
+    }
+
+    private fun stopStopwatchTicker() {
+        swTicker?.stop()
+        swTicker = null
+        isStopwatchRunning = false
+    }
+
+    // ─── 리스너 ───
+
     fun addListener(listener: () -> Unit) { listeners.add(listener) }
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
 
@@ -84,8 +126,13 @@ class TimerService {
     private fun notifyListeners() { listeners.toList().forEach { it() } }
 
     /** 남은 시간 표기: h:mm:ss 또는 mm:ss (문제 탭 바, 상태바 공용) */
-    fun formatRemaining(): String {
-        val totalSec = remainingMs / 1000
+    fun formatRemaining(): String = formatHms(remainingMs)
+
+    /** 스톱워치 경과 시간 표기: h:mm:ss 또는 mm:ss */
+    fun formatStopwatch(): String = formatHms(stopwatchElapsedMs)
+
+    private fun formatHms(ms: Long): String {
+        val totalSec = ms / 1000
         val h = totalSec / 3600
         val m = (totalSec % 3600) / 60
         val s = totalSec % 60

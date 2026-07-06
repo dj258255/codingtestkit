@@ -86,10 +86,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
         iconTextGap = 0
     }
-    // ─── 하단 타이머 바 (이슈 #16): 문제를 보면서 남은 시간 확인·조작 ───
+    // ─── 하단 타이머 바 (이슈 #16): 문제를 보면서 타이머·스톱워치 확인·조작 ───
     private val timerService = TimerService.getInstance(project)
     private val timerBarLabel = JLabel("30:00", AllIcons.Vcs.History, SwingConstants.LEFT).apply {
         font = Font("JetBrains Mono", Font.BOLD, JBUI.scale(13))
+        toolTipText = I18n.t("타이머", "Timer")
     }
     private val timerBarToggle = JButton(AllIcons.Actions.Execute).apply {
         toolTipText = I18n.t("타이머 시작/일시정지", "Start/pause timer")
@@ -99,8 +100,29 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         toolTipText = I18n.t("타이머 초기화", "Reset timer")
         preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
     }
+    // 남은 시간 비율을 보여주는 얇은 프로그레스 바 (바 상단에 배치)
+    private val timerBarProgress = JProgressBar(0, 1000).apply {
+        isStringPainted = false
+        border = JBUI.Borders.empty()
+        preferredSize = Dimension(0, JBUI.scale(3))
+        value = 1000
+    }
+    private val swBarLabel = JLabel("00:00", AllIcons.Debugger.Db_muted_breakpoint, SwingConstants.LEFT).apply {
+        font = Font("JetBrains Mono", Font.BOLD, JBUI.scale(13))
+        toolTipText = I18n.t("스톱워치", "Stopwatch")
+    }
+    private val swBarToggle = JButton(AllIcons.Actions.Execute).apply {
+        toolTipText = I18n.t("스톱워치 시작/일시정지", "Start/pause stopwatch")
+        preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
+    }
+    private val swBarReset = JButton(AllIcons.Actions.Restart).apply {
+        toolTipText = I18n.t("스톱워치 초기화", "Reset stopwatch")
+        preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
+    }
     private var timerBarLastText = ""
     private var timerBarLastRunning = false
+    private var swBarLastText = ""
+    private var swBarLastRunning = false
 
     private val problemDisplay = JEditorPane().apply {
         contentType = "text/html"
@@ -259,18 +281,27 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             add(scrollPane, BorderLayout.CENTER)
         }
 
-        // 하단 타이머 바 — 타이머 탭·상태바와 같은 TimerService를 공유
+        // 하단 타이머 바 — 타이머 탭·상태바와 같은 TimerService를 공유.
+        // 상단에 얇은 프로그레스 바, 왼쪽에 타이머 그룹, 오른쪽에 스톱워치 그룹.
         val timerBar = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.compound(
-                JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0),
-                JBUI.Borders.empty(2, 8, 2, 4)
-            )
-            add(timerBarLabel, BorderLayout.WEST)
-            add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
+            border = JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0)
+            add(timerBarProgress, BorderLayout.NORTH)
+            add(JPanel(BorderLayout()).apply {
                 isOpaque = false
-                add(timerBarToggle)
-                add(timerBarReset)
-            }, BorderLayout.EAST)
+                border = JBUI.Borders.empty(2, 8, 2, 4)
+                add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(2), 0)).apply {
+                    isOpaque = false
+                    add(timerBarLabel)
+                    add(timerBarToggle)
+                    add(timerBarReset)
+                }, BorderLayout.WEST)
+                add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
+                    isOpaque = false
+                    add(swBarLabel)
+                    add(swBarToggle)
+                    add(swBarReset)
+                }, BorderLayout.EAST)
+            }, BorderLayout.CENTER)
         }
         add(timerBar, BorderLayout.SOUTH)
 
@@ -278,6 +309,10 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             if (timerService.isRunning) timerService.pause() else timerService.start()
         }
         timerBarReset.addActionListener { timerService.reset() }
+        swBarToggle.addActionListener {
+            if (timerService.isStopwatchRunning) timerService.stopwatchPause() else timerService.stopwatchStart()
+        }
+        swBarReset.addActionListener { timerService.stopwatchReset() }
         timerService.addListener { syncTimerBar() }
         syncTimerBar()
 
@@ -391,16 +426,29 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     /** 타이머 바 표시 동기화 — 33ms 틱마다 불리므로 표시 문자열이 바뀔 때만 갱신 */
     private fun syncTimerBar() {
+        // 프로그레스는 int(0~1000) 단위라 같은 값이면 setValue가 no-op
+        timerBarProgress.value = if (timerService.totalMs > 0)
+            ((timerService.remainingMs.toDouble() / timerService.totalMs) * 1000).toInt() else 1000
+
         val running = timerService.isRunning
         val text = timerService.formatRemaining()
-        if (text == timerBarLastText && running == timerBarLastRunning) return
-        timerBarLastText = text
-        timerBarLastRunning = running
+        if (text != timerBarLastText || running != timerBarLastRunning) {
+            timerBarLastText = text
+            timerBarLastRunning = running
+            timerBarLabel.text = text
+            timerBarToggle.icon = if (running) AllIcons.Actions.Suspend else AllIcons.Actions.Execute
+            timerBarLabel.foreground = if (timerService.remainingMs in 1..59999 && running)
+                JBColor(Color.RED, Color(230, 80, 80)) else JBColor.foreground()
+        }
 
-        timerBarLabel.text = text
-        timerBarToggle.icon = if (running) AllIcons.Actions.Suspend else AllIcons.Actions.Execute
-        timerBarLabel.foreground = if (timerService.remainingMs in 1..59999 && running)
-            JBColor(Color.RED, Color(230, 80, 80)) else JBColor.foreground()
+        val swRunning = timerService.isStopwatchRunning
+        val swText = timerService.formatStopwatch()
+        if (swText != swBarLastText || swRunning != swBarLastRunning) {
+            swBarLastText = swText
+            swBarLastRunning = swRunning
+            swBarLabel.text = swText
+            swBarToggle.icon = if (swRunning) AllIcons.Actions.Suspend else AllIcons.Actions.Execute
+        }
     }
 
     private fun createComboRenderer(): ListCellRenderer<Any?> {

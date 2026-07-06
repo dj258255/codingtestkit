@@ -20,7 +20,7 @@ class TimerPanel(timerService: TimerService) : JPanel(BorderLayout()) {
         val tabbedPane = JTabbedPane().apply {
             border = JBUI.Borders.empty()
         }
-        tabbedPane.addTab(I18n.t("스톱워치", "Stopwatch"), AllIcons.Debugger.Db_muted_breakpoint, StopwatchPanel())
+        tabbedPane.addTab(I18n.t("스톱워치", "Stopwatch"), AllIcons.Debugger.Db_muted_breakpoint, StopwatchPanel(timerService))
         tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Actions.StartDebugger, CountdownPanel(timerService))
         add(tabbedPane, BorderLayout.CENTER)
     }
@@ -206,12 +206,10 @@ class TimerPanel(timerService: TimerService) : JPanel(BorderLayout()) {
 
     // ─── 스톱워치 ───
 
-    private class StopwatchPanel : JPanel(BorderLayout()) {
+    private class StopwatchPanel(private val timerService: TimerService) : JPanel(BorderLayout()) {
 
-        private var startTime: Long = 0
-        private var accumulatedMs: Long = 0
-        private var running = false
-        private var timer: Timer? = null
+        // 스톱워치 상태(경과 시간·실행 여부)는 TimerService가 소유하고,
+        // 이 패널은 서비스 리스너로 표시만 동기화한다 (이슈 #16).
         private var lapCount = 0
         private var lastLapMs: Long = 0
 
@@ -293,54 +291,25 @@ class TimerPanel(timerService: TimerService) : JPanel(BorderLayout()) {
             }
             add(lapScroll, BorderLayout.CENTER)
 
-            startButton.addActionListener { start() }
-            stopButton.addActionListener { stop() }
+            startButton.addActionListener { timerService.stopwatchStart() }
+            stopButton.addActionListener { timerService.stopwatchPause() }
             resetButton.addActionListener { reset() }
             lapButton.addActionListener { lap() }
-        }
 
-        private fun getElapsedMs(): Long {
-            return if (running) accumulatedMs + (System.currentTimeMillis() - startTime)
-            else accumulatedMs
-        }
-
-        private fun start() {
-            if (running) return
-            running = true
-            startTime = System.currentTimeMillis()
-            startButton.isEnabled = false
-            stopButton.isEnabled = true
-            lapButton.isEnabled = true
-            timer = Timer(33) { updateDisplay() }
-            timer?.start()
-        }
-
-        private fun stop() {
-            if (!running) return
-            accumulatedMs += System.currentTimeMillis() - startTime
-            running = false
-            timer?.stop()
-            startButton.isEnabled = true
-            startButton.text = I18n.t("재개", "Resume")
-            stopButton.isEnabled = false
-            lapButton.isEnabled = false
-            updateDisplay()
+            // 문제 탭 하단 바에서 조작해도 이 패널이 따라가도록 서비스 구독
+            timerService.addListener { syncFromService() }
+            syncFromService()
         }
 
         private fun reset() {
-            if (running) { timer?.stop(); running = false }
-            accumulatedMs = 0; lapCount = 0; lastLapMs = 0
+            lapCount = 0; lastLapMs = 0
             lapRecords.clear()
             lapTableModel.fireTableDataChanged()
-            startButton.isEnabled = true
-            startButton.text = I18n.t("시작", "Start")
-            stopButton.isEnabled = false
-            lapButton.isEnabled = false
-            updateDisplay()
+            timerService.stopwatchReset()
         }
 
         private fun lap() {
-            val elapsed = getElapsedMs()
+            val elapsed = timerService.stopwatchElapsedMs
             lapCount++
             val diff = elapsed - lastLapMs
             lastLapMs = elapsed
@@ -348,8 +317,15 @@ class TimerPanel(timerService: TimerService) : JPanel(BorderLayout()) {
             lapTableModel.fireTableRowsInserted(lapRecords.size - 1, lapRecords.size - 1)
         }
 
-        private fun updateDisplay() {
-            timeLabel.text = formatTime(getElapsedMs())
+        /** 서비스 상태에서 버튼·표시를 유도 — 어디서 조작해도 일관됨 */
+        private fun syncFromService() {
+            val running = timerService.isStopwatchRunning
+            val pausedMidway = !running && timerService.stopwatchElapsedMs > 0
+            startButton.isEnabled = !running
+            stopButton.isEnabled = running
+            lapButton.isEnabled = running
+            startButton.text = if (pausedMidway) I18n.t("재개", "Resume") else I18n.t("시작", "Start")
+            timeLabel.text = formatTime(timerService.stopwatchElapsedMs)
         }
     }
 
