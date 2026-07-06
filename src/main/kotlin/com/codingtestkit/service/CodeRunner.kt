@@ -629,7 +629,14 @@ end
     private val javacPath: String by lazy { findExecutable("javac", "$javaHome/bin/javac") }
     private val javaPath: String by lazy { findExecutable("java", "$javaHome/bin/java") }
     private val pythonPath: String by lazy { detectPython() }
-    private val gppPath: String by lazy { findExecutable("g++", "/usr/bin/g++", "/usr/local/bin/g++", "/opt/homebrew/bin/g++") }
+    private val gppPath: String by lazy {
+        findExecutable("g++",
+            "/usr/bin/g++", "/usr/local/bin/g++", "/opt/homebrew/bin/g++",
+            // Windows: MSYS2(UCRT64/MINGW64), MinGW, TDM-GCC, Chocolatey
+            "C:\\msys64\\ucrt64\\bin\\g++", "C:\\msys64\\mingw64\\bin\\g++",
+            "C:\\MinGW\\bin\\g++", "C:\\TDM-GCC-64\\bin\\g++",
+            "C:\\ProgramData\\chocolatey\\bin\\g++")
+    }
     private val kotlincPath: String by lazy { detectKotlinc() }
     private val nodePath: String by lazy { detectNode() }
     private val rustcPath: String by lazy {
@@ -698,7 +705,7 @@ end
     private fun detectKotlinc(): String {
         // 1. PATH나 일반적인 설치 경로
         val found = findExecutable("kotlinc", "/usr/local/bin/kotlinc", "/opt/homebrew/bin/kotlinc")
-        if (found != "kotlinc" && File(found).exists()) return found
+        if (found.isNotBlank()) return found
 
         // 2. SDKMAN
         val sdkmanPath = "${System.getProperty("user.home")}/.sdkman/candidates/kotlin/current/bin/kotlinc"
@@ -786,7 +793,9 @@ end
                 if (ok && resolved != null) return resolved
             } catch (_: Exception) {}
         }
-        return candidates.first() // fallback: 원래 이름 그대로 (PATH 탐색에 맡김)
+        // 못 찾으면 빈 문자열: 호출부의 not-found 분기가 도구별 설치 안내를 띄울 수 있게 함.
+        // (이름 그대로 반환하면 ProcessBuilder가 CreateProcess error=2 같은 원시 오류를 노출)
+        return ""
     }
 
     fun getDetectedPaths(): Map<String, String> = mapOf(
@@ -933,10 +942,18 @@ end
 
     private fun runCpp(code: String, input: String, dir: File, timeout: Long): RunResult {
         if (gppPath.isBlank()) {
-            return RunResult(output = "", error = I18n.t(
+            val message = if (isWindows) I18n.t(
+                "g++를 찾을 수 없습니다.\nMinGW-w64(또는 MSYS2)를 설치하고 bin 폴더를 PATH에 등록하세요.\n" +
+                    "이미 설치했다면 IDE를 완전히 재시작하세요.\n" +
+                    "(PATH 변경은 재시작 전의 IDE에 반영되지 않으며, JetBrains Toolbox 사용 시 Toolbox도 재시작 필요)",
+                "g++ not found.\nInstall MinGW-w64 (or MSYS2) and add its bin folder to PATH.\n" +
+                    "If already installed, fully restart the IDE.\n" +
+                    "(PATH changes are not picked up by an already-running IDE; restart JetBrains Toolbox too if you use it)"
+            ) else I18n.t(
                 "g++를 찾을 수 없습니다.\nXcode Command Line Tools를 설치하세요:\nxcode-select --install",
                 "g++ not found.\nPlease install Xcode Command Line Tools:\nxcode-select --install"
-            ), exitCode = -1)
+            )
+            return RunResult(output = "", error = message, exitCode = -1)
         }
         val sourceFile = File(dir, "solution.cpp")
         val outputFile = File(dir, "solution")
@@ -1052,10 +1069,18 @@ end
         input: String,
         timeout: Long
     ): RunResult {
-        val process = ProcessBuilder(command)
-            .directory(dir)
-            .redirectErrorStream(false)
-            .start()
+        val process = try {
+            ProcessBuilder(command)
+                .directory(dir)
+                .redirectErrorStream(false)
+                .start()
+        } catch (e: java.io.IOException) {
+            // 실행 파일이 PATH에 없거나 접근 불가 (예: CreateProcess error=2)
+            return RunResult(output = "", error = I18n.t(
+                "'${command.first()}' 을(를) 실행할 수 없습니다.\n설치 후 PATH에 등록하고 IDE를 완전히 재시작하세요.",
+                "Failed to run '${command.first()}'.\nInstall it, add it to PATH, then fully restart the IDE."
+            ), exitCode = -1)
+        }
 
         // 입력이 없어도 stdin을 닫아 EOF를 전달해야 함.
         // 닫지 않으면 stdin을 읽는 코드가 타임아웃까지 블로킹되어 허위 시간 초과가 발생하고 파이프 FD가 누수됨.
