@@ -89,21 +89,46 @@ object SweaJcefFetcher {
         private val future: CompletableFuture<Problem?>
     ) {
         private val done = AtomicBoolean(false)
-        private var frame: JFrame? = null
+        private var frame: JFrame? = null // OSR 미지원 환경의 숨김 프레임 폴백용
         private var browser: JBCefBrowser? = null
         private var timeoutTimer: Timer? = null
 
-        fun start() {
+        /**
+         * 사용자에게 보이지 않는 스크래핑용 브라우저 생성.
+         *
+         * 1순위는 오프스크린 렌더링(OSR): OS 창 자체가 없어 어떤 플랫폼에서도
+         * 노출될 수 없다. 화면 밖 좌표(-3000,-3000)로 숨기는 기존 방식은
+         * Linux(Wayland 등)에서 WM이 창 위치 지정을 무시해 제목줄 없는
+         * 플로팅 창으로 그대로 노출됐다 (이슈 #9).
+         */
+        private fun createHiddenBrowser(url: String): JBCefBrowser {
+            try {
+                val osr = JBCefBrowser.createBuilder()
+                    .setUrl(url)
+                    .setOffScreenRendering(true)
+                    .setCreateImmediately(true)
+                    .build()
+                // OSR는 컴포넌트 크기를 뷰포트로 사용하므로 명시적으로 지정
+                osr.component.setBounds(0, 0, 1024, 768)
+                return osr
+            } catch (e: Exception) {
+                LOG.info("[CodingTestKit] JCEF OSR unavailable, falling back to hidden frame: ${e.message}")
+            }
+            // 폴백: 화면 밖 숨김 프레임 (일부 Linux WM에서는 노출될 수 있음)
+            val windowed = JBCefBrowser(url)
             frame = JFrame().apply {
                 type = Window.Type.UTILITY
                 isUndecorated = true
                 size = Dimension(1024, 768)
                 setLocation(-3000, -3000)
+                contentPane.add(windowed.component)
+                isVisible = true
             }
+            return windowed
+        }
 
-            browser = JBCefBrowser(LIST_URL)
-            frame!!.contentPane.add(browser!!.component)
-            frame!!.isVisible = true
+        fun start() {
+            browser = createHiddenBrowser(LIST_URL)
 
             LOG.info("[CodingTestKit] JCEF fetch session started: $contestProbId")
 
