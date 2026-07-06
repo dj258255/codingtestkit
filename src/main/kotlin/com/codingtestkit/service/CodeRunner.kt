@@ -13,8 +13,10 @@ object CodeRunner {
      * 컴파일 단계 전용 타임아웃.
      * 컴파일 시간은 문제의 실행 시간 제한과 무관하며, 저사양·콜드 캐시 환경(CI 등)에서는
      * rustc/go/kotlinc가 10초를 훌쩍 넘길 수 있어 넉넉하게 잡는다.
+     * 60초로도 느린 Windows CI 러너에서 rustc -O가 간헐적으로 초과함 (이슈 #18) —
+     * 상한일 뿐이라 정상 컴파일 속도에는 영향 없음.
      */
-    private const val COMPILE_TIMEOUT_SECONDS = 60L
+    private const val COMPILE_TIMEOUT_SECONDS = 120L
 
     data class RunResult(
         val output: String,
