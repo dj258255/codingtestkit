@@ -117,6 +117,30 @@ class CodeforcesCrawlerTest {
     }
 
     @Test
+    fun `stripMathJaxArtifacts cleans legacy saved description`() {
+        // 수정 이전 버전에서 저장된 problem.json의 description 형태
+        val legacy = """<h2>Problem</h2><p>You are given
+            <span class="MathJax_Preview">n</span>
+            <span class="MathJax" role="presentation" style="position:relative;"><span>n</span></span>
+            <script type="math/tex">n</script>
+            vertices and <script type="math/tex; mode=display">a_i \le 10^6</script>.</p>"""
+
+        val cleaned = CodeforcesCrawler.stripMathJaxArtifacts(legacy)
+
+        assertFalse(cleaned.contains("role=\"presentation\""))
+        assertFalse(cleaned.contains("MathJax"))
+        assertFalse(cleaned.contains("math/tex"))
+        assertTrue(cleaned.contains("${'$'}n${'$'}"), "inline TeX restored: $cleaned")
+        assertTrue(cleaned.contains("${'$'}${'$'}a_i \\le 10^6${'$'}${'$'}"), "display TeX restored: $cleaned")
+    }
+
+    @Test
+    fun `stripMathJaxArtifacts is no-op for clean description`() {
+        val clean = "<h2>Problem</h2><p>Given ${'$'}n${'$'} vertices.</p>"
+        assertEquals(clean, CodeforcesCrawler.stripMathJaxArtifacts(clean))
+    }
+
+    @Test
     fun `plain HTML without MathJax is unaffected`() {
         val html = """
             <html><body><div class="problem-statement">
