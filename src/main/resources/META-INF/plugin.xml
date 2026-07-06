@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit</name>
-    <version>1.5.0</version>
+    <version>1.6.0</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -157,6 +157,35 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.6.0</h3>
+        <p><b>Always-visible timer</b> (Problems-tab mini bar + status bar) and <b>Codeforces stability</b> — invisible Cloudflare fallback, cookie-based fast fetching, math rendering & translation fixes.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] Timer mini bar & status bar</b> – The countdown timer and stopwatch (with start/pause/reset and a thin remaining-time progress bar) are now always visible at the bottom of the Problems tab, and the remaining time also appears in the IDE status bar. All views share one timer — controlling it anywhere keeps the others in sync. (<a href="https://github.com/dj258255/codingtestkit/issues/16">#16</a>)</li>
+            <li><b>[New] Tool window opens on the left</b> – Docked in the same group as the Project view so the two toggle, each using the full height. Drag it elsewhere if you prefer. When split with another tool window, its height can now be freely resized. (<a href="https://github.com/dj258255/codingtestkit/issues/14">#14</a>, <a href="https://github.com/dj258255/codingtestkit/issues/12">#12</a>)</li>
+            <li><b>[New] Faster Codeforces fetching under Cloudflare</b> – Once the embedded-browser fallback passes the challenge, its cookies are reused so subsequent fetches take the fast HTTP path (~1s) instead of re-running the browser. (<a href="https://github.com/dj258255/codingtestkit/issues/21">#21</a>)</li>
+            <li><b>[Fix] Codeforces fallback browser visible on Linux</b> – The scraping browser now uses off-screen rendering, which creates no OS window at all — it can no longer appear as an undecorated floating window (Wayland ignored the previous off-screen positioning) or be closed mid-fetch. (<a href="https://github.com/dj258255/codingtestkit/issues/9">#9</a>)</li>
+            <li><b>[Fix] Duplicated formulas & broken translation on fallback-fetched Codeforces problems</b> – The fallback captured MathJax-rendered DOM, showing each formula twice and leaking raw markup into translations. The original TeX is now restored at fetch time, and previously saved problems are cleaned automatically when loaded. (<a href="https://github.com/dj258255/codingtestkit/issues/25">#25</a>)</li>
+            <li><b>[Fix] Legacy Codeforces image formulas invisible in dark theme</b> – Black-on-transparent formula images are auto-inverted to match the theme. (<a href="https://github.com/dj258255/codingtestkit/issues/27">#27</a>)</li>
+            <li><b>[Fix] C++ compiler not found on Windows</b> – Common MinGW-w64 / MSYS2 / TDM-GCC install paths are now checked, and missing-toolchain errors give OS-specific guidance (install + PATH + full IDE restart) instead of macOS-only instructions. Applies to every language's missing-tool message. (<a href="https://github.com/dj258255/codingtestkit/issues/10">#10</a>)</li>
+            <li><b>[Fix] Translation protects math and samples</b> – LaTeX formulas and sample I/O are kept verbatim during KR↔EN translation, and the whole description is translated in a single request (faster, fewer rate limits).</li>
+            <li><b>[Fix] False compile-timeout on slow machines</b> – The compile-stage timeout was raised to 120s (it is an upper bound only; normal compile speed is unaffected). (<a href="https://github.com/dj258255/codingtestkit/issues/18">#18</a>)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] 타이머 미니 바 & 상태바 표시</b> – 카운트다운 타이머와 스톱워치(시작/일시정지/초기화 + 남은 시간 프로그레스 바)가 문제 탭 하단에 항상 표시되고, IDE 상태바에도 남은 시간이 나옵니다. 세 화면이 같은 타이머를 공유해 어디서 조작해도 동기화됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/16">#16</a>)</li>
+            <li><b>[신규] 툴윈도우 기본 위치 왼쪽</b> – 프로젝트 뷰와 같은 그룹에서 토글되어 각자 전체 높이를 사용합니다 (드래그로 위치 변경 가능). 다른 툴윈도우와 세로 분할 시 높이도 자유롭게 조절됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/14">#14</a>, <a href="https://github.com/dj258255/codingtestkit/issues/12">#12</a>)</li>
+            <li><b>[신규] Cloudflare 차단 시 코드포스 가져오기 가속</b> – 내장 브라우저 폴백이 챌린지를 한 번 통과하면 그 쿠키를 재사용해, 다음 문제부터는 빠른 HTTP 경로(~1초)로 가져옵니다. (<a href="https://github.com/dj258255/codingtestkit/issues/21">#21</a>)</li>
+            <li><b>[수정] Linux에서 코드포스 폴백 브라우저 노출</b> – 스크래핑 브라우저를 오프스크린 렌더링으로 전환해 OS 창 자체가 생성되지 않습니다. 제목줄 없는 플로팅 창으로 노출되거나(Wayland가 화면 밖 배치를 무시) 사용자가 실수로 닫는 문제가 원천 차단됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/9">#9</a>)</li>
+            <li><b>[수정] 폴백으로 가져온 코드포스 문제의 수식 중복·번역 깨짐</b> – 폴백이 MathJax가 렌더링한 DOM을 가져와 수식이 두 번씩 표시되고 번역 시 마크업이 본문에 노출됐습니다. 가져오는 시점에 원본 TeX를 복원하고, 이전에 저장된 문제도 불러올 때 자동 정리됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/25">#25</a>)</li>
+            <li><b>[수정] 다크 테마에서 코드포스 구식 수식 이미지 안 보임</b> – 투명 배경 + 검은 글씨 수식 이미지를 테마에 맞게 자동 반전합니다. (<a href="https://github.com/dj258255/codingtestkit/issues/27">#27</a>)</li>
+            <li><b>[수정] Windows에서 g++ 미탐지</b> – MinGW-w64 / MSYS2 / TDM-GCC 일반 설치 경로를 탐지하고, 컴파일러 미발견 안내가 OS별로 표시됩니다 (설치 + PATH 등록 + IDE 완전 재시작 안내). 모든 언어의 도구 미발견 메시지에 적용. (<a href="https://github.com/dj258255/codingtestkit/issues/10">#10</a>)</li>
+            <li><b>[수정] 번역 시 수식·예제 보호</b> – 한↔영 번역에서 LaTeX 수식과 예제 입출력을 원형 그대로 유지하고, 본문을 한 번의 요청으로 번역합니다 (더 빠르고 rate limit에 강함).</li>
+            <li><b>[수정] 저사양 환경 허위 컴파일 시간 초과</b> – 컴파일 단계 타임아웃을 120초로 상향 (상한일 뿐 정상 컴파일 속도에는 무영향). (<a href="https://github.com/dj258255/codingtestkit/issues/18">#18</a>)</li>
+        </ul>
+
         <h3>v1.5.0</h3>
         <p><b>Rust, Go, and Ruby language support</b> (requested in <a href="https://github.com/dj258255/codingtestkit/issues/7">#7</a>) + Cloudflare-resistant Codeforces fetching.</p>
 
