@@ -140,8 +140,12 @@ object CodeforcesJcefFetcher {
                     .setOffScreenRendering(true)
                     .setCreateImmediately(true)
                     .build()
-                // OSR는 컴포넌트 크기를 뷰포트로 사용하므로 명시적으로 지정
+                // OSR는 컴포넌트 크기를 뷰포트로 사용하므로 명시적으로 지정.
+                // setBounds만으로는 일부 환경(Linux)에서 뷰포트가 0×0으로 잡혀
+                // 렌더링·JS 실행이 안 될 수 있어 wasResized로 크기를 확실히 통지 (이슈 #30).
                 osr.component.setBounds(0, 0, 1024, 768)
+                osr.component.preferredSize = Dimension(1024, 768)
+                try { osr.cefBrowser.wasResized(1024, 768) } catch (_: Throwable) {}
                 return osr
             } catch (e: Exception) {
                 LOG.info("[CodingTestKit] JCEF OSR unavailable, falling back to hidden frame: ${e.message}")

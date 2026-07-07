@@ -809,9 +809,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     ProblemSource.CODEFORCES -> try {
                         CodeforcesCrawler.fetchProblem(id, cookies)
                     } catch (e: Exception) {
-                        // Cloudflare가 Jsoup을 차단(403)하면 실브라우저(JCEF)로 폴백
+                        // Cloudflare가 Jsoup을 차단(403)하면 3단 폴백:
+                        // 1) OSR 실브라우저(안 보임, 자동) → 2) 실패 시 보이는 다이얼로그(사용자 직접 통과)
                         if (CodeforcesJcefFetcher.isAvailable()) {
                             CodeforcesJcefFetcher.fetchProblem(id)
+                                ?: fetchCodeforcesViaDialog(id)
                                 ?: throw IllegalStateException("${e.message}\nJCEF fallback: ${CodeforcesJcefFetcher.lastError}")
                         } else throw e
                     }
@@ -829,6 +831,23 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
         }
+    }
+
+    /**
+     * OSR 폴백까지 실패했을 때의 최종 폴백: 보이는 다이얼로그로 사용자가 직접
+     * Cloudflare 챌린지를 통과하게 한다 (이슈 #30). 백그라운드 스레드에서 호출되므로
+     * EDT에서 다이얼로그를 띄우고 결과를 기다린다.
+     */
+    private fun fetchCodeforcesViaDialog(id: String): Problem? {
+        if (!JBCefApp.isSupported()) return null
+        var result: Problem? = null
+        SwingUtilities.invokeAndWait {
+            val dialog = CodeforcesFetchDialog(project, id)
+            if (dialog.showAndGet()) {
+                result = dialog.getProblem()
+            }
+        }
+        return result
     }
 
     private fun fetchSweaProblem(problemId: String, language: Language) {
