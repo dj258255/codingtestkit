@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit</name>
-    <version>1.6.0</version>
+    <version>1.6.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -157,6 +157,21 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.6.1</h3>
+        <p><b>Codeforces fetching on Linux</b> + <b>instant UI language switching.</b></p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] Codeforces fetch on Linux</b> – The invisible (offscreen) browser cannot complete Cloudflare's canvas-rendering challenge on Linux due to a CEF-level offscreen paint/requestAnimationFrame issue (reproduced in CI). On Linux, fetching now goes straight to the visible fallback dialog (a real window renders correctly and passes the check); the passed <code>cf_clearance</code> cookie is cached so only the first problem shows the dialog and later fetches are silent. macOS/Windows keep the invisible automatic path.</li>
+            <li><b>[New] Instant UI language switching</b> – Changing the UI language (Korean/English) in Settings now updates all panels immediately without reopening the tool window; the current tab is preserved.</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] 리눅스 Codeforces 가져오기</b> – 안 보이는(오프스크린) 브라우저가 리눅스에서 CEF 오프스크린 페인트/requestAnimationFrame 문제로 Cloudflare의 canvas 렌더 챌린지를 통과하지 못하는 것을 CI로 확인. 리눅스는 이제 곧바로 보이는 폴백 다이얼로그(실제 창은 정상 렌더 → 통과)로 가며, 통과한 <code>cf_clearance</code> 쿠키를 캐싱해 첫 문제만 다이얼로그가 뜨고 이후는 조용히 가져온다. macOS/Windows는 안 보이는 자동 경로 유지.</li>
+            <li><b>[신규] UI 언어 즉시 전환</b> – 설정에서 UI 언어(한국어/English)를 바꾸면 도구 창을 다시 열지 않아도 모든 패널이 즉시 갱신된다. 보던 탭은 유지.</li>
+        </ul>
+
         <h3>v1.6.0</h3>
         <p><b>Always-visible timer</b> (Problems-tab mini bar + status bar) and <b>Codeforces stability</b> — invisible Cloudflare fallback, cookie-based fast fetching, math rendering & translation fixes.</p>
 
