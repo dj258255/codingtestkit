@@ -73,5 +73,9 @@ tasks {
     test {
         useJUnitPlatform()
         jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
+        // OSR 스파이크(JcefOsrSpikeTest)가 헤드리스 CI에서 JCEF를 초기화할 수 있게.
+        // 평소엔 무해(스파이크는 CTK_OSR_SPIKE=true 환경변수일 때만 실동작).
+        systemProperty("ide.browser.jcef.headless.enabled", "true")
+        testLogging { showStandardStreams = true } // [OSR-SPIKE] 로그를 CI에 노출
     }
 }
