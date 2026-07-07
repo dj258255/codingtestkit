@@ -125,53 +125,69 @@ object CodeforcesJcefFetcher {
         private var browser: JBCefBrowser? = null
         private var timeoutTimer: Timer? = null
 
+        private var isOsr = false
+
         /**
-         * 사용자에게 보이지 않는 스크래핑용 브라우저 생성.
+         * 사용자에게 보이지 않는 스크래핑용 브라우저를 생성만(네이티브 초기화 X) 한다.
          *
          * 1순위는 오프스크린 렌더링(OSR): OS 창 자체가 없어 어떤 플랫폼에서도
          * 노출될 수 없다. 화면 밖 좌표(-3000,-3000)로 숨기는 기존 방식은
          * Linux(Wayland 등)에서 WM이 창 위치 지정을 무시해 제목줄 없는
          * 플로팅 창으로 그대로 노출됐다 (이슈 #9).
+         *
+         * 중요: 여기서는 브라우저를 만들되 **네이티브 생성(createImmediately)은 하지 않는다.**
+         * JBCefJSQuery·로드 핸들러를 먼저 등록한 뒤 start()에서 생성해야 메시지 라우터가
+         * 제때 붙는다. setCreateImmediately(true)로 먼저 생성하면 일부 환경(Linux)에서
+         * JSQuery 콜백이 아예 안 붙어 추출이 멈춘다 (이슈 #30).
          */
-        private fun createHiddenBrowser(url: String): JBCefBrowser {
+        private fun buildHiddenBrowser(url: String): JBCefBrowser {
             try {
                 val osr = JBCefBrowser.createBuilder()
                     .setUrl(url)
                     .setOffScreenRendering(true)
-                    .setCreateImmediately(true)
+                    .setCreateImmediately(false)
                     .build()
-                // OSR는 컴포넌트 크기를 뷰포트로 사용하므로 명시적으로 지정.
-                // setBounds만으로는 일부 환경(Linux)에서 뷰포트가 0×0으로 잡혀
-                // 렌더링·JS 실행이 안 될 수 있어 wasResized로 크기를 확실히 통지 (이슈 #30).
                 osr.component.setBounds(0, 0, 1024, 768)
                 osr.component.preferredSize = Dimension(1024, 768)
-                try { osr.cefBrowser.wasResized(1024, 768) } catch (_: Throwable) {}
+                isOsr = true
                 return osr
             } catch (e: Exception) {
                 LOG.info("[CodingTestKit] JCEF OSR unavailable, falling back to hidden frame: ${e.message}")
             }
             // 폴백: 화면 밖 숨김 프레임 (일부 Linux WM에서는 노출될 수 있음)
-            val windowed = JBCefBrowser(url)
-            frame = JFrame().apply {
-                type = Window.Type.UTILITY
-                isUndecorated = true
-                size = Dimension(1024, 768)
-                setLocation(-3000, -3000)
-                contentPane.add(windowed.component)
-                isVisible = true
+            isOsr = false
+            return JBCefBrowser(url)
+        }
+
+        /** 핸들러 등록이 끝난 뒤 브라우저 네이티브를 생성하고 로딩을 시작한다. */
+        private fun realizeBrowser(br: JBCefBrowser) {
+            if (isOsr) {
+                br.createImmediately()
+                // OSR 뷰포트가 0×0으로 잡혀 렌더링·JS 실행이 안 되는 환경 대응 (이슈 #30)
+                try { br.cefBrowser.wasResized(1024, 768) } catch (_: Throwable) {}
+            } else {
+                frame = JFrame().apply {
+                    type = Window.Type.UTILITY
+                    isUndecorated = true
+                    size = Dimension(1024, 768)
+                    setLocation(-3000, -3000)
+                    contentPane.add(br.component) // 표시가 네이티브 생성을 트리거
+                    isVisible = true
+                }
             }
-            return windowed
         }
 
         fun start() {
             val (contestId, letter) = CodeforcesCrawler.parseProblemId(problemId)
             val url = "https://codeforces.com/problemset/problem/$contestId/$letter?locale=en"
 
-            browser = createHiddenBrowser(url)
+            val br = buildHiddenBrowser(url)
+            browser = br
 
-            LOG.info("[CodingTestKit] Codeforces JCEF fetch started: $problemId")
+            LOG.info("[CodingTestKit] Codeforces JCEF fetch started: $problemId (osr=$isOsr)")
 
-            val jsQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
+            // 1) JSQuery·핸들러를 먼저 등록 (메시지 라우터가 네이티브 생성 전에 붙도록)
+            val jsQuery = JBCefJSQuery.create(br as JBCefBrowserBase)
             jsQuery.addHandler { html ->
                 handleHtml(html)
                 JBCefJSQuery.Response("")
@@ -181,7 +197,7 @@ object CodeforcesJcefFetcher {
                 complete(null, "JCEF internal timeout")
             }.apply { isRepeats = false; start() }
 
-            browser!!.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
+            br.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
                 override fun onLoadEnd(cefBrowser: CefBrowser?, cefFrame: CefFrame?, httpStatusCode: Int) {
                     if (cefFrame?.isMain != true || done.get()) return
                     val url = cefBrowser?.url ?: ""
@@ -197,7 +213,10 @@ object CodeforcesJcefFetcher {
                         tryCookieRetry()
                     }
                 }
-            }, browser!!.cefBrowser)
+            }, br.cefBrowser)
+
+            // 2) 모든 핸들러 등록이 끝난 뒤에야 네이티브 브라우저를 생성·로딩
+            realizeBrowser(br)
         }
 
         private val cookieRetryStarted = AtomicBoolean(false)
