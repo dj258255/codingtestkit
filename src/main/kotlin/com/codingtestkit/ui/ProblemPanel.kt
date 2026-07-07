@@ -134,6 +134,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private val useCef = try { JBCefApp.isSupported() } catch (_: Exception) { false }
+    private val isLinux = System.getProperty("os.name").lowercase().contains("linux")
     private var cefBrowser: JBCefBrowser? = null
     private var currentProblemHtml = ""
 
@@ -809,13 +810,22 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                     ProblemSource.CODEFORCES -> try {
                         CodeforcesCrawler.fetchProblem(id, cookies)
                     } catch (e: Exception) {
-                        // Cloudflare가 Jsoup을 차단(403)하면 3단 폴백:
-                        // 1) OSR 실브라우저(안 보임, 자동) → 2) 실패 시 보이는 다이얼로그(사용자 직접 통과)
-                        if (CodeforcesJcefFetcher.isAvailable()) {
-                            CodeforcesJcefFetcher.fetchProblem(id)
-                                ?: fetchCodeforcesViaDialog(id)
-                                ?: throw IllegalStateException("${e.message}\nJCEF fallback: ${CodeforcesJcefFetcher.lastError}")
-                        } else throw e
+                        // Cloudflare가 Jsoup을 차단(403)하면 실브라우저(JCEF) 폴백.
+                        if (!CodeforcesJcefFetcher.isAvailable()) throw e
+                        // Linux는 OSR(오프스크린)에서 CEF OnPaint/requestAnimationFrame이 돌지 않아
+                        // Cloudflare의 canvas 렌더 챌린지를 통과하지 못한다 — GitHub Actions(Xvfb) CI로
+                        // 재현·확인한 CEF 레벨 버그(chromiumembedded/cef#2800, #4166). 따라서 Linux는
+                        // OSR로 시간을 허비하지 않고 곧바로 보이는 다이얼로그(실제 창 렌더 → 통과)로 간다.
+                        // macOS/Windows는 OSR이 정상이라 팝업 없이 자동 처리를 먼저 시도.
+                        val osrProblem = if (isLinux) null else CodeforcesJcefFetcher.fetchProblem(id)
+                        osrProblem
+                            ?: fetchCodeforcesViaDialog(id)
+                            ?: throw IllegalStateException(I18n.t(
+                                "Codeforces 문제를 가져오지 못했습니다. Cloudflare 확인이 필요합니다.\n" +
+                                    "다시 시도하면 뜨는 창에서 확인을 완료해 주세요.",
+                                "Failed to fetch the Codeforces problem — Cloudflare verification is required.\n" +
+                                    "Try again and complete the check in the window that appears."
+                            ))
                     }
                     ProblemSource.SWEA -> throw IllegalStateException("unreachable")
                 }
