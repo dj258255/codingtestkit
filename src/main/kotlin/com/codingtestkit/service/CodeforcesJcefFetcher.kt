@@ -184,13 +184,48 @@ object CodeforcesJcefFetcher {
             browser!!.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
                 override fun onLoadEnd(cefBrowser: CefBrowser?, cefFrame: CefFrame?, httpStatusCode: Int) {
                     if (cefFrame?.isMain != true || done.get()) return
-                    LOG.info("[CodingTestKit] Codeforces JCEF loaded: ${cefBrowser?.url} (status=$httpStatusCode)")
+                    val url = cefBrowser?.url ?: ""
+                    LOG.info("[CodingTestKit] Codeforces JCEF loaded: $url (status=$httpStatusCode)")
                     // Cloudflare 챌린지 페이지일 수 있으므로 .problem-statement가
                     // 나타날 때까지 폴링. 챌린지 통과 후 리다이렉트되면 onLoadEnd가
                     // 다시 불리고 새 문서에 폴러가 재주입된다.
                     startPolling(cefBrowser, jsQuery)
+                    // 문제 페이지가 로드되면 cf_clearance 쿠키가 생기므로, JS 추출(위 폴러)이
+                    // 일부 환경(Linux/RustRover)에서 콜백이 안 오는 경우를 대비해 쿠키로
+                    // Jsoup을 재시도하는 경로를 병행한다. 먼저 성공하는 쪽이 이긴다 (이슈 #30).
+                    if (httpStatusCode == 200 && url.contains("/problem")) {
+                        tryCookieRetry()
+                    }
                 }
             }, browser!!.cefBrowser)
+        }
+
+        private val cookieRetryStarted = AtomicBoolean(false)
+
+        /**
+         * 브라우저가 페이지를 로드해 cf_clearance가 설정된 뒤, JS 추출 대신
+         * 그 쿠키로 Jsoup을 재시도한다. JBCefJSQuery 콜백이 동작하지 않는
+         * 환경에서도 문제를 가져올 수 있는 우회 경로 (이슈 #30).
+         */
+        private fun tryCookieRetry() {
+            if (!cookieRetryStarted.compareAndSet(false, true)) return
+            Thread {
+                try {
+                    // Cloudflare 핸드셰이크가 쿠키를 심을 시간을 준다
+                    Thread.sleep(1500)
+                    if (done.get()) return@Thread
+                    // CodeforcesCrawler.fetchProblem이 내부적으로 전역 쿠키(cf_clearance)를
+                    // 읽어 병합하므로(#21), 별도 인자 없이 호출해도 방금 설정된 쿠키를 쓴다.
+                    val problem = CodeforcesCrawler.fetchProblem(problemId)
+                    if (!done.get() && (problem.title.isNotBlank() || problem.description.length > 50)) {
+                        LOG.info("[CodingTestKit] Codeforces JCEF cookie-retry succeeded")
+                        complete(problem)
+                    }
+                } catch (e: Exception) {
+                    // Jsoup 재시도 실패 — JS 폴러가 아직 성공할 수 있으므로 무시
+                    LOG.info("[CodingTestKit] Codeforces cookie-retry failed: ${e.message}")
+                }
+            }.apply { isDaemon = true; start() }
         }
 
         private fun startPolling(cefBrowser: CefBrowser?, jsQuery: JBCefJSQuery) {

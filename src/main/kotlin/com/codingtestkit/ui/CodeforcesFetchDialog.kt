@@ -89,12 +89,43 @@ class CodeforcesFetchDialog(
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(cefBrowser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
                 if (frame?.isMain != true || extracted) return
+                val url = cefBrowser?.url ?: ""
                 // 챌린지 통과 후 리다이렉트되면 onLoadEnd가 다시 불리고 폴러가 재주입됨
                 startPolling(cefBrowser, jsQuery)
+                // 사용자가 챌린지를 통과해 문제 페이지가 로드되면 cf_clearance가 생기므로,
+                // JS 추출이 안 되는 환경을 대비해 쿠키로 Jsoup 재시도를 병행 (이슈 #30)
+                if (httpStatusCode == 200 && url.contains("/problem")) {
+                    tryCookieRetry()
+                }
             }
         }, browser.cefBrowser)
 
         return panel
+    }
+
+    @Volatile private var cookieRetryStarted = false
+
+    /** 페이지 로드 후 cf_clearance 쿠키로 Jsoup 재시도 (JS 추출 우회, 이슈 #30) */
+    private fun tryCookieRetry() {
+        if (cookieRetryStarted) return
+        cookieRetryStarted = true
+        Thread {
+            try {
+                Thread.sleep(1500)
+                if (extracted) return@Thread
+                val parsed = CodeforcesCrawler.fetchProblem(problemId)
+                if (parsed.title.isNotBlank() || parsed.description.length > 50) {
+                    SwingUtilities.invokeLater {
+                        if (extracted) return@invokeLater
+                        extracted = true
+                        problem = parsed
+                        statusLabel.text = I18n.t("문제를 가져왔습니다.", "Problem fetched.")
+                        statusLabel.foreground = Color(0, 120, 0)
+                        doOKAction()
+                    }
+                }
+            } catch (_: Exception) { /* 폴러가 아직 성공할 수 있으므로 무시 */ }
+        }.apply { isDaemon = true; start() }
     }
 
     private fun startPolling(cefBrowser: CefBrowser?, jsQuery: JBCefJSQuery) {
