@@ -33,8 +33,15 @@ object CodeforcesJcefFetcher {
     var lastError: String = ""
         private set
 
-    // Cloudflare 챌린지 통과 시간(수 초~수십 초)을 포함한 타임아웃
+    // Cloudflare 챌린지 통과 시간(수 초~수십 초)을 포함한 기본 타임아웃 (macOS/Windows)
     private const val FETCH_TIMEOUT_MS = 60_000L
+
+    // Linux는 OSR OnPaint가 안 불려 canvas 렌더 기반 챌린지가 완료되지 않는 경우가 있다.
+    // 여기서 60초를 허비하면 보이는 다이얼로그 안전망이 그만큼 늦게 뜨므로, 짧게 잡아
+    // 빠르게 실패를 감지하고 다이얼로그로 넘긴다. setWindowVisibility로 렌더가 되살아나면
+    // 보통 수 초 내에 성공하므로 12초면 충분하다.
+    private val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+    private val fetchTimeoutMs: Long get() = if (isLinux) 12_000L else FETCH_TIMEOUT_MS
 
     fun isAvailable(): Boolean = try {
         JBCefApp.isSupported()
@@ -103,10 +110,11 @@ object CodeforcesJcefFetcher {
             }
         }
 
+        val timeoutMs = fetchTimeoutMs
         return try {
-            future.get(FETCH_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: TimeoutException) {
-            lastError = "Timeout (${FETCH_TIMEOUT_MS / 1000}s)"
+            lastError = "Timeout (${timeoutMs / 1000}s)"
             LOG.info("[CodingTestKit] Codeforces JCEF fetch timeout: $problemId")
             null
         } catch (e: Exception) {
@@ -124,6 +132,7 @@ object CodeforcesJcefFetcher {
         private var frame: JFrame? = null // OSR 미지원 환경의 숨김 프레임 폴백용
         private var browser: JBCefBrowser? = null
         private var timeoutTimer: Timer? = null
+        private var keepAliveTimer: Timer? = null
 
         private var isOsr = false
 
@@ -163,8 +172,21 @@ object CodeforcesJcefFetcher {
         private fun realizeBrowser(br: JBCefBrowser) {
             if (isOsr) {
                 br.createImmediately()
-                // OSR 뷰포트가 0×0으로 잡혀 렌더링·JS 실행이 안 되는 환경 대응 (이슈 #30)
-                try { br.cefBrowser.wasResized(1024, 768) } catch (_: Throwable) {}
+                try {
+                    val cb = br.cefBrowser
+                    // OSR 뷰포트가 0×0으로 잡혀 렌더링·JS 실행이 안 되는 환경 대응 (이슈 #30)
+                    cb.wasResized(1024, 768)
+                    // 창 없는 OSR은 CEF가 '숨김' 상태로 간주해 컴포지터·requestAnimationFrame을
+                    // 멈춘다. Cloudflare 챌린지 JS가 rAF에 의존하므로 영영 완료되지 않아
+                    // Linux에서 타임아웃됐다. '보이는' 상태 + 포커스로 페인트 루프를 계속 돌린다.
+                    cb.setWindowVisibility(true)
+                    cb.setFocus(true)
+                    // CEF가 다시 숨김으로 되돌리거나 첫 페인트를 건너뛰는 환경 대응:
+                    // 챌린지가 도는 동안 주기적으로 '보임'을 재확인해 rAF가 멈추지 않게 한다.
+                    Timer(1000) { if (!done.get()) try { cb.setWindowVisibility(true) } catch (_: Throwable) {} }
+                        .apply { isRepeats = true; start() }
+                        .also { keepAliveTimer = it }
+                } catch (_: Throwable) {}
             } else {
                 frame = JFrame().apply {
                     type = Window.Type.UTILITY
@@ -193,7 +215,9 @@ object CodeforcesJcefFetcher {
                 JBCefJSQuery.Response("")
             }
 
-            timeoutTimer = Timer((FETCH_TIMEOUT_MS - 5000).toInt()) {
+            // 내부 타임아웃은 호출부 future.get보다 살짝 먼저 발동해, 세션이 스스로
+            // 브라우저를 dispose하고 future를 null로 완료시킨다 (리눅스에서 12초 후 즉시 정리).
+            timeoutTimer = Timer((fetchTimeoutMs - 2000).coerceAtLeast(3000).toInt()) {
                 complete(null, "JCEF internal timeout")
             }.apply { isRepeats = false; start() }
 
@@ -297,6 +321,7 @@ object CodeforcesJcefFetcher {
                 LOG.info("[CodingTestKit] Codeforces JCEF fetch OK: ${problem?.title}")
             }
             timeoutTimer?.stop()
+            keepAliveTimer?.stop()
 
             SwingUtilities.invokeLater {
                 try { browser?.dispose() } catch (_: Exception) {}
