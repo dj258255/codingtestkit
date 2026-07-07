@@ -18,8 +18,14 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
+import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.ui.content.ContentFactory
 
-class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
+class MainPanel(
+    private val project: Project,
+    private val initialTabIndex: Int = 0
+) : JPanel(BorderLayout()), Disposable {
 
     /**
      * 다른 툴윈도우(예: 프로젝트 뷰)와 같은 쪽에 세로 분할될 때,
@@ -37,17 +43,26 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     private val referencePanel = ReferencePanel()
     private val settingsPanel = SettingsPanel(project)
     private var lastLoadedFolder: String? = null
+    private val tabbedPane = JBTabbedPane()
+
+    // UI 언어가 바뀌면 도구 창 콘텐츠를 통째로 다시 생성해 즉시 반영한다.
+    // 패널들이 생성 시점에 I18n.t()로 텍스트를 한 번만 읽으므로, 새로 만들어야 갱신됨.
+    private val languageListener: () -> Unit = {
+        SwingUtilities.invokeLater { rebuildToolWindow() }
+    }
 
     init {
         border = JBUI.Borders.empty()
+        I18n.addChangeListener(languageListener)
 
-        val tabbedPane = JBTabbedPane()
         tabbedPane.addTab(I18n.t("문제", "Problems"), AllIcons.Actions.Download, problemPanel)
         tabbedPane.addTab(I18n.t("테스트", "Tests"), AllIcons.Actions.Execute, testPanel)
         tabbedPane.addTab(I18n.t("템플릿", "Templates"), AllIcons.Actions.Copy, templatePanel)
         tabbedPane.addTab(I18n.t("타이머", "Timer"), AllIcons.Vcs.History, timerPanel)
         tabbedPane.addTab(I18n.t("레퍼런스", "Reference"), AllIcons.Actions.Preview, referencePanel)
         tabbedPane.addTab(I18n.t("설정", "Settings"), AllIcons.General.Settings, settingsPanel)
+        // 언어 변경으로 재생성될 때 이전에 보던 탭을 유지 (첫 탭으로 튕기지 않도록)
+        if (initialTabIndex in 0 until tabbedPane.tabCount) tabbedPane.selectedIndex = initialTabIndex
 
         add(tabbedPane, BorderLayout.CENTER)
 
@@ -152,5 +167,21 @@ class MainPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         }
     }
 
-    override fun dispose() {}
+    /**
+     * 도구 창의 콘텐츠(이 MainPanel)를 새 MainPanel로 교체한다.
+     * 기존 콘텐츠를 dispose하면 이 인스턴스의 languageListener도 함께 해제된다.
+     */
+    private fun rebuildToolWindow() {
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("CodingTestKit") ?: return
+        val contentManager = toolWindow.contentManager
+        val newPanel = MainPanel(project, tabbedPane.selectedIndex)
+        val newContent = ContentFactory.getInstance().createContent(newPanel, "", false)
+        newContent.setDisposer(newPanel)
+        contentManager.removeAllContents(true) // 기존 콘텐츠 dispose → 이 MainPanel.dispose() 호출
+        contentManager.addContent(newContent)
+    }
+
+    override fun dispose() {
+        I18n.removeChangeListener(languageListener)
+    }
 }

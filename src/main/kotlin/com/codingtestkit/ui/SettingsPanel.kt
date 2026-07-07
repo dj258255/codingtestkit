@@ -65,20 +65,9 @@ class SettingsPanel(private val project: Project) : JPanel() {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
         })
         langPanel.add(langCombo)
-        val langNotePanel = JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            alignmentX = LEFT_ALIGNMENT
-            isOpaque = false
-        }
-        langNotePanel.add(JLabel(I18n.t("* 변경 후 도구 창을 다시 열어야 적용됩니다", "* Reopen tool window to apply changes")).apply {
-            font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
-            foreground = JBColor.GRAY
-            alignmentX = LEFT_ALIGNMENT
-        })
         langSection.add(langPanel)
-        langSection.add(Box.createVerticalStrut(JBUI.scale(2)))
-        langSection.add(langNotePanel)
         langCombo.addActionListener {
+            // 언어 변경 시 도구 창이 즉시 다시 그려짐 (MainPanel의 I18n 리스너)
             I18n.setLanguage(I18n.Lang.entries[langCombo.selectedIndex])
         }
         add(langSection)
