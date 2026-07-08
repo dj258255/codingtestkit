@@ -190,88 +190,136 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         return editor?.document?.text ?: ""
     }
 
-    private fun runAllTests() {
+    /** 실행 중 중복 실행 방지 (Run All / 개별 실행 공용) */
+    @Volatile
+    private var running = false
+
+    /**
+     * 실행 전 공통 검증: 실행 중이 아니고, 코드와 케이스가 있어야 한다.
+     * 통과하면 실행할 코드를 반환, 아니면 경고 표시 후 null.
+     */
+    private fun prepareRun(): String? {
+        if (running) return null
         val code = getCurrentCode()
         if (code.isBlank()) {
-            statusLabel.text = I18n.t("코드 없음", "No code")
-            statusLabel.icon = AllIcons.General.Warning
-            statusLabel.foreground = JBColor(Color(200, 120, 0), Color(230, 160, 50))
-            return
+            warnStatus(I18n.t("코드 없음", "No code"))
+            return null
         }
-
         // 카드에서 수정된 값 반영
         syncCardsToTestCases()
-
         if (testCases.isEmpty()) {
-            statusLabel.text = I18n.t("케이스 없음", "No cases")
-            statusLabel.icon = AllIcons.General.Warning
-            statusLabel.foreground = JBColor(Color(200, 120, 0), Color(230, 160, 50))
-            return
+            warnStatus(I18n.t("케이스 없음", "No cases"))
+            return null
         }
+        return code
+    }
 
-        val language = getSelectedLanguage()
-        runButton.isEnabled = false
+    private fun warnStatus(text: String) {
+        statusLabel.text = text
+        statusLabel.icon = AllIcons.General.Warning
+        statusLabel.foreground = JBColor(Color(200, 120, 0), Color(230, 160, 50))
+    }
+
+    private fun setRunningStatus() {
         statusLabel.text = I18n.t("실행 중...", "Running...")
         statusLabel.icon = AllIcons.Process.Step_1
         statusLabel.foreground = JBColor.foreground()
+    }
+
+    /**
+     * 케이스 하나를 실행하고 판정을 tc에 반영한다. 백그라운드 스레드에서 호출할 것.
+     */
+    private fun executeCase(code: String, language: Language, tc: TestCase): CodeRunner.RunResult {
+        val result = if (problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE) {
+            CodeRunner.runProgrammers(code, language, tc, parameterNames)
+        } else {
+            CodeRunner.run(code, language, tc)
+        }
+
+        if (result.exitCode != 0 && result.error.isNotBlank()) {
+            tc.actualOutput = result.error
+            tc.passed = false
+        } else {
+            val stdout = result.output.trim()
+            val expected = tc.expectedOutput.trim()
+
+            // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
+            fun normalize(s: String): String = s
+                .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
+                .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
+                .replace(Regex("""\[\s+"""), "[")
+                .replace(Regex("""\s+]"""), "]")
+            tc.actualOutput = stdout
+            tc.passed = normalize(stdout) == normalize(expected)
+        }
+        return result
+    }
+
+    /** 실행 결과를 해당 카드에 반영 (EDT에서 호출할 것) */
+    private fun applyResultToCard(index: Int, tc: TestCase, result: CodeRunner.RunResult) {
+        if (index >= cards.size) return
+        // 정상 종료인데 stderr가 있으면 디버그 출력으로 표시
+        if (result.exitCode == 0 && result.error.isNotBlank()) {
+            cards[index].setStderrOutput(result.error.trim())
+        }
+        cards[index].setResult(tc, result.executionTimeMs, result.peakMemoryKB)
+    }
+
+    /** 실행된 케이스 기준으로 상태 요약 갱신 */
+    private fun updateSummary() {
+        val pass = testCases.count { it.passed == true }
+        val allPassed = testCases.isNotEmpty() && pass == testCases.size
+        statusLabel.text = "$pass / ${testCases.size} ${I18n.t("통과", "passed")}"
+        statusLabel.icon = if (allPassed) AllIcons.General.InspectionsOK else AllIcons.General.Error
+        statusLabel.foreground = if (allPassed) {
+            JBColor(Color(46, 160, 67), Color(80, 200, 80))
+        } else {
+            JBColor(Color(218, 54, 51), Color(230, 80, 80))
+        }
+    }
+
+    private fun runAllTests() {
+        val code = prepareRun() ?: return
+        val language = getSelectedLanguage()
+        running = true
+        runButton.isEnabled = false
+        setRunningStatus()
 
         // 모든 카드 상태 초기화
         for (card in cards) card.setRunning()
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            var passCount = 0
             for ((i, tc) in testCases.withIndex()) {
-                val result = if (problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE) {
-                    CodeRunner.runProgrammers(code, language, tc, parameterNames)
-                } else {
-                    CodeRunner.run(code, language, tc)
-                }
-
-                if (result.exitCode != 0 && result.error.isNotBlank()) {
-                    tc.actualOutput = result.error
-                    tc.passed = false
-                } else {
-                    val stdout = result.output.trim()
-                    val stderr = result.error.trim()
-                    val expected = tc.expectedOutput.trim()
-
-                    // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
-                    fun normalize(s: String): String = s
-                        .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
-                        .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
-                        .replace(Regex("""\[\s+"""), "[")
-                        .replace(Regex("""\s+]"""), "]")
-                    tc.actualOutput = stdout
-                    tc.passed = normalize(stdout) == normalize(expected)
-
-                    // stderr가 있으면 디버그 출력으로 표시
-                    if (stderr.isNotBlank()) {
-                        SwingUtilities.invokeLater {
-                            if (i < cards.size) cards[i].setStderrOutput(stderr)
-                        }
-                    }
-                }
-                if (tc.passed == true) passCount++
-
+                val result = executeCase(code, language, tc)
                 val idx = i
-                val timeMs = result.executionTimeMs
-                val memKB = result.peakMemoryKB
-                SwingUtilities.invokeLater {
-                    if (idx < cards.size) cards[idx].setResult(tc, timeMs, memKB)
-                }
+                SwingUtilities.invokeLater { applyResultToCard(idx, tc, result) }
             }
-
-            val finalPassCount = passCount
             SwingUtilities.invokeLater {
+                running = false
                 runButton.isEnabled = true
-                val allPassed = finalPassCount == testCases.size
-                statusLabel.text = "$finalPassCount / ${testCases.size} ${I18n.t("통과", "passed")}"
-                statusLabel.icon = if (allPassed) AllIcons.General.InspectionsOK else AllIcons.General.Error
-                statusLabel.foreground = if (allPassed) {
-                    JBColor(Color(46, 160, 67), Color(80, 200, 80))
-                } else {
-                    JBColor(Color(218, 54, 51), Color(230, 80, 80))
-                }
+                updateSummary()
+            }
+        }
+    }
+
+    /** 케이스 하나만 실행 (카드의 ▶ 버튼, 이슈 #36) */
+    private fun runTestAt(index: Int) {
+        val code = prepareRun() ?: return
+        if (index !in testCases.indices) return
+        val language = getSelectedLanguage()
+        running = true
+        runButton.isEnabled = false
+        setRunningStatus()
+        cards.getOrNull(index)?.setRunning()
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val tc = testCases[index]
+            val result = executeCase(code, language, tc)
+            SwingUtilities.invokeLater {
+                applyResultToCard(index, tc, result)
+                running = false
+                runButton.isEnabled = true
+                updateSummary()
             }
         }
     }
@@ -372,6 +420,19 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             headerPanel.add(summaryLabel, BorderLayout.CENTER)
 
+            // 개별 실행 버튼 (이슈 #36) — 자체 리스너를 가져 헤더 토글과 분리됨
+            val runBtn = JLabel(AllIcons.Actions.Execute).apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = I18n.t("이 케이스만 실행", "Run this case only")
+                border = JBUI.Borders.empty(0, 4)
+            }
+            runBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    val idx = cards.indexOf(this@TestCaseCard)
+                    if (idx >= 0) runTestAt(idx)
+                }
+            })
+
             // 삭제 버튼
             val deleteBtn = JLabel(AllIcons.Actions.Close).apply {
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -384,7 +445,11 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     if (idx >= 0) removeTestCaseAt(idx)
                 }
             })
-            headerPanel.add(deleteBtn, BorderLayout.EAST)
+
+            val headerButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 0, 0)).apply { isOpaque = false }
+            headerButtons.add(runBtn)
+            headerButtons.add(deleteBtn)
+            headerPanel.add(headerButtons, BorderLayout.EAST)
 
             add(headerPanel, BorderLayout.NORTH)
 
