@@ -203,61 +203,6 @@ object CodeRunner {
     }
 
     /**
-     * Python 코드를 pydevd 클라이언트로 실행해 IDE의 Python Debug Server에 접속시킨다
-     * (이슈 #36 Tier 2, 역방향 — 호출 전에 어댑터가 IDE를 해당 포트로 listen시켜야 함).
-     *
-     * pydevd는 PyCharm에 번들된 헬퍼(plugins/python-ce/helpers/pydev)를 쓰므로
-     * 사용자가 따로 설치할 필요 없다. 브레이크포인트는 파일 경로로 바인딩되므로
-     * Go와 마찬가지로 에디터의 실제 파일을 실행한다.
-     */
-    fun startPythonDebugClient(code: String, input: String, userFile: File?, port: Int): DebugHandle {
-        if (pythonPath.isBlank()) {
-            return DebugHandle(false, errorMessage = I18n.t(
-                "Python을 찾을 수 없습니다.", "Python not found."
-            ))
-        }
-        val pydevd = findPydevd() ?: return DebugHandle(false, errorMessage = I18n.t(
-            "pydevd를 찾을 수 없습니다. PyCharm에서 실행 중인지 확인하세요.",
-            "pydevd not found. Make sure you are running PyCharm."
-        ))
-
-        val dir = createTempDir()
-        return try {
-            val scriptFile = if (userFile != null && userFile.exists()) userFile
-                             else File(dir, "solution.py").apply { writeText(code, StandardCharsets.UTF_8) }
-            val process = ProcessBuilder(
-                listOf(pythonPath, pydevd, "--client", "127.0.0.1", "--port", port.toString(),
-                       "--file", scriptFile.absolutePath)
-            ).directory(dir).start()
-            Thread {
-                try {
-                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (input.isNotBlank()) it.write(input) }
-                } catch (_: Exception) {}
-            }.apply { isDaemon = true; start() }
-            drainToVoid(process.inputStream)
-            drainToVoid(process.errorStream)
-
-            DebugHandle(true, port = port, process = process, workDir = dir)
-        } catch (e: Exception) {
-            dir.deleteRecursively()
-            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
-        }
-    }
-
-    /** pydevd.py 탐색: PythonCore/Pythonid 플러그인의 helpers/pydev */
-    private fun findPydevd(): String? {
-        for (pluginId in listOf("PythonCore", "Pythonid")) {
-            try {
-                val plugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
-                    com.intellij.openapi.extensions.PluginId.getId(pluginId))
-                val f = plugin?.pluginPath?.toFile()?.let { File(it, "helpers/pydev/pydevd.py") }
-                if (f != null && f.exists()) return f.absolutePath
-            } catch (_: Throwable) {}
-        }
-        return null
-    }
-
-    /**
      * dlv 탐색: 1) Go 플러그인(GoLand)에 번들된 dlv → 2) PATH/GOPATH의 dlv.
      * 번들 경로: <go-plugin>/lib/dlv/<os><arch>/dlv
      */

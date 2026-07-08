@@ -533,6 +533,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val adapter = com.codingtestkit.debug.TestDebugAdapter.forLanguage(language)
         if (adapter == null) {
+            val all = com.codingtestkit.debug.TestDebugAdapter.EP_NAME.extensionList
+            com.intellij.openapi.diagnostic.Logger.getInstance(TestPanel::class.java).warn(
+                "[CodingTestKit] no debug adapter for $language; loaded adapters=" +
+                    all.joinToString { "${it.javaClass.simpleName}(supports=${it.supports(language)},avail=${runCatching { it.isAvailable() }.getOrNull()})" })
             Messages.showInfoMessage(project, debugUnsupportedMessage(language), "CodingTestKit")
             return
         }
@@ -552,23 +556,23 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val sessionName = "CodingTestKit #${index + 1}"
 
-        // 역방향(Python/pydevd): IDE를 먼저 listen시킨 뒤 클라이언트 프로세스가 접속
-        if (adapter.isReverseConnection()) {
-            val port = CodeRunner.findFreePort()
-            statusLabel.icon = AllIcons.Actions.StartDebugger
-            statusLabel.text = I18n.t("디버그 서버 시작 중...", "Starting debug server...")
-            if (!adapter.attachToPort(project, sessionName, port)) {
-                statusLabel.text = ""
+        // 실행-소유(Python): IDE가 스크립트를 직접 디버그 실행 (우리는 프로세스 안 띄움)
+        if (adapter.ownsLaunch()) {
+            if (userFile == null || !userFile.exists()) {
                 Messages.showWarningDialog(project, I18n.t(
-                    "디버그 서버를 시작할 수 없습니다.", "Cannot start the debug server."), "CodingTestKit")
+                    "디버깅하려면 소스 파일을 먼저 저장하세요.", "Please save the source file before debugging."), "CodingTestKit")
                 return
             }
-            running = true
-            setRunningStatus()
-            ApplicationManager.getApplication().executeOnPooledThread {
-                Thread.sleep(1500) // IDE 서버가 listen을 여는 시간 여유
-                val handle = CodeRunner.startPythonDebugClient(code, tc.input, userFile, port)
-                SwingUtilities.invokeLater { finishDebugLaunch(handle, null) }
+            statusLabel.icon = AllIcons.Actions.StartDebugger
+            statusLabel.text = I18n.t("디버거 시작 중...", "Starting debugger...")
+            val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile)
+            if (!ok) {
+                statusLabel.text = ""
+                Messages.showWarningDialog(project, I18n.t(
+                    "디버깅을 시작할 수 없습니다. 프로젝트에 인터프리터가 설정돼 있는지 확인하세요.",
+                    "Cannot start debugging. Make sure an interpreter is configured for the project."), "CodingTestKit")
+            } else {
+                statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
             }
             return
         }

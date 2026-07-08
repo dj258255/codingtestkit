@@ -18,8 +18,9 @@ repositories {
 dependencies {
     intellijPlatform {
         pycharmProfessional("2026.1.4")
-        // Python Debug Server(원격 디버그) 설정 타입은 Pythonid 플러그인에 있음
-        bundledPlugin("Pythonid")
+        // 일반 Python 실행 구성(PythonConfigurationType)은 PythonCore에 있음 —
+        // Community에도 있어 무료 PyCharm까지 커버된다.
+        bundledPlugin("PythonCore")
     }
     compileOnly(project(":core"))
 }

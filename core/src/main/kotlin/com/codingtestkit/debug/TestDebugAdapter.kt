@@ -3,6 +3,7 @@ package com.codingtestkit.debug
 import com.codingtestkit.model.Language
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
+import java.io.File
 
 /**
  * 언어별 IDE 디버거 attach 어댑터 (이슈 #36).
@@ -27,13 +28,6 @@ interface TestDebugAdapter {
     fun isAvailable(): Boolean = true
 
     /**
-     * 역방향 연결 여부. JVM/Go는 프로세스가 서버(디버그 포트 listen)이고 IDE가 붙지만,
-     * Python(pydevd)은 반대로 IDE가 서버로 listen하고 스크립트가 접속한다.
-     * true면 호출부는 attachToPort(IDE listen 시작)를 먼저 부른 뒤 프로세스를 실행해야 한다.
-     */
-    fun isReverseConnection(): Boolean = false
-
-    /**
      * PID attach 방식 여부 (Rust/C++ 네이티브). 디버그 서버 없이 프로세스를 먼저 실행하고
      * 실행 중인 PID에 IDE 디버거(LLDB 등)를 붙인다. 프로그램이 첫 stdin 읽기에서 블록된
      * 동안 attach하고, 완료 후 입력을 흘려보내는 방식으로 정지 시점을 확보한다.
@@ -44,6 +38,21 @@ interface TestDebugAdapter {
     fun attachToPid(project: Project, sessionName: String, pid: Long): Boolean = false
 
     /**
+     * IDE가 실행까지 소유하는 방식 여부 (Python 등). true면 CodeRunner는 프로세스를
+     * 띄우지 않고, 어댑터가 IDE의 실행 구성으로 스크립트를 디버그 실행한다.
+     * (Java/Go의 서버-attach, 네이티브 PID-attach와 구분되는 세 번째 패턴)
+     */
+    fun ownsLaunch(): Boolean = false
+
+    /**
+     * 실행-소유 어댑터 전용: 소스 파일을 IDE 디버거로 직접 실행한다.
+     * @param sourceFile 에디터의 실제 소스 파일 (브레이크포인트 바인딩 대상)
+     * @param input 케이스 표준입력 (파일 리다이렉션으로 전달)
+     * @param workingDir 임시 파일(입력 등)을 둘 작업 디렉토리
+     */
+    fun launchDebug(project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File): Boolean = false
+
+    /**
      * 디버그 서버(JDWP/dlv 등)가 127.0.0.1의 지정 포트에서 대기 중인 프로세스에
      * IDE 디버거를 attach한다. 프로세스 시작은 호출부(CodeRunner) 책임이고,
      * 디버그 세션의 수명·정리는 IDE가 담당한다.
@@ -51,7 +60,7 @@ interface TestDebugAdapter {
      * @param sessionName 디버그 세션 표시 이름 (예: "CodingTestKit #1")
      * @return attach 시도 성공 여부
      */
-    fun attachToPort(project: Project, sessionName: String, port: Int): Boolean
+    fun attachToPort(project: Project, sessionName: String, port: Int): Boolean = false
 
     companion object {
         val EP_NAME: ExtensionPointName<TestDebugAdapter> =
