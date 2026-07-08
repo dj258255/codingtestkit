@@ -24,8 +24,29 @@ class TestCaseGeneratorDialog(
     /** 파라미터형 플랫폼(리트코드/프로그래머스)이면 배열 리터럴 형식을 기본 선택 */
     private val parameterStyle: Boolean = false,
     /** 파라미터형 문제의 파라미터 이름들 (다중 파라미터 안내용) */
-    private val parameterNames: List<String> = emptyList()
+    private val parameterNames: List<String> = emptyList(),
+    /** 파라미터 타입들 (리트코드 metaData 제공 시 전 파라미터 자동 생성, 이슈 #36) */
+    private val parameterTypes: List<String> = emptyList()
 ) : DialogWrapper(true) {
+
+    companion object {
+        private val INT_ARRAY_TYPES = setOf("integer[]", "long[]", "list<integer>", "list<long>")
+        private val STRING_ARRAY_TYPES = setOf("string[]", "list<string>")
+        private val SCALAR_INT_TYPES = setOf("integer", "long")
+
+        /** 자동 생성을 지원하는 파라미터 타입인가 (TreeNode·2차원 배열 등은 v2) */
+        fun isSupportedType(type: String): Boolean {
+            val t = type.trim().lowercase()
+            return t in INT_ARRAY_TYPES || t in STRING_ARRAY_TYPES || t in SCALAR_INT_TYPES ||
+                t == "string" || t == "boolean" || t == "double"
+        }
+    }
+
+    /** 모든 파라미터 타입을 알고 있고 지원 가능하면 전 파라미터 자동 생성 모드 */
+    private val autoParams: Boolean = parameterStyle &&
+        parameterTypes.isNotEmpty() &&
+        parameterTypes.size == parameterNames.size &&
+        parameterTypes.all { isSupportedType(it) }
 
     enum class OutputFormat(val ko: String, val en: String) {
         SPACE("공백 구분 (stdin형 — 코드포스/SWEA)", "Space-separated (stdin — Codeforces/SWEA)"),
@@ -96,8 +117,28 @@ class TestCaseGeneratorDialog(
 
         addRow(I18n.t("시드 (비우면 랜덤):", "Seed (blank = random):"), seedField)
 
+        // 전 파라미터 자동 생성 모드 (리트코드 — API가 타입 제공)
+        if (autoParams) {
+            formatCombo.isEnabled = false     // 배열은 항상 리터럴 형식
+            firstLineNCheck.isEnabled = false // 파라미터형에는 첫 줄 N 없음
+            gbc.gridx = 0; gbc.gridwidth = 2
+            val mapping = parameterNames.indices.joinToString(", ") { i ->
+                "${parameterNames[i]} (${parameterTypes[i]})"
+            }
+            panel.add(JLabel("<html><b>${I18n.t(
+                "✓ 전 파라미터 자동 생성: $mapping<br>" +
+                    "배열은 N·범위·패턴 적용, 숫자는 범위 내 랜덤, 문자열은 길이 N (최대 10만).",
+                "✓ Auto-generating all parameters: $mapping<br>" +
+                    "Arrays use N/range/pattern; numbers are random in range; strings use length N (max 100k)."
+            )}</b></html>").apply {
+                foreground = com.intellij.ui.JBColor(java.awt.Color(46, 140, 60), java.awt.Color(90, 190, 100))
+            }, gbc)
+            gbc.gridy++
+            gbc.gridwidth = 1
+        }
+
         // 다중 파라미터 문제 안내: 생성 입력은 첫 파라미터 줄만 채움 (이슈 #36)
-        if (parameterStyle && parameterNames.size > 1) {
+        if (!autoParams && parameterStyle && parameterNames.size > 1) {
             gbc.gridx = 0; gbc.gridwidth = 2
             panel.add(JLabel("<html><b>${I18n.t(
                 "⚠ 이 문제의 파라미터: ${parameterNames.joinToString(", ")} (${parameterNames.size}개)<br>" +
@@ -166,49 +207,68 @@ class TestCaseGeneratorDialog(
         return (0 until cases).map { caseIdx ->
             // 시드 지정 시 케이스마다 파생 시드로 재현 가능 + 케이스 간 서로 다름
             val rng = if (baseSeed != null) Random(baseSeed + caseIdx) else Random.Default
-            buildString(n * 8) {
+            if (autoParams) {
+                // 전 파라미터 자동 생성: 줄 = 파라미터 (리트코드 입력 형식)
+                parameterTypes.joinToString("\n") { valueForType(it, rng, n, min, max, pattern) }
+            } else buildString(n * 8) {
                 if (format == OutputFormat.ARRAY) append('[')
                 else if (firstLineNCheck.isSelected) append(n).append('\n')
-                when (pattern) {
-                    Pattern.RANDOM -> {
-                        for (i in 0 until n) {
-                            if (i > 0) append(sep)
-                            // min==max면 nextLong 빈 범위 예외 방지, max+1 오버플로 방지
-                            append(
-                                if (min == max) min
-                                else rng.nextLong(min, if (max == Long.MAX_VALUE) max else max + 1)
-                            )
-                        }
-                    }
-                    Pattern.INCREASING -> {
-                        for (i in 0 until n) {
-                            if (i > 0) append(sep)
-                            append(min + i)
-                        }
-                    }
-                    Pattern.DECREASING -> {
-                        for (i in 0 until n) {
-                            if (i > 0) append(sep)
-                            append(max - i)
-                        }
-                    }
-                    Pattern.CONSTANT -> {
-                        for (i in 0 until n) {
-                            if (i > 0) append(sep)
-                            append(min)
-                        }
-                    }
-                    Pattern.PERMUTATION -> {
-                        val perm = (1..n).toMutableList()
-                        perm.shuffle(rng)
-                        for ((i, v) in perm.withIndex()) {
-                            if (i > 0) append(sep)
-                            append(v)
-                        }
-                    }
-                }
+                appendSeries(this, rng, sep, n, min, max, pattern)
                 if (format == OutputFormat.ARRAY) append(']')
             }
         }
     }
+
+    /** min==max 빈 범위·max+1 오버플로를 처리하는 범위 랜덤 */
+    private fun randLong(rng: Random, min: Long, max: Long): Long =
+        if (min == max) min else rng.nextLong(min, if (max == Long.MAX_VALUE) max else max + 1)
+
+    /** 패턴에 따라 n개 값을 sep로 이어 붙임 */
+    private fun appendSeries(sb: StringBuilder, rng: Random, sep: String, n: Int, min: Long, max: Long, pattern: Pattern) {
+        when (pattern) {
+            Pattern.RANDOM -> for (i in 0 until n) {
+                if (i > 0) sb.append(sep)
+                sb.append(randLong(rng, min, max))
+            }
+            Pattern.INCREASING -> for (i in 0 until n) {
+                if (i > 0) sb.append(sep)
+                sb.append(min + i)
+            }
+            Pattern.DECREASING -> for (i in 0 until n) {
+                if (i > 0) sb.append(sep)
+                sb.append(max - i)
+            }
+            Pattern.CONSTANT -> for (i in 0 until n) {
+                if (i > 0) sb.append(sep)
+                sb.append(min)
+            }
+            Pattern.PERMUTATION -> {
+                val perm = (1..n).toMutableList()
+                perm.shuffle(rng)
+                for ((i, v) in perm.withIndex()) {
+                    if (i > 0) sb.append(sep)
+                    sb.append(v)
+                }
+            }
+        }
+    }
+
+    /** 파라미터 타입별 값 생성 (리트코드 입력 표기: 배열 [..], 문자열 "..", 숫자/불리언 리터럴) */
+    private fun valueForType(type: String, rng: Random, n: Int, min: Long, max: Long, pattern: Pattern): String {
+        val t = type.trim().lowercase()
+        return when {
+            t in INT_ARRAY_TYPES -> buildString(n * 8) {
+                append('['); appendSeries(this, rng, ",", n, min, max, pattern); append(']')
+            }
+            t in STRING_ARRAY_TYPES -> (0 until n).joinToString(",", "[", "]") { "\"${randomWord(rng, 5)}\"" }
+            t in SCALAR_INT_TYPES -> randLong(rng, min, max).toString()
+            t == "string" -> "\"${randomWord(rng, n.coerceAtMost(100_000))}\""
+            t == "boolean" -> if (rng.nextBoolean()) "true" else "false"
+            t == "double" -> (min.toDouble() + (max - min).toDouble() * rng.nextDouble()).toString()
+            else -> "" // isSupportedType가 걸러서 도달하지 않음
+        }
+    }
+
+    private fun randomWord(rng: Random, len: Int): String =
+        buildString(len) { repeat(len) { append('a' + rng.nextInt(26)) } }
 }

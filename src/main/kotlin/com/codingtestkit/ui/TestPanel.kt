@@ -174,6 +174,12 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         problemSource = source
     }
 
+    private var parameterTypes: List<String> = emptyList()
+
+    fun setParameterTypes(types: List<String>) {
+        parameterTypes = types
+    }
+
     fun setParameterNames(names: List<String>) {
         parameterNames = names
         updateInfoLabel()
@@ -231,7 +237,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun openGeneratorDialog() {
         // 파라미터형 플랫폼(리트코드/프로그래머스)은 배열 리터럴 형식을 기본으로
         val parameterStyle = problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
-        val dialog = TestCaseGeneratorDialog(parameterStyle, parameterNames)
+        val dialog = TestCaseGeneratorDialog(parameterStyle, parameterNames, parameterTypes)
         if (!dialog.showAndGet()) return
         syncCardsToTestCases() // 기존 카드 편집 내용 보존
         for (input in dialog.generateInputs()) {

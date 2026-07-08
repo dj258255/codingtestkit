@@ -10,6 +10,8 @@ data class Problem(
     val memoryLimit: String = "",
     val difficulty: String = "",
     val parameterNames: List<String> = emptyList(),
+    // nullable: 기존 problem.json에 없는 필드라 Gson이 null을 넣음 (하위호환, 이슈 #36)
+    val parameterTypes: List<String>? = null,
     val initialCode: String = "",
     val contestProbId: String = ""
 )
