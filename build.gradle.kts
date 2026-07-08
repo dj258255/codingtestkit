@@ -1,7 +1,8 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.25"
-    id("org.jetbrains.intellij.platform") version "2.2.1"
+    // 2.6+ 필요: 2026.x IDE 샌드박스 기동 지원 (MultiRoutingFileSystemProvider 부트 클래스패스)
+    id("org.jetbrains.intellij.platform") version "2.9.0"
 }
 
 group = "com.codingtestkit"
@@ -18,6 +19,13 @@ dependencies {
     implementation("org.jsoup:jsoup:1.17.2")
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // 공유 코어(모델 + 디버그 어댑터 EP)와 IDE별 디버거 모듈 (이슈 #36).
+    // pluginModule이 아닌 일반 implementation인 이유: pluginModule(2.9+)은 V2 콘텐츠
+    // 모듈(별도 클래스로더)로 패키징돼 메인 코드가 core 클래스를 못 본다.
+    // 일반 jar로 lib/에 넣으면 단일 클래스로더 — 로드는 optional depends가 제어한다.
+    implementation(project(":core"))
+    implementation(project(":debugger-go"))
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
@@ -27,11 +35,6 @@ dependencies {
         // JVM 원격 디버그(RemoteConfigurationType 등)는 Java 플러그인 모듈에 있음 (이슈 #36 Tier 1).
         // 컴파일용으로만 필요하고, 런타임 로드는 plugin.xml의 optional 의존성이 제어한다.
         bundledPlugin("com.intellij.java")
-        // 공유 코어 모듈(모델 + 디버그 어댑터 EP)과 IDE별 디버거 모듈 — 메인 jar에 병합된다 (이슈 #36).
-        // 각 디버거 모듈은 자기 IDE SDK로 컴파일되지만, 클래스 로드는 optional 의존성이 제어하므로
-        // 해당 플러그인이 없는 IDE에서는 그 클래스가 로드되지 않는다.
-        pluginModule(implementation(project(":core")))
-        pluginModule(implementation(project(":debugger-go")))
         pluginVerifier()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
