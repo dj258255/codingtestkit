@@ -10,6 +10,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
@@ -517,6 +518,61 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
+    /**
+     * 케이스 하나를 IDE 디버거로 실행 (카드의 🐞 버튼, 이슈 #36 Tier 1).
+     * Java/Kotlin을 JDWP suspend로 띄우고 TestDebugService로 attach한다.
+     */
+    private fun debugTestAt(index: Int) {
+        if (running) return
+        val code = getCurrentCode()
+        if (code.isBlank()) { warnStatus(I18n.t("코드 없음", "No code")); return }
+        syncCardsToTestCases()
+        val tc = testCases.getOrNull(index) ?: return
+        val language = getSelectedLanguage()
+
+        val debugService = com.codingtestkit.service.TestDebugService.getInstance(project)
+        if (debugService == null || !debugService.isAvailable()) {
+            Messages.showInfoMessage(project, I18n.t(
+                "이 IDE에서는 디버깅을 사용할 수 없습니다.\nJava/Kotlin 디버깅은 IntelliJ IDEA에서 지원됩니다.",
+                "Debugging is not available in this IDE.\nJava/Kotlin debugging is supported in IntelliJ IDEA."
+            ), "CodingTestKit")
+            return
+        }
+
+        running = true
+        setRunningStatus()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val handle = CodeRunner.startJvmDebug(code, language, tc, parameterNames, problemSource)
+            SwingUtilities.invokeLater {
+                running = false
+                runButton.isEnabled = true
+                if (!handle.ok) {
+                    statusLabel.icon = AllIcons.General.Warning
+                    statusLabel.text = ""
+                    Messages.showWarningDialog(project, handle.errorMessage
+                        ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
+                    return@invokeLater
+                }
+                statusLabel.icon = AllIcons.Actions.StartDebugger
+                statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
+                val attached = debugService.attachJvm(project, "CodingTestKit #${index + 1}", handle.port)
+                if (!attached) {
+                    handle.cleanup()
+                    Messages.showWarningDialog(project, I18n.t(
+                        "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
+                    statusLabel.text = ""
+                    return@invokeLater
+                }
+                // 프로세스가 끝나면 임시 파일 정리 (디버그 세션이 잡고 있던 리소스)
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    try { handle.process?.waitFor() } catch (_: Exception) {}
+                    handle.cleanup()
+                }
+                statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
+            }
+        }
+    }
+
     /** 케이스 하나만 실행 (카드의 ▶ 버튼, 이슈 #36) */
     private fun runTestAt(index: Int) {
         val code = prepareRun() ?: return
@@ -664,6 +720,19 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             })
 
+            // 디버그 버튼 (이슈 #36 Tier 1) — ▶ 옆, tanmay 스케치 위치
+            val debugBtn = JLabel(AllIcons.Actions.StartDebugger).apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = I18n.t("이 케이스로 디버그 (Java/Kotlin)", "Debug this case (Java/Kotlin)")
+                border = JBUI.Borders.empty(0, 4)
+            }
+            debugBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    val idx = cards.indexOf(this@TestCaseCard)
+                    if (idx >= 0) debugTestAt(idx)
+                }
+            })
+
             // 삭제 버튼
             val deleteBtn = JLabel(AllIcons.Actions.Close).apply {
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -679,6 +748,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             val headerButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 0, 0)).apply { isOpaque = false }
             headerButtons.add(runBtn)
+            headerButtons.add(debugBtn)
             headerButtons.add(deleteBtn)
             headerPanel.add(headerButtons, BorderLayout.EAST)
 

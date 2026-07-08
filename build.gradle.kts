@@ -24,6 +24,9 @@ dependencies {
 
     intellijPlatform {
         intellijIdeaCommunity("2024.3")
+        // JVM 원격 디버그(RemoteConfigurationType 등)는 Java 플러그인 모듈에 있음 (이슈 #36 Tier 1).
+        // 컴파일용으로만 필요하고, 런타임 로드는 plugin.xml의 optional 의존성이 제어한다.
+        bundledPlugin("com.intellij.java")
         pluginVerifier()
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }

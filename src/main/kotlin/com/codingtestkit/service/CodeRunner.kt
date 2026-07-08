@@ -30,6 +30,137 @@ object CodeRunner {
     )
 
     /**
+     * 디버그 세션 시작 결과 (이슈 #36 Tier 1).
+     * ok=true면 port로 IDE 디버거를 attach하고, 세션이 끝나면 cleanup()을 호출해야 한다.
+     */
+    data class DebugHandle(
+        val ok: Boolean,
+        val port: Int = -1,
+        val errorMessage: String? = null,
+        val process: Process? = null,
+        val workDir: File? = null
+    ) {
+        fun cleanup() {
+            try { process?.destroyForcibly() } catch (_: Exception) {}
+            try { workDir?.deleteRecursively() } catch (_: Exception) {}
+        }
+    }
+
+    /** OS가 비워둔 TCP 포트 하나 확보 (loopback 기준 — JDWP도 127.0.0.1에 바인딩) */
+    private fun findFreePort(): Int =
+        java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { it.localPort }
+
+    /**
+     * Java/Kotlin 코드를 JDWP suspend=y 로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 1).
+     * suspend=y라 디버거가 붙기 전까지 사용자 코드가 실행되지 않아, attach 전에 끝나버리는
+     * 레이스가 없다. 반환된 process는 디버그 세션이 잡고 있으므로 호출부가 정리 시점을 관리.
+     *
+     * 지원: JAVA, KOTLIN. 그 외 언어는 ok=false + 안내 메시지.
+     * 컴파일 에러 시에도 ok=false + 에러 메시지.
+     */
+    fun startJvmDebug(
+        code: String,
+        language: Language,
+        testCase: TestCase,
+        parameterNames: List<String>,
+        source: com.codingtestkit.model.ProblemSource
+    ): DebugHandle {
+        if (language != Language.JAVA && language != Language.KOTLIN) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "현재 디버깅은 IntelliJ IDEA의 Java/Kotlin만 지원합니다.\n" +
+                    "(C++/Rust/Go/Ruby는 CLion/RustRover/GoLand/RubyMine에서 지원 예정)",
+                "Debugging currently supports Java/Kotlin in IntelliJ IDEA only.\n" +
+                    "(C++/Rust/Go/Ruby will be supported in CLion/RustRover/GoLand/RubyMine)"
+            ))
+        }
+
+        // 래퍼가 필요한 경우(프로그래머스/리트코드, main 없음) 래핑
+        val wrapperStyle = source == com.codingtestkit.model.ProblemSource.PROGRAMMERS ||
+            source == com.codingtestkit.model.ProblemSource.LEETCODE
+        val runCode: String
+        val stdin: String
+        if (wrapperStyle && !hasMainFunction(code, language)) {
+            val inputValues = testCase.input.split("\n").map { it.trim() }
+            runCode = if (language == Language.JAVA) wrapJava(code, inputValues, parameterNames)
+                      else wrapKotlin(code, inputValues, parameterNames)
+            stdin = ""
+        } else {
+            runCode = code
+            stdin = testCase.input
+        }
+
+        val dir = createTempDir()
+        return try {
+            val port = findFreePort()
+            // 127.0.0.1로 바인딩해 로컬 IDE만 attach 가능하게 한다.
+            // address=*:port 또는 bare port는 모든 인터페이스에 노출돼 원격 코드 실행 위험.
+            val jdwp = "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=127.0.0.1:$port"
+            val command = if (language == Language.JAVA) {
+                compileJavaForDebug(runCode, dir) ?: return DebugHandle(false, errorMessage =
+                    I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
+            } else {
+                compileKotlinForDebug(runCode, dir) ?: return DebugHandle(false, errorMessage =
+                    I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
+            }.let { entry -> javaCommand(jdwp) + entry }
+
+            val process = ProcessBuilder(command).directory(dir).redirectErrorStream(false).start()
+            // stdin 전달 (suspend 상태여도 파이프에 미리 써둘 수 있음)
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (stdin.isNotBlank()) it.write(stdin) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+            // 자식 출력은 콘솔에 안 붙지만 파이프가 차면 블로킹되므로 흘려보냄
+            drainToVoid(process.inputStream)
+            drainToVoid(process.errorStream)
+
+            DebugHandle(true, port = port, process = process, workDir = dir)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
+    }
+
+    /** Java 디버그용 컴파일 → 실행 인자(-cp DIR MainClass) 반환, 실패 시 null */
+    private fun compileJavaForDebug(code: String, dir: File): List<String>? {
+        val sep = "///MAIN_SEPARATOR///"
+        if (code.contains(sep)) {
+            val parts = code.split(sep)
+            File(dir, "Solution.java").writeText(parts[0].trim(), StandardCharsets.UTF_8)
+            File(dir, "Main.java").writeText(parts[1].trim(), StandardCharsets.UTF_8)
+            val c = executeProcess(javacCommand(File(dir, "Solution.java"), File(dir, "Main.java")), dir, "", COMPILE_TIMEOUT_SECONDS)
+            if (c.exitCode != 0) return null
+            return listOf("-cp", dir.absolutePath, "Main")
+        }
+        val className = detectJavaClassName(code)
+        val src = File(dir, "$className.java")
+        src.writeText(code, StandardCharsets.UTF_8)
+        val c = executeProcess(javacCommand(src), dir, "", COMPILE_TIMEOUT_SECONDS)
+        if (c.exitCode != 0) return null
+        return listOf("-cp", dir.absolutePath, className)
+    }
+
+    /** Kotlin 디버그용 컴파일 → 실행 인자(-jar solution.jar) 반환, 실패 시 null */
+    private fun compileKotlinForDebug(code: String, dir: File): List<String>? {
+        if (kotlincPath.isBlank()) return null
+        val src = File(dir, "Solution.kt")
+        src.writeText(code, StandardCharsets.UTF_8)
+        val jar = File(dir, "solution.jar")
+        val c = executeProcess(
+            listOf(kotlincPath, "-J-Dfile.encoding=UTF-8", src.absolutePath, "-include-runtime", "-d", jar.absolutePath),
+            dir, "", COMPILE_TIMEOUT_SECONDS
+        )
+        if (c.exitCode != 0) return null
+        return listOf("-jar", jar.absolutePath)
+    }
+
+    private fun drainToVoid(stream: java.io.InputStream) {
+        Thread {
+            try { stream.bufferedReader(Charsets.UTF_8).use { while (it.readLine() != null) {} } } catch (_: Exception) {}
+        }.apply { isDaemon = true; start() }
+    }
+
+    /**
      * stdin 방식: 입력을 표준입력으로 전달하고 stdout 결과를 비교
      */
     fun run(
