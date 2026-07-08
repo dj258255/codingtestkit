@@ -542,7 +542,11 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
         val userFile = editor?.let {
             val fdm = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
-            fdm.saveDocument(it.document)
+            // saveDocument는 write-intent 잠금 필요 — 마우스 리스너의 EDT는 잠금이 없어
+            // (2026.1부터 엄격) runWriteAction으로 감싼다
+            ApplicationManager.getApplication().runWriteAction {
+                fdm.saveDocument(it.document)
+            }
             fdm.getFile(it.document)?.toNioPath()?.toFile()
         }
 
