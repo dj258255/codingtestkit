@@ -68,6 +68,19 @@ intellijPlatform {
     }
 }
 
+// 로컬 설치된 각 JetBrains IDE에서 플러그인을 실검증하는 샌드박스 실행 태스크 (이슈 #36).
+// 예: ./gradlew runGoLand → 플러그인이 설치된 GoLand 샌드박스 실행 (Go 디버깅 검증용).
+// 해당 IDE가 설치돼 있지 않으면 그 태스크만 실패하고 빌드에는 영향 없다.
+intellijPlatformTesting {
+    runIde {
+        val home = System.getProperty("user.home")
+        register("runGoLand") { localPath = file("$home/Applications/GoLand.app") }
+        register("runPyCharm") { localPath = file("$home/Applications/PyCharm.app") }
+        register("runCLion") { localPath = file("$home/Applications/CLion.app") }
+        register("runRustRover") { localPath = file("$home/Applications/RustRover.app") }
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
