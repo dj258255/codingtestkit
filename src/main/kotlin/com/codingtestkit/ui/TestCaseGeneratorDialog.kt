@@ -125,7 +125,11 @@ class TestCaseGeneratorDialog : DialogWrapper(true) {
                     Pattern.RANDOM -> {
                         for (i in 0 until n) {
                             if (i > 0) append(sep)
-                            append(rng.nextLong(min, if (max == Long.MAX_VALUE) max else max + 1))
+                            // min==max면 nextLong 빈 범위 예외 방지, max+1 오버플로 방지
+                            append(
+                                if (min == max) min
+                                else rng.nextLong(min, if (max == Long.MAX_VALUE) max else max + 1)
+                            )
                         }
                     }
                     Pattern.INCREASING -> {
