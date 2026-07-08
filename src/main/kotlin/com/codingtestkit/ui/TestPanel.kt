@@ -18,6 +18,17 @@ import javax.swing.*
 
 class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
+    companion object {
+        /** 이 길이를 넘는 입력은 카드에 미리보기만 표시 (렌더링·sync 보호, 이슈 #36) */
+        private const val LARGE_INPUT_CHARS = 100_000
+
+        private fun largeInputPreview(input: String): String =
+            input.take(500) + "\n… " + I18n.t(
+                "[총 %,d자 — 대량 입력은 표시를 생략하며 실행 시 원본을 사용합니다]",
+                "[%,d chars total — large input is truncated for display; the original is used when running]"
+            ).format(input.length)
+    }
+
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray())
     private val runButton = JButton(I18n.t("전체 실행", "Run All"), AllIcons.Actions.Execute).apply {
         toolTipText = I18n.t("모든 테스트 케이스를 실행합니다", "Run all test cases")
@@ -27,6 +38,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         preferredSize = Dimension(JBUI.scale(28), JBUI.scale(28))
         horizontalAlignment = SwingConstants.CENTER
         margin = JBUI.emptyInsets()
+    }
+    private val generateButton = JButton(I18n.t("생성", "Generate"), AllIcons.Actions.New).apply {
+        toolTipText = I18n.t("대량 테스트 케이스 생성 (랜덤/정렬/순열)", "Generate large test cases (random/sorted/permutation)")
     }
     private val statusLabel = JLabel("").apply {
         border = JBUI.Borders.empty(0, 4)
@@ -79,6 +93,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         languageCombo.addActionListener { onLanguageChanged?.invoke(getSelectedLanguage()) }
         buttonRow.add(runButton)
         buttonRow.add(addButton)
+        buttonRow.add(generateButton)
         topPanel.add(buttonRow)
 
         // Row 2: 정보 + 상태
@@ -102,6 +117,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 이벤트
         runButton.addActionListener { runAllTests() }
         addButton.addActionListener { addTestCase() }
+        generateButton.addActionListener { openGeneratorDialog() }
 
         // 키보드 단축키 액션 등록
         com.codingtestkit.service.CodingTestKitActionService.getInstance(project).runAllAction = {
@@ -156,6 +172,18 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         updateInfoLabel()
         cardListPanel.revalidate()
         cardListPanel.repaint()
+    }
+
+    /** 생성 다이얼로그를 열고, 생성된 입력들을 예상 출력 없는 케이스로 추가 (이슈 #36) */
+    private fun openGeneratorDialog() {
+        val dialog = TestCaseGeneratorDialog()
+        if (!dialog.showAndGet()) return
+        syncCardsToTestCases() // 기존 카드 편집 내용 보존
+        for (input in dialog.generateInputs()) {
+            testCases.add(TestCase(input = input, expectedOutput = ""))
+        }
+        rebuildCards()
+        updateInfoLabel()
     }
 
     private fun addTestCase() {
@@ -372,10 +400,23 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         private val toggleIcon = JLabel(AllIcons.General.ArrowRight)
         private val titleLabel = JLabel("#$number")
         private val statusIcon = JLabel()
-        private val inputArea = JTextArea(testCase.input, 3, 20).apply {
+
+        /**
+         * 생성된 대량 입력은 에디터에 그대로 넣으면 렌더링이 느려지고,
+         * 잘라서 표시하면 sync 시 원본이 파괴되므로: 미리보기 + 읽기전용으로 두고
+         * getInput()이 모델 원본을 반환한다 (이슈 #36).
+         */
+        private val inputTooLarge = testCase.input.length > LARGE_INPUT_CHARS
+        private val inputArea = JTextArea(
+            if (inputTooLarge) largeInputPreview(testCase.input) else testCase.input, 3, 20
+        ).apply {
             font = Font("JetBrains Mono", Font.PLAIN, JBUI.scale(12))
             border = JBUI.Borders.empty(4)
             lineWrap = true
+            if (inputTooLarge) {
+                isEditable = false
+                foreground = JBColor.GRAY
+            }
         }
         private val expectedArea = JTextArea(testCase.expectedOutput, 3, 20).apply {
             font = Font("JetBrains Mono", Font.PLAIN, JBUI.scale(12))
@@ -432,8 +473,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 foreground = JBColor.GRAY
                 font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
             }
-            val inputFirst = testCase.input.lines().firstOrNull()?.trim() ?: ""
-            val outputFirst = testCase.expectedOutput.lines().firstOrNull()?.trim() ?: ""
+            // take()를 먼저 해서 대량 입력에서도 문자열 전체 복사가 일어나지 않게 함
+            val inputFirst = testCase.input.take(200).lineSequence().first().trim()
+            val outputFirst = testCase.expectedOutput.take(200).lineSequence().first().trim()
             val inPreview = if (inputFirst.length > 20) inputFirst.take(20) + "…" else inputFirst
             val outPreview = if (outputFirst.length > 20) outputFirst.take(20) + "…" else outputFirst
             val parts = mutableListOf<String>()
@@ -667,7 +709,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             if (!isExpanded) toggle()
         }
 
-        fun getInput(): String = inputArea.text
+        fun getInput(): String = if (inputTooLarge) testCase.input else inputArea.text
         fun getExpected(): String = expectedArea.text
 
         fun setRunning() {
