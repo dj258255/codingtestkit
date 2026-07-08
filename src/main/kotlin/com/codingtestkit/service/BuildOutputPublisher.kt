@@ -50,6 +50,13 @@ object BuildOutputPublisher {
             .removePrefix(I18n.t("컴파일 에러", "Compile error") + ":\n")
             .removePrefix("컴파일 에러:\n").removePrefix("Compile error:\n")
 
+        // 래퍼가 사용자 코드 줄번호를 보존하는 언어 (하네스가 코드 아래에만 붙음)
+        // — 래퍼형 실행이어도 클릭 이동이 정확함. C++는 include 미보유 시 프리펜드가
+        // 있어 제외, Java는 별도 파일 이름 일치 규칙으로 커버, Go는 package 프리펜드로 제외.
+        val linePreservedWrapper = language in setOf(
+            Language.PYTHON, Language.KOTLIN, Language.JAVASCRIPT, Language.RUST, Language.RUBY
+        )
+
         val diags = parse(language, compilerOutput)
         if (diags.isEmpty()) {
             // 파싱 실패 시 원문 그대로 (여전히 Build 창에서 보는 게 낫다)
@@ -60,7 +67,8 @@ object BuildOutputPublisher {
                 val target = when {
                     userFile == null -> null
                     !wrapperStyle -> userFile                       // stdin형: 원형 그대로 → 1:1
-                    d.fileName == userFile.name -> userFile          // 래퍼형: 파일명 일치(원형 보존) 케이스만
+                    d.fileName == userFile.name -> userFile          // 래퍼형: 파일명 일치(Java 분리 파일)
+                    linePreservedWrapper -> userFile                 // 래퍼형: 줄 보존 언어 (하네스가 아래)
                     else -> null
                 }
                 if (target != null && d.line > 0) {

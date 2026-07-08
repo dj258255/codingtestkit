@@ -337,12 +337,13 @@ class Main {
             "_result = $methodName($args)"
         }
 
+        // 사용자 코드가 1번 줄부터 원형 그대로 시작해야 브레이크포인트·진단 줄번호가
+        // 1:1로 맞는다 (이슈 #36 디버깅 / #32 소스 이동). import는 하단 하네스로.
         return """
-import sys as _sys
-
 $code
 
 # 사용자 print()를 stderr로 리다이렉트
+import sys as _sys
 _orig_stdout = _sys.stdout
 _sys.stdout = _sys.stderr
 $callExpr
@@ -368,13 +369,16 @@ else:
             .map { it.groupValues[1] }
             .filter { it !in excluded && !it.startsWith("~") }.toList()
         val methodName = cppMethods.find { it == "solution" } ?: cppMethods.lastOrNull() ?: "solution"
+        // 사용자 코드가 1번 줄부터 원형 유지되도록, include가 이미 있으면(일반적)
+        // 아무것도 프리펜드하지 않는다. include가 없을 때만 보충 (줄이 밀리지만 드묾)
         val hasInclude = code.contains("#include")
-        val includes = if (hasInclude) "" else """
+        val prefix = if (hasInclude) "" else """
 #include <iostream>
 #include <vector>
 #include <string>
 using namespace std;
-""".trimIndent()
+
+""".trimStart('\n')
 
         val callExpr = if (hasClass) {
             "    Solution sol;\n    auto _result = sol.$methodName($args);"
@@ -382,8 +386,7 @@ using namespace std;
             "    auto _result = $methodName($args);"
         }
 
-        return """
-$includes
+        return prefix + """
 $code
 
 template<typename T> void _print(T r) { cout << r; }
@@ -549,14 +552,16 @@ else console.log(_result);
             .filter { it != "main" }.toList()
         val methodName = rsFns.find { it == "solution" } ?: rsFns.lastOrNull() ?: "solution"
 
-        // LeetCode 스타일(impl Solution)이면 struct 선언 보충 후 연관 함수로 호출
+        // LeetCode 스타일(impl Solution)이면 struct 선언 보충 후 연관 함수로 호출.
+        // Rust는 모듈 아이템 선언 순서가 무관하므로 struct를 코드 '아래'에 둬서
+        // 사용자 코드 줄번호를 원형 그대로 보존한다 (이슈 #36 디버깅 / #32 소스 이동)
         val hasImpl = code.contains("impl Solution")
-        val structDecl = if (hasImpl && !code.contains("struct Solution")) "struct Solution;\n\n" else ""
+        val structDecl = if (hasImpl && !code.contains("struct Solution")) "\nstruct Solution;\n" else ""
         val callExpr = if (hasImpl) "Solution::$methodName($args)" else "$methodName($args)"
 
         return """
-$structDecl$code
-
+$code
+$structDecl
 fn main() {
     let _result = $callExpr;
     // {:?}는 문자열을 "따옴표 포함"으로, 벡터를 [a, b]로 출력 → 공백 제거로 [a,b] 형태 통일
@@ -604,12 +609,12 @@ func main() {
             .filter { it != "initialize" }.toList()
         val methodName = rbMethods.find { it == "solution" } ?: rbMethods.lastOrNull() ?: "solution"
 
+        // require는 하단 하네스로 — 사용자 코드 줄번호 원형 보존 (이슈 #36/#32)
         return """
-require 'json'
-
 $code
 
 # 사용자 puts를 stderr로 리다이렉트
+require 'json'
 _orig_stdout = ${'$'}stdout
 ${'$'}stdout = ${'$'}stderr
 _result = $methodName($args)
