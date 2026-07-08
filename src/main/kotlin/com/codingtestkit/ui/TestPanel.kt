@@ -31,6 +31,8 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             val d = description.lowercase()
             return listOf(
                 "any of them", "any one of them", "print any", "output any",
+                // LeetCode는 print 대신 return 표현 + "in any order"가 관용구
+                "return any", "in any order",
                 "multiple valid answer", "multiple answers", "multiple solutions",
                 "multiple correct", "any valid answer", "any correct answer",
                 "여러 개일 경우", "여러 개인 경우", "여러 가지일 경우", "아무 것이나", "아무거나"
@@ -64,11 +66,15 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         )
     }
 
+    // EDT에서 쓰고 실행(풀 스레드)에서 읽으므로 @Volatile로 가시성 보장
     /** 커스텀 체커 (세션 레벨, 이슈 #36). null이면 미사용 → 문자열 비교/중립 판정 */
+    @Volatile
     private var checkerCode: String? = null
+    @Volatile
     private var checkerLanguage: Language = Language.PYTHON
 
     /** 복수 정답 허용 문제 힌트 (문제 설명에서 자동 감지, 이슈 #36) */
+    @Volatile
     private var multipleAnswersAllowed = false
 
     fun setMultipleAnswersHint(allowed: Boolean) {
@@ -870,23 +876,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     headerPanel.background = JBColor(Color(255, 240, 240), Color(60, 40, 40))
                 }
                 null -> {
-                    if (isNeutralRan(tc)) {
-                        // 판정 없는 중립 실행 — 예상 출력 없음(실행만) 또는 복수 정답 불일치(직접 확인)
-                        statusIcon.icon = AllIcons.General.Information
-                        val label = if (tc.expectedOutput.isBlank()) {
-                            I18n.t("실행됨", "DONE")
-                        } else {
-                            I18n.t("직접 확인 (복수 정답 가능)", "CHECK (multiple answers possible)")
-                        }
-                        titleLabel.text = "#$number $label$timeStr"
-                        titleLabel.foreground = JBColor(Color(70, 110, 180), Color(120, 160, 230))
-                        headerPanel.background = JBColor(Color(238, 243, 250), Color(42, 46, 55))
+                    // setResult는 실행 직후에만 호출되므로 null = '실행됐지만 판정 없음'(중립).
+                    // stdout이 비어도(출력 없는 프로그램) '실행됨'으로 표시한다.
+                    statusIcon.icon = AllIcons.General.Information
+                    val label = if (tc.expectedOutput.isBlank()) {
+                        I18n.t("실행됨", "DONE")
                     } else {
-                        statusIcon.icon = null
-                        titleLabel.text = "#$number"
-                        titleLabel.foreground = JBColor.foreground()
-                        headerPanel.background = JBColor(Color(240, 240, 240), Color(50, 50, 50))
+                        I18n.t("직접 확인 (복수 정답 가능)", "CHECK (multiple answers possible)")
                     }
+                    titleLabel.text = "#$number $label$timeStr"
+                    titleLabel.foreground = JBColor(Color(70, 110, 180), Color(120, 160, 230))
+                    headerPanel.background = JBColor(Color(238, 243, 250), Color(42, 46, 55))
                 }
             }
             revalidate()

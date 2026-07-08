@@ -98,6 +98,7 @@ class MainPanel(
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            testPanel.setMultipleAnswersHint(false)
                             CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                         } else {
                             detectAndLoadProblem(selected, basePath)
@@ -109,6 +110,7 @@ class MainPanel(
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            testPanel.setMultipleAnswersHint(false)
                             CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                             return
                         }
