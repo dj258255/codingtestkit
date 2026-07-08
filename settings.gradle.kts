@@ -6,3 +6,4 @@ rootProject.name = "CodingTestKit"
 // 이후 :debugger-go(GoLand SDK), :debugger-python(PyCharm SDK) 등이 여기에 추가된다.
 include(":core")
 include(":debugger-go")
+include(":debugger-python")

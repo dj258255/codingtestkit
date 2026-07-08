@@ -27,6 +27,23 @@ interface TestDebugAdapter {
     fun isAvailable(): Boolean = true
 
     /**
+     * 역방향 연결 여부. JVM/Go는 프로세스가 서버(디버그 포트 listen)이고 IDE가 붙지만,
+     * Python(pydevd)은 반대로 IDE가 서버로 listen하고 스크립트가 접속한다.
+     * true면 호출부는 attachToPort(IDE listen 시작)를 먼저 부른 뒤 프로세스를 실행해야 한다.
+     */
+    fun isReverseConnection(): Boolean = false
+
+    /**
+     * PID attach 방식 여부 (Rust/C++ 네이티브). 디버그 서버 없이 프로세스를 먼저 실행하고
+     * 실행 중인 PID에 IDE 디버거(LLDB 등)를 붙인다. 프로그램이 첫 stdin 읽기에서 블록된
+     * 동안 attach하고, 완료 후 입력을 흘려보내는 방식으로 정지 시점을 확보한다.
+     */
+    fun attachesToPid(): Boolean = false
+
+    /** PID attach 방식 어댑터 전용. 백그라운드 스레드에서 호출해도 된다. */
+    fun attachToPid(project: Project, sessionName: String, pid: Long): Boolean = false
+
+    /**
      * 디버그 서버(JDWP/dlv 등)가 127.0.0.1의 지정 포트에서 대기 중인 프로세스에
      * IDE 디버거를 attach한다. 프로세스 시작은 호출부(CodeRunner) 책임이고,
      * 디버그 세션의 수명·정리는 IDE가 담당한다.

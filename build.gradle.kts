@@ -25,6 +25,7 @@ dependencies {
     // 일반 jar로 lib/에 넣으면 단일 클래스로더 — 로드는 optional depends가 제어한다.
     implementation(project(":core"))
     implementation(project(":debugger-go"))
+    implementation(project(":debugger-python"))
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("junit:junit:4.13.2")

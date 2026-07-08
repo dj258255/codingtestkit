@@ -720,6 +720,8 @@
     <depends optional="true" config-file="codingtestkit-java.xml">com.intellij.modules.java</depends>
     <!-- Go 테스트 디버깅 (이슈 #36 Tier 3). Go 플러그인이 있는 IDE(GoLand 등)에서만 로드. -->
     <depends optional="true" config-file="codingtestkit-go.xml">org.jetbrains.plugins.go</depends>
+    <!-- Python 테스트 디버깅 (이슈 #36 Tier 2). Python 플러그인이 있는 IDE(PyCharm 등)에서만 로드. -->
+    <depends optional="true" config-file="codingtestkit-python.xml">Pythonid</depends>
 
     <!-- 언어별 디버그 어댑터 확장점 (이슈 #36). IDE별 모듈(Java/Go/Python…)이 자기
          어댑터를 여기에 등록한다. 서비스가 아닌 EP인 이유: IDEA Ultimate처럼 여러
@@ -729,6 +731,13 @@
                         interface="com.codingtestkit.debug.TestDebugAdapter"
                         dynamic="true"/>
     </extensionPoints>
+
+    <!-- Rust/C++ 네이티브 PID attach 어댑터 (이슈 #36 Tier 3).
+         플랫폼 공통 attach API만 쓰므로 항상 등록하고, RustRover/CLion이 아닌
+         IDE에서는 isAvailable=false로 스스로 비활성화된다. -->
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.service.NativeAttachDebugAdapter"/>
+    </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
         <editorActionHandler action="EditorPaste"

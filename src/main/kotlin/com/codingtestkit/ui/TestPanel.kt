@@ -550,38 +550,109 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             fdm.getFile(it.document)?.toNioPath()?.toFile()
         }
 
+        val sessionName = "CodingTestKit #${index + 1}"
+
+        // 역방향(Python/pydevd): IDE를 먼저 listen시킨 뒤 클라이언트 프로세스가 접속
+        if (adapter.isReverseConnection()) {
+            val port = CodeRunner.findFreePort()
+            statusLabel.icon = AllIcons.Actions.StartDebugger
+            statusLabel.text = I18n.t("디버그 서버 시작 중...", "Starting debug server...")
+            if (!adapter.attachToPort(project, sessionName, port)) {
+                statusLabel.text = ""
+                Messages.showWarningDialog(project, I18n.t(
+                    "디버그 서버를 시작할 수 없습니다.", "Cannot start the debug server."), "CodingTestKit")
+                return
+            }
+            running = true
+            setRunningStatus()
+            ApplicationManager.getApplication().executeOnPooledThread {
+                Thread.sleep(1500) // IDE 서버가 listen을 여는 시간 여유
+                val handle = CodeRunner.startPythonDebugClient(code, tc.input, userFile, port)
+                SwingUtilities.invokeLater { finishDebugLaunch(handle, null) }
+            }
+            return
+        }
+
+        // PID attach(Rust/C++ 네이티브): 실행 → 첫 stdin 읽기에서 블록 → LLDB attach → 입력 전달
+        if (adapter.attachesToPid()) {
+            running = true
+            setRunningStatus()
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val handle = CodeRunner.startDebug(code, language, tc, parameterNames, problemSource, userFile)
+                if (!handle.ok) {
+                    SwingUtilities.invokeLater { finishDebugLaunch(handle, null) }
+                    return@executeOnPooledThread
+                }
+                SwingUtilities.invokeLater {
+                    statusLabel.icon = AllIcons.Actions.StartDebugger
+                    statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
+                }
+                val pid = handle.process?.pid() ?: -1L
+                val attached = adapter.attachToPid(project, sessionName, pid)
+                if (attached) {
+                    // 디버그 세션이 브레이크포인트를 등록할 시간 여유 후 입력 전달
+                    Thread.sleep(2500)
+                    handle.sendPendingInput()
+                }
+                SwingUtilities.invokeLater {
+                    if (!attached) {
+                        handle.cleanup()
+                        running = false
+                        runButton.isEnabled = true
+                        statusLabel.text = ""
+                        Messages.showWarningDialog(project, I18n.t(
+                            "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
+                    } else {
+                        finishDebugLaunch(handle, null)
+                    }
+                }
+            }
+            return
+        }
+
+        // 정방향(JVM/Go): 프로세스가 디버그 서버로 대기 → IDE가 attach
         running = true
         setRunningStatus()
         ApplicationManager.getApplication().executeOnPooledThread {
             val handle = CodeRunner.startDebug(code, language, tc, parameterNames, problemSource, userFile)
             SwingUtilities.invokeLater {
-                running = false
-                runButton.isEnabled = true
-                if (!handle.ok) {
-                    statusLabel.icon = AllIcons.General.Warning
-                    statusLabel.text = ""
-                    Messages.showWarningDialog(project, handle.errorMessage
-                        ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
-                    return@invokeLater
-                }
-                statusLabel.icon = AllIcons.Actions.StartDebugger
-                statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
-                val attached = adapter.attachToPort(project, "CodingTestKit #${index + 1}", handle.port)
-                if (!attached) {
-                    handle.cleanup()
-                    Messages.showWarningDialog(project, I18n.t(
-                        "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
-                    statusLabel.text = ""
-                    return@invokeLater
-                }
-                // 프로세스가 끝나면 임시 파일 정리 (디버그 세션이 잡고 있던 리소스)
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    try { handle.process?.waitFor() } catch (_: Exception) {}
-                    handle.cleanup()
-                }
-                statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
+                finishDebugLaunch(handle) { adapter.attachToPort(project, sessionName, handle.port) }
             }
         }
+    }
+
+    /**
+     * 디버그 실행 마무리 공통 처리: 실패 안내, attach(정방향만), 프로세스 종료 시 임시 파일 정리.
+     * @param attach 정방향 어댑터의 attach 동작 (역방향은 이미 listen 중이므로 null)
+     */
+    private fun finishDebugLaunch(handle: CodeRunner.DebugHandle, attach: (() -> Boolean)?) {
+        running = false
+        runButton.isEnabled = true
+        if (!handle.ok) {
+            statusLabel.icon = AllIcons.General.Warning
+            statusLabel.text = ""
+            Messages.showWarningDialog(project, handle.errorMessage
+                ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
+            return
+        }
+        if (attach != null) {
+            statusLabel.icon = AllIcons.Actions.StartDebugger
+            statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
+            if (!attach()) {
+                handle.cleanup()
+                Messages.showWarningDialog(project, I18n.t(
+                    "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
+                statusLabel.text = ""
+                return
+            }
+        }
+        // 프로세스가 끝나면 임시 파일 정리 (디버그 세션이 잡고 있던 리소스)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try { handle.process?.waitFor() } catch (_: Exception) {}
+            handle.cleanup()
+        }
+        statusLabel.icon = AllIcons.Actions.StartDebugger
+        statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
     }
 
     /** 현재 IDE에 해당 언어 디버그 어댑터가 없을 때, 어느 IDE에서 되는지 안내 */

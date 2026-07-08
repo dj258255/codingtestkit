@@ -38,16 +38,32 @@ object CodeRunner {
         val port: Int = -1,
         val errorMessage: String? = null,
         val process: Process? = null,
-        val workDir: File? = null
+        val workDir: File? = null,
+        /** PID attach 방식(네이티브): attach 완료 후에 전달할 케이스 입력 */
+        val pendingInput: String? = null
     ) {
         fun cleanup() {
             try { process?.destroyForcibly() } catch (_: Exception) {}
             try { workDir?.deleteRecursively() } catch (_: Exception) {}
         }
+
+        /**
+         * 지연된 케이스 입력을 지금 전달한다 (네이티브 PID attach 전용).
+         * 프로그램은 첫 stdin 읽기에서 블록돼 있다가 이 호출로 진행을 시작한다.
+         */
+        fun sendPendingInput() {
+            val p = process ?: return
+            val data = pendingInput ?: return
+            Thread {
+                try {
+                    p.outputStream.bufferedWriter(Charsets.UTF_8).use { if (data.isNotBlank()) it.write(data) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+        }
     }
 
-    /** OS가 비워둔 TCP 포트 하나 확보 (loopback 기준 — JDWP도 127.0.0.1에 바인딩) */
-    private fun findFreePort(): Int =
+    /** OS가 비워둔 TCP 포트 하나 확보 (loopback 기준 — 디버그 포트도 127.0.0.1에 바인딩) */
+    fun findFreePort(): Int =
         java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { it.localPort }
 
     /**
@@ -67,10 +83,61 @@ object CodeRunner {
     ): DebugHandle = when (language) {
         Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source)
         Language.GO -> startGoDebug(code, testCase.input, userFile)
+        Language.RUST, Language.CPP -> startNativeDebug(code, language, testCase.input, userFile)
         else -> DebugHandle(false, errorMessage = I18n.t(
             "${language.displayName} 디버깅은 아직 지원되지 않습니다.",
             "${language.displayName} debugging is not supported yet."
         ))
+    }
+
+    /**
+     * Rust/C++를 디버그 심볼 포함으로 빌드해 실행한다 (이슈 #36 Tier 3, PID attach 방식).
+     * 디버그 서버 없이 프로그램을 바로 실행하되 입력은 pendingInput으로 미뤄둔다 —
+     * 프로그램이 첫 stdin 읽기에서 블록된 사이 어댑터가 PID로 LLDB를 붙이고,
+     * attach 완료 후 sendPendingInput()으로 입력을 흘려보내 진행시킨다.
+     */
+    private fun startNativeDebug(code: String, language: Language, input: String, userFile: File?): DebugHandle {
+        val mainMarker = if (language == Language.RUST) "fn main(" else "int main("
+        if (!code.contains(mainMarker)) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "${language.displayName} 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.",
+                "${language.displayName} debugging supports code with a main function (Codeforces/SWEA style)."
+            ))
+        }
+        val compilerPath = if (language == Language.RUST) rustcPath else gppPath
+        if (compilerPath.isBlank()) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "${language.displayName} 컴파일러를 찾을 수 없습니다.",
+                "${language.displayName} compiler not found."
+            ))
+        }
+
+        val dir = createTempDir()
+        return try {
+            val ext = if (language == Language.RUST) "rs" else "cpp"
+            // 실제 파일로 빌드해야 브레이크포인트가 소스 경로로 바인딩된다
+            val sourceFile = if (userFile != null && userFile.exists()) userFile
+                             else File(dir, "solution.$ext").apply { writeText(code, StandardCharsets.UTF_8) }
+            val bin = File(dir, if (isWindows) "solution.exe" else "solution")
+            val compileCmd = if (language == Language.RUST)
+                listOf(compilerPath, "-g", "-C", "opt-level=0", sourceFile.absolutePath, "-o", bin.absolutePath)
+            else
+                listOf(compilerPath, "-g", "-O0", "-std=c++17", sourceFile.absolutePath, "-o", bin.absolutePath)
+            val compile = executeProcess(compileCmd, dir, "", COMPILE_TIMEOUT_SECONDS)
+            if (compile.exitCode != 0) {
+                dir.deleteRecursively()
+                return DebugHandle(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
+            }
+
+            val process = ProcessBuilder(listOf(bin.absolutePath)).directory(dir).start()
+            drainToVoid(process.inputStream)
+            drainToVoid(process.errorStream)
+            // 입력은 아직 안 씀 — attach 완료 후 sendPendingInput()으로 전달
+            DebugHandle(true, process = process, workDir = dir, pendingInput = input)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
     }
 
     /**
@@ -133,6 +200,61 @@ object CodeRunner {
             dir.deleteRecursively()
             DebugHandle(false, errorMessage = e.message ?: "debug start failed")
         }
+    }
+
+    /**
+     * Python 코드를 pydevd 클라이언트로 실행해 IDE의 Python Debug Server에 접속시킨다
+     * (이슈 #36 Tier 2, 역방향 — 호출 전에 어댑터가 IDE를 해당 포트로 listen시켜야 함).
+     *
+     * pydevd는 PyCharm에 번들된 헬퍼(plugins/python-ce/helpers/pydev)를 쓰므로
+     * 사용자가 따로 설치할 필요 없다. 브레이크포인트는 파일 경로로 바인딩되므로
+     * Go와 마찬가지로 에디터의 실제 파일을 실행한다.
+     */
+    fun startPythonDebugClient(code: String, input: String, userFile: File?, port: Int): DebugHandle {
+        if (pythonPath.isBlank()) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "Python을 찾을 수 없습니다.", "Python not found."
+            ))
+        }
+        val pydevd = findPydevd() ?: return DebugHandle(false, errorMessage = I18n.t(
+            "pydevd를 찾을 수 없습니다. PyCharm에서 실행 중인지 확인하세요.",
+            "pydevd not found. Make sure you are running PyCharm."
+        ))
+
+        val dir = createTempDir()
+        return try {
+            val scriptFile = if (userFile != null && userFile.exists()) userFile
+                             else File(dir, "solution.py").apply { writeText(code, StandardCharsets.UTF_8) }
+            val process = ProcessBuilder(
+                listOf(pythonPath, pydevd, "--client", "127.0.0.1", "--port", port.toString(),
+                       "--file", scriptFile.absolutePath)
+            ).directory(dir).start()
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (input.isNotBlank()) it.write(input) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+            drainToVoid(process.inputStream)
+            drainToVoid(process.errorStream)
+
+            DebugHandle(true, port = port, process = process, workDir = dir)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
+    }
+
+    /** pydevd.py 탐색: PythonCore/Pythonid 플러그인의 helpers/pydev */
+    private fun findPydevd(): String? {
+        for (pluginId in listOf("PythonCore", "Pythonid")) {
+            try {
+                val plugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
+                    com.intellij.openapi.extensions.PluginId.getId(pluginId))
+                val f = plugin?.pluginPath?.toFile()?.let { File(it, "helpers/pydev/pydevd.py") }
+                if (f != null && f.exists()) return f.absolutePath
+            } catch (_: Throwable) {}
+        }
+        return null
     }
 
     /**

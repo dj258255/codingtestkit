@@ -1,0 +1,7 @@
+<!-- Pythonid 플러그인이 있는 IDE(PyCharm, IDEA Ultimate+Python)에서만 로드되는 확장.
+     Python Debug Server(pydevd 역방향)가 Python 플러그인에 있으므로 여기서만 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.python.PyDebugAdapter"/>
+    </extensions>
+</idea-plugin>
