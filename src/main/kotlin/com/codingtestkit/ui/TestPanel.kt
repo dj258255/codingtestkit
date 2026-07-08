@@ -229,7 +229,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     /** 생성 다이얼로그를 열고, 생성된 입력들을 예상 출력 없는 케이스로 추가 (이슈 #36) */
     private fun openGeneratorDialog() {
-        val dialog = TestCaseGeneratorDialog()
+        // 파라미터형 플랫폼(리트코드/프로그래머스)은 배열 리터럴 형식을 기본으로
+        val parameterStyle = problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
+        val dialog = TestCaseGeneratorDialog(parameterStyle)
         if (!dialog.showAndGet()) return
         syncCardsToTestCases() // 기존 카드 편집 내용 보존
         for (input in dialog.generateInputs()) {
