@@ -426,6 +426,25 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun isNeutralRan(tc: TestCase): Boolean =
         tc.passed == null && tc.actualOutput.isNotBlank()
 
+    /** Build 창에 게시할 진단인가: 컴파일 에러 또는 인터프리터 문법 에러(시작 실패) */
+    private fun shouldPublishDiagnostics(result: CodeRunner.RunResult, language: Language): Boolean =
+        result.compileError ||
+            (result.exitCode != 0 && com.codingtestkit.service.BuildOutputPublisher.isStartupError(language, result.error))
+
+    /**
+     * 컴파일/문법 진단을 IDE Build Output 창에 게시 (이슈 #32).
+     * 백그라운드 스레드에서 호출 가능 (BuildViewManager 이벤트는 스레드 세이프).
+     */
+    private fun publishCompileError(result: CodeRunner.RunResult, language: Language) {
+        val vf = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+            .selectedFiles.firstOrNull()
+        val wrapperStyle = problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
+        com.codingtestkit.service.BuildOutputPublisher.publishCompileError(
+            project, language, result.error,
+            vf?.let { java.io.File(it.path) }, wrapperStyle
+        )
+    }
+
     /** 실행 결과를 해당 카드에 반영 (EDT에서 호출할 것) */
     private fun applyResultToCard(index: Int, tc: TestCase, outcome: ExecOutcome) {
         if (index >= cards.size) return
@@ -479,8 +498,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         for (card in cards) card.setRunning()
 
         ApplicationManager.getApplication().executeOnPooledThread {
+            var compileErrorPublished = false
             for ((i, tc) in testCases.withIndex()) {
                 val result = executeCase(code, language, tc)
+                // 컴파일/문법 에러는 케이스마다 동일하므로 첫 실패만 Build 창에 게시 (이슈 #32)
+                if (!compileErrorPublished && shouldPublishDiagnostics(result.result, language)) {
+                    compileErrorPublished = true
+                    publishCompileError(result.result, language)
+                }
                 val idx = i
                 SwingUtilities.invokeLater { applyResultToCard(idx, tc, result) }
             }
@@ -505,6 +530,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         ApplicationManager.getApplication().executeOnPooledThread {
             val tc = testCases[index]
             val result = executeCase(code, language, tc)
+            if (shouldPublishDiagnostics(result.result, language)) publishCompileError(result.result, language)
             SwingUtilities.invokeLater {
                 applyResultToCard(index, tc, result)
                 running = false

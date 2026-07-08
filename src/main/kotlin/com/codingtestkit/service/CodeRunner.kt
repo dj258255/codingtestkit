@@ -24,7 +24,9 @@ object CodeRunner {
         val exitCode: Int,
         val timedOut: Boolean = false,
         val executionTimeMs: Long = 0,
-        val peakMemoryKB: Long = 0
+        val peakMemoryKB: Long = 0,
+        /** 컴파일 단계 실패 여부 (Build Output 창 게시용, 이슈 #32) */
+        val compileError: Boolean = false
     )
 
     /**
@@ -843,7 +845,7 @@ end
                 dir, "", COMPILE_TIMEOUT_SECONDS
             )
             if (compile.exitCode != 0) {
-                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
             }
             return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
@@ -865,7 +867,7 @@ end
                 dir, "", COMPILE_TIMEOUT_SECONDS
             )
             if (compile.exitCode != 0) {
-                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+                return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
             }
             return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
         }
@@ -875,7 +877,7 @@ end
 
         val compile = executeProcess(javacCommand(sourceFile), dir, "", COMPILE_TIMEOUT_SECONDS)
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
         return executeProcess(javaCommand("-cp", dir.absolutePath, className), dir, input, timeout)
@@ -964,7 +966,7 @@ end
             dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
         return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
@@ -988,7 +990,7 @@ end
             dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
         return executeProcess(javaCommand("-jar", jarFile.absolutePath), dir, input, timeout)
@@ -1023,7 +1025,7 @@ end
             dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
         return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
@@ -1045,7 +1047,7 @@ end
             dir, "", COMPILE_TIMEOUT_SECONDS
         )
         if (compile.exitCode != 0) {
-            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode)
+            return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
         return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
