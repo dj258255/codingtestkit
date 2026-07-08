@@ -42,6 +42,16 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private val generateButton = JButton(I18n.t("생성", "Generate"), AllIcons.Actions.New).apply {
         toolTipText = I18n.t("대량 테스트 케이스 생성 (랜덤/정렬/순열)", "Generate large test cases (random/sorted/permutation)")
     }
+    private val checkerButton = JButton(I18n.t("체커", "Checker"), AllIcons.Actions.Checked).apply {
+        toolTipText = I18n.t(
+            "커스텀 체커 설정 — 복수 정답 문제를 문자열 비교 대신 체커 프로그램으로 판정",
+            "Set a custom checker — judge multiple-valid-answer problems with a program instead of string comparison"
+        )
+    }
+
+    /** 커스텀 체커 (세션 레벨, 이슈 #36). null이면 미사용 → 문자열 비교/중립 판정 */
+    private var checkerCode: String? = null
+    private var checkerLanguage: Language = Language.PYTHON
     private val statusLabel = JLabel("").apply {
         border = JBUI.Borders.empty(0, 4)
     }
@@ -94,6 +104,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         buttonRow.add(runButton)
         buttonRow.add(addButton)
         buttonRow.add(generateButton)
+        buttonRow.add(checkerButton)
         topPanel.add(buttonRow)
 
         // Row 2: 정보 + 상태
@@ -118,6 +129,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         runButton.addActionListener { runAllTests() }
         addButton.addActionListener { addTestCase() }
         generateButton.addActionListener { openGeneratorDialog() }
+        checkerButton.addActionListener { openCheckerDialog() }
 
         // 키보드 단축키 액션 등록
         com.codingtestkit.service.CodingTestKitActionService.getInstance(project).runAllAction = {
@@ -172,6 +184,19 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         updateInfoLabel()
         cardListPanel.revalidate()
         cardListPanel.repaint()
+    }
+
+    /** 체커 설정 다이얼로그 (이슈 #36). 코드를 비우고 저장하면 해제 */
+    private fun openCheckerDialog() {
+        val dialog = CheckerDialog(checkerLanguage, checkerCode ?: "")
+        if (!dialog.showAndGet()) return
+        checkerLanguage = dialog.getLanguage()
+        checkerCode = dialog.getCode().ifBlank { null }
+        checkerButton.text = if (checkerCode != null) {
+            I18n.t("체커 ✓", "Checker ✓")
+        } else {
+            I18n.t("체커", "Checker")
+        }
     }
 
     /** 생성 다이얼로그를 열고, 생성된 입력들을 예상 출력 없는 케이스로 추가 (이슈 #36) */
@@ -254,10 +279,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         statusLabel.foreground = JBColor.foreground()
     }
 
+    /** 실행 결과 + 체커 메시지 (카드 디버그 영역 표시용) */
+    private class ExecOutcome(
+        val result: CodeRunner.RunResult,
+        val checkerMessage: String? = null
+    )
+
     /**
      * 케이스 하나를 실행하고 판정을 tc에 반영한다. 백그라운드 스레드에서 호출할 것.
+     * 판정 우선순위: 실행 에러 → 커스텀 체커 → 문자열 비교 → (예상 출력 없음) 중립.
      */
-    private fun executeCase(code: String, language: Language, tc: TestCase): CodeRunner.RunResult {
+    private fun executeCase(code: String, language: Language, tc: TestCase): ExecOutcome {
         val result = if (problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE) {
             CodeRunner.runProgrammers(code, language, tc, parameterNames)
         } else {
@@ -267,26 +299,60 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (result.exitCode != 0 && result.error.isNotBlank()) {
             tc.actualOutput = result.error
             tc.passed = false
-        } else {
-            val stdout = result.output.trim()
-            val expected = tc.expectedOutput.trim()
-            tc.actualOutput = stdout
-
-            if (expected.isBlank()) {
-                // 예상 출력이 없으면 판정하지 않는 중립 실행 (이슈 #36):
-                // 대량 생성 케이스로 TLE/메모리만 확인하는 용도. passed=null 유지.
-                tc.passed = null
-            } else {
-                // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
-                fun normalize(s: String): String = s
-                    .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
-                    .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
-                    .replace(Regex("""\[\s+"""), "[")
-                    .replace(Regex("""\s+]"""), "]")
-                tc.passed = normalize(stdout) == normalize(expected)
-            }
+            return ExecOutcome(result)
         }
-        return result
+
+        val stdout = result.output.trim()
+        val expected = tc.expectedOutput.trim()
+        tc.actualOutput = stdout
+
+        val checker = checkerCode
+        if (!checker.isNullOrBlank()) {
+            // 커스텀 체커 판정 (복수 정답 문제, 이슈 #36)
+            val (ok, message) = runChecker(checker, tc, stdout)
+            tc.passed = ok
+            return ExecOutcome(result, message)
+        }
+
+        if (expected.isBlank()) {
+            // 예상 출력이 없으면 판정하지 않는 중립 실행 (이슈 #36):
+            // 대량 생성 케이스로 TLE/메모리만 확인하는 용도. passed=null 유지.
+            tc.passed = null
+        } else {
+            // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
+            fun normalize(s: String): String = s
+                .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
+                .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
+                .replace(Regex("""\[\s+"""), "[")
+                .replace(Regex("""\s+]"""), "]")
+            tc.passed = normalize(stdout) == normalize(expected)
+        }
+        return ExecOutcome(result)
+    }
+
+    /**
+     * 체커 실행: stdin으로 입력/사용자출력/예상출력을 ===CTK=== 구분으로 전달하고,
+     * 체커 stdout 첫 줄이 OK/AC면 통과. 체커 자체가 실패하면 불통과 + 에러 메시지.
+     */
+    private fun runChecker(checkerSrc: String, tc: TestCase, userOut: String): Pair<Boolean, String> {
+        val payload = buildString {
+            append(tc.input.trimEnd()).append('\n')
+            append("===CTK===\n")
+            append(userOut.trimEnd()).append('\n')
+            append("===CTK===\n")
+            append(tc.expectedOutput.trimEnd()).append('\n')
+        }
+        val res = CodeRunner.run(
+            checkerSrc, checkerLanguage,
+            TestCase(input = payload, expectedOutput = ""), timeoutSeconds = 10
+        )
+        if (res.exitCode != 0 && res.error.isNotBlank()) {
+            return false to I18n.t("체커 실행 실패: ", "Checker failed: ") + res.error.trim()
+        }
+        val out = res.output.trim()
+        val firstLine = out.lineSequence().firstOrNull()?.trim()?.uppercase() ?: ""
+        val ok = firstLine == "OK" || firstLine == "AC" || firstLine.startsWith("OK ")
+        return ok to out
     }
 
     /** 실행됐지만 판정 없는 중립 케이스인가 (예상 출력 없음, 이슈 #36) */
@@ -294,8 +360,13 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         tc.passed == null && tc.expectedOutput.isBlank() && tc.actualOutput.isNotBlank()
 
     /** 실행 결과를 해당 카드에 반영 (EDT에서 호출할 것) */
-    private fun applyResultToCard(index: Int, tc: TestCase, result: CodeRunner.RunResult) {
+    private fun applyResultToCard(index: Int, tc: TestCase, outcome: ExecOutcome) {
         if (index >= cards.size) return
+        val result = outcome.result
+        // 체커 메시지 먼저 (setDebugOutput은 덮어쓰기, setStderrOutput은 이어붙이기)
+        outcome.checkerMessage?.takeIf { it.isNotBlank() }?.let {
+            cards[index].setDebugOutput("[checker] $it")
+        }
         // 정상 종료인데 stderr가 있으면 디버그 출력으로 표시
         if (result.exitCode == 0 && result.error.isNotBlank()) {
             cards[index].setStderrOutput(result.error.trim())
