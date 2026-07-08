@@ -718,6 +718,8 @@
     <!-- Java/Kotlin 테스트 디버깅 (이슈 #36 Tier 1). Java 모듈이 있는 IDE에서만 로드 —
          RustRover/GoLand 등에서는 무시되어 플러그인은 정상 로드된다. -->
     <depends optional="true" config-file="codingtestkit-java.xml">com.intellij.modules.java</depends>
+    <!-- Go 테스트 디버깅 (이슈 #36 Tier 3). Go 플러그인이 있는 IDE(GoLand 등)에서만 로드. -->
+    <depends optional="true" config-file="codingtestkit-go.xml">org.jetbrains.plugins.go</depends>
 
     <!-- 언어별 디버그 어댑터 확장점 (이슈 #36). IDE별 모듈(Java/Go/Python…)이 자기
          어댑터를 여기에 등록한다. 서비스가 아닌 EP인 이유: IDEA Ultimate처럼 여러

@@ -51,6 +51,116 @@ object CodeRunner {
         java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { it.localPort }
 
     /**
+     * 언어별 디버그 실행 진입점 (이슈 #36). 케이스 입력으로 디버그 서버를 띄우고,
+     * 반환된 port에 TestDebugAdapter가 IDE 디버거를 attach한다.
+     *
+     * @param userFile 에디터에 열린 실제 파일. Go 등 네이티브 디버깅은 브레이크포인트를
+     *                 소스 파일 경로로 바인딩하므로, 임시 사본이 아닌 실제 파일로 빌드해야 한다.
+     */
+    fun startDebug(
+        code: String,
+        language: Language,
+        testCase: TestCase,
+        parameterNames: List<String>,
+        source: com.codingtestkit.model.ProblemSource,
+        userFile: File? = null
+    ): DebugHandle = when (language) {
+        Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source)
+        Language.GO -> startGoDebug(code, testCase.input, userFile)
+        else -> DebugHandle(false, errorMessage = I18n.t(
+            "${language.displayName} 디버깅은 아직 지원되지 않습니다.",
+            "${language.displayName} debugging is not supported yet."
+        ))
+    }
+
+    /**
+     * Go 코드를 dlv headless 서버로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 3).
+     * dlv도 JDWP suspend=y처럼 클라이언트가 붙기 전까지 프로그램을 정지시켜 두므로
+     * attach 전에 끝나버리는 레이스가 없다.
+     *
+     * 브레이크포인트는 바이너리에 기록된 소스 파일 경로로 바인딩되므로, 에디터의 실제
+     * 파일(userFile)로 빌드한다 — 임시 사본으로 빌드하면 브레이크포인트가 잡히지 않는다.
+     */
+    private fun startGoDebug(code: String, input: String, userFile: File?): DebugHandle {
+        if (goPath.isBlank()) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "Go를 찾을 수 없습니다.\nhttps://go.dev/dl 에서 Go를 설치하세요.",
+                "Go not found.\nPlease install Go via https://go.dev/dl"
+            ))
+        }
+        val dlv = findDlv() ?: return DebugHandle(false, errorMessage = I18n.t(
+            "dlv(Delve 디버거)를 찾을 수 없습니다.\nGoLand에서 실행 중인지 확인하거나 `go install github.com/go-delve/delve/cmd/dlv@latest`로 설치하세요.",
+            "dlv (Delve debugger) not found.\nMake sure you are running GoLand, or install it: `go install github.com/go-delve/delve/cmd/dlv@latest`"
+        ))
+        if (!code.contains("func main(")) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "Go 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.\nLeetCode/프로그래머스 래퍼 스타일은 추후 지원 예정입니다.",
+                "Go debugging supports code with a main function (Codeforces/SWEA style).\nLeetCode/Programmers wrapper style is planned."
+            ))
+        }
+
+        val dir = createTempDir()
+        return try {
+            // 실제 파일 경로로 빌드해야 브레이크포인트가 바인딩된다 (에디터 저장은 호출부 책임)
+            val sourceFile = if (userFile != null && userFile.exists()) userFile
+                             else File(dir, "solution.go").apply { writeText(code, StandardCharsets.UTF_8) }
+            val bin = File(dir, if (isWindows) "solution.exe" else "solution")
+            // -gcflags all=-N -l: 최적화·인라이닝 비활성화 (디버그 정보 보존, dlv 표준 플래그)
+            val compile = executeProcess(
+                listOf(goPath, "build", "-gcflags", "all=-N -l", "-o", bin.absolutePath, sourceFile.absolutePath),
+                dir, "", COMPILE_TIMEOUT_SECONDS
+            )
+            if (compile.exitCode != 0) {
+                dir.deleteRecursively()
+                return DebugHandle(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
+            }
+
+            val port = findFreePort()
+            val process = ProcessBuilder(
+                listOf(dlv, "--listen=127.0.0.1:$port", "--headless=true", "--api-version=2", "exec", bin.absolutePath)
+            ).directory(dir).start()
+            // 케이스 입력 전달 — dlv headless는 자기 stdin을 안 읽고 대상 프로그램에 물려준다
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (input.isNotBlank()) it.write(input) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+            drainToVoid(process.inputStream)
+            drainToVoid(process.errorStream)
+
+            DebugHandle(true, port = port, process = process, workDir = dir)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
+    }
+
+    /**
+     * dlv 탐색: 1) Go 플러그인(GoLand)에 번들된 dlv → 2) PATH/GOPATH의 dlv.
+     * 번들 경로: <go-plugin>/lib/dlv/<os><arch>/dlv
+     */
+    private fun findDlv(): String? {
+        try {
+            val plugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
+                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.plugins.go"))
+            val base = plugin?.pluginPath?.toFile()
+            if (base != null) {
+                val os = System.getProperty("os.name").lowercase()
+                val arm = System.getProperty("os.arch").lowercase().let { it.contains("aarch64") || it.contains("arm") }
+                val osDir = when {
+                    os.contains("win") -> if (arm) "windowsarm" else "windows"
+                    os.contains("mac") -> if (arm) "macarm" else "mac"
+                    else -> if (arm) "linuxarm" else "linux"
+                }
+                val f = File(base, "lib/dlv/$osDir/" + if (os.contains("win")) "dlv.exe" else "dlv")
+                if (f.exists()) return f.absolutePath
+            }
+        } catch (_: Throwable) {}
+        val fallback = findExecutable("dlv", "${System.getProperty("user.home")}/go/bin/dlv")
+        return fallback.ifBlank { null }
+    }
+
+    /**
      * Java/Kotlin 코드를 JDWP suspend=y 로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 1).
      * suspend=y라 디버거가 붙기 전까지 사용자 코드가 실행되지 않아, attach 전에 끝나버리는
      * 레이스가 없다. 반환된 process는 디버그 세션이 잡고 있으므로 호출부가 정리 시점을 관리.
@@ -58,7 +168,7 @@ object CodeRunner {
      * 지원: JAVA, KOTLIN. 그 외 언어는 ok=false + 안내 메시지.
      * 컴파일 에러 시에도 ok=false + 에러 메시지.
      */
-    fun startJvmDebug(
+    private fun startJvmDebug(
         code: String,
         language: Language,
         testCase: TestCase,

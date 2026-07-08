@@ -1,0 +1,7 @@
+<!-- org.jetbrains.plugins.go 가 있는 IDE(GoLand, IDEA Ultimate+Go)에서만 로드되는 확장.
+     dlv 원격 디버그 attach가 Go 플러그인에 있으므로, Go 디버그 어댑터를 여기서만 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.go.GoDebugAdapter"/>
+    </extensions>
+</idea-plugin>

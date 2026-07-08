@@ -537,10 +537,19 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             return
         }
 
+        // Go 등 네이티브 디버깅은 소스 파일 경로로 브레이크포인트를 바인딩하므로
+        // 에디터 문서를 디스크에 저장하고 실제 파일 경로를 넘긴다
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+        val userFile = editor?.let {
+            val fdm = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            fdm.saveDocument(it.document)
+            fdm.getFile(it.document)?.toNioPath()?.toFile()
+        }
+
         running = true
         setRunningStatus()
         ApplicationManager.getApplication().executeOnPooledThread {
-            val handle = CodeRunner.startJvmDebug(code, language, tc, parameterNames, problemSource)
+            val handle = CodeRunner.startDebug(code, language, tc, parameterNames, problemSource, userFile)
             SwingUtilities.invokeLater {
                 running = false
                 runButton.isEnabled = true

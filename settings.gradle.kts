@@ -5,3 +5,4 @@ rootProject.name = "CodingTestKit"
 // 루트(메인)  — 플러그인 본체. IntelliJ IDEA SDK로 컴파일 (Java/Kotlin 디버거 포함).
 // 이후 :debugger-go(GoLand SDK), :debugger-python(PyCharm SDK) 등이 여기에 추가된다.
 include(":core")
+include(":debugger-go")
