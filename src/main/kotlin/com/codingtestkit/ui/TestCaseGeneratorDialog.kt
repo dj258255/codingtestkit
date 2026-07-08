@@ -22,7 +22,9 @@ import kotlin.random.Random
  */
 class TestCaseGeneratorDialog(
     /** 파라미터형 플랫폼(리트코드/프로그래머스)이면 배열 리터럴 형식을 기본 선택 */
-    private val parameterStyle: Boolean = false
+    private val parameterStyle: Boolean = false,
+    /** 파라미터형 문제의 파라미터 이름들 (다중 파라미터 안내용) */
+    private val parameterNames: List<String> = emptyList()
 ) : DialogWrapper(true) {
 
     enum class OutputFormat(val ko: String, val en: String) {
@@ -93,6 +95,23 @@ class TestCaseGeneratorDialog(
         firstLineNCheck.isEnabled = formatCombo.selectedIndex != OutputFormat.ARRAY.ordinal
 
         addRow(I18n.t("시드 (비우면 랜덤):", "Seed (blank = random):"), seedField)
+
+        // 다중 파라미터 문제 안내: 생성 입력은 첫 파라미터 줄만 채움 (이슈 #36)
+        if (parameterStyle && parameterNames.size > 1) {
+            gbc.gridx = 0; gbc.gridwidth = 2
+            panel.add(JLabel("<html><b>${I18n.t(
+                "⚠ 이 문제의 파라미터: ${parameterNames.joinToString(", ")} (${parameterNames.size}개)<br>" +
+                    "생성 입력은 첫 파라미터(${parameterNames.first()}) 줄만 채웁니다.<br>" +
+                    "나머지 파라미터 값은 생성 후 카드의 입력에 줄로 직접 추가하세요.",
+                "⚠ This problem's parameters: ${parameterNames.joinToString(", ")} (${parameterNames.size})<br>" +
+                    "The generated input fills only the first parameter (${parameterNames.first()}).<br>" +
+                    "Add the remaining parameter values as extra lines in the case input."
+            )}</b></html>").apply {
+                foreground = com.intellij.ui.JBColor(java.awt.Color(200, 120, 0), java.awt.Color(230, 160, 50))
+            }, gbc)
+            gbc.gridy++
+            gbc.gridwidth = 1
+        }
 
         gbc.gridx = 0; gbc.gridwidth = 2
         panel.add(JLabel("<html><i>${I18n.t(
