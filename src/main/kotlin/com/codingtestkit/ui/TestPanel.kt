@@ -242,18 +242,28 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         } else {
             val stdout = result.output.trim()
             val expected = tc.expectedOutput.trim()
-
-            // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
-            fun normalize(s: String): String = s
-                .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
-                .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
-                .replace(Regex("""\[\s+"""), "[")
-                .replace(Regex("""\s+]"""), "]")
             tc.actualOutput = stdout
-            tc.passed = normalize(stdout) == normalize(expected)
+
+            if (expected.isBlank()) {
+                // 예상 출력이 없으면 판정하지 않는 중립 실행 (이슈 #36):
+                // 대량 생성 케이스로 TLE/메모리만 확인하는 용도. passed=null 유지.
+                tc.passed = null
+            } else {
+                // 비교용 정규화: trailing whitespace + 배열 내부 공백 통일
+                fun normalize(s: String): String = s
+                    .lines().joinToString("\n") { it.trimEnd() }.trimEnd()
+                    .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
+                    .replace(Regex("""\[\s+"""), "[")
+                    .replace(Regex("""\s+]"""), "]")
+                tc.passed = normalize(stdout) == normalize(expected)
+            }
         }
         return result
     }
+
+    /** 실행됐지만 판정 없는 중립 케이스인가 (예상 출력 없음, 이슈 #36) */
+    private fun isNeutralRan(tc: TestCase): Boolean =
+        tc.passed == null && tc.expectedOutput.isBlank() && tc.actualOutput.isNotBlank()
 
     /** 실행 결과를 해당 카드에 반영 (EDT에서 호출할 것) */
     private fun applyResultToCard(index: Int, tc: TestCase, result: CodeRunner.RunResult) {
@@ -268,13 +278,27 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     /** 실행된 케이스 기준으로 상태 요약 갱신 */
     private fun updateSummary() {
         val pass = testCases.count { it.passed == true }
-        val allPassed = testCases.isNotEmpty() && pass == testCases.size
-        statusLabel.text = "$pass / ${testCases.size} ${I18n.t("통과", "passed")}"
-        statusLabel.icon = if (allPassed) AllIcons.General.InspectionsOK else AllIcons.General.Error
-        statusLabel.foreground = if (allPassed) {
-            JBColor(Color(46, 160, 67), Color(80, 200, 80))
+        val fail = testCases.count { it.passed == false }
+        val neutral = testCases.count { isNeutralRan(it) }
+        val green = JBColor(Color(46, 160, 67), Color(80, 200, 80))
+        val red = JBColor(Color(218, 54, 51), Color(230, 80, 80))
+
+        if (neutral > 0) {
+            // 판정 없는(중립) 케이스가 섞이면 pass/total 형식이 오해를 부르므로 분리 표기
+            statusLabel.text = I18n.t(
+                "통과 $pass · 실패 $fail · 실행만 $neutral",
+                "pass $pass · fail $fail · ran $neutral"
+            )
+            when {
+                fail > 0 -> { statusLabel.icon = AllIcons.General.Error; statusLabel.foreground = red }
+                pass > 0 -> { statusLabel.icon = AllIcons.General.InspectionsOK; statusLabel.foreground = green }
+                else -> { statusLabel.icon = AllIcons.General.Information; statusLabel.foreground = JBColor.foreground() }
+            }
         } else {
-            JBColor(Color(218, 54, 51), Color(230, 80, 80))
+            val allPassed = testCases.isNotEmpty() && pass == testCases.size
+            statusLabel.text = "$pass / ${testCases.size} ${I18n.t("통과", "passed")}"
+            statusLabel.icon = if (allPassed) AllIcons.General.InspectionsOK else AllIcons.General.Error
+            statusLabel.foreground = if (allPassed) green else red
         }
     }
 
@@ -462,7 +486,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             contentPanel.add(createFieldPanel(I18n.t("입력", "Input"), inputArea))
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            contentPanel.add(createFieldPanel(I18n.t("예상 출력", "Expected"), expectedArea))
+            contentPanel.add(createFieldPanel(I18n.t("예상 출력 (비우면 판정 없이 실행만)", "Expected (empty = run without verdict)"), expectedArea))
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
             contentPanel.add(createFieldPanel(I18n.t("실제 출력", "Actual"), actualArea))
 
@@ -696,10 +720,18 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                     headerPanel.background = JBColor(Color(255, 240, 240), Color(60, 40, 40))
                 }
                 null -> {
-                    statusIcon.icon = null
-                    titleLabel.text = "#$number"
-                    titleLabel.foreground = JBColor.foreground()
-                    headerPanel.background = JBColor(Color(240, 240, 240), Color(50, 50, 50))
+                    if (isNeutralRan(tc)) {
+                        // 판정 없는 중립 실행 (예상 출력 없음) — 시간/메모리가 주 정보 (이슈 #36)
+                        statusIcon.icon = AllIcons.General.Information
+                        titleLabel.text = "#$number ${I18n.t("실행됨", "DONE")}$timeStr"
+                        titleLabel.foreground = JBColor(Color(70, 110, 180), Color(120, 160, 230))
+                        headerPanel.background = JBColor(Color(238, 243, 250), Color(42, 46, 55))
+                    } else {
+                        statusIcon.icon = null
+                        titleLabel.text = "#$number"
+                        titleLabel.foreground = JBColor.foreground()
+                        headerPanel.background = JBColor(Color(240, 240, 240), Color(50, 50, 50))
+                    }
                 }
             }
             revalidate()
