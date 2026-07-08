@@ -719,6 +719,15 @@
          RustRover/GoLand 등에서는 무시되어 플러그인은 정상 로드된다. -->
     <depends optional="true" config-file="codingtestkit-java.xml">com.intellij.modules.java</depends>
 
+    <!-- 언어별 디버그 어댑터 확장점 (이슈 #36). IDE별 모듈(Java/Go/Python…)이 자기
+         어댑터를 여기에 등록한다. 서비스가 아닌 EP인 이유: IDEA Ultimate처럼 여러
+         언어 플러그인이 공존하면 어댑터도 여러 개 로드되기 때문. -->
+    <extensionPoints>
+        <extensionPoint qualifiedName="com.codingtestkit.testDebugAdapter"
+                        interface="com.codingtestkit.debug.TestDebugAdapter"
+                        dynamic="true"/>
+    </extensionPoints>
+
     <extensions defaultExtensionNs="com.intellij">
         <editorActionHandler action="EditorPaste"
                              implementationClass="com.codingtestkit.service.PasteBlockHandler"/>

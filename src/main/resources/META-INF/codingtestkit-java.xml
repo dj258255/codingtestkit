@@ -1,10 +1,8 @@
 <!-- com.intellij.modules.java 가 있는 IDE(IntelliJ IDEA 등)에서만 로드되는 확장.
-     JVM 디버거가 Java 플러그인에 있으므로, 디버그 서비스 구현을 여기서만 등록한다.
-     비-Java IDE(RustRover/GoLand 등)에서는 이 파일이 로드되지 않아 서비스가 없다. -->
+     JVM 디버거가 Java 플러그인에 있으므로, JVM 디버그 어댑터를 여기서만 등록한다.
+     비-Java IDE(RustRover/GoLand 등)에서는 이 파일이 로드되지 않아 어댑터가 없다. -->
 <idea-plugin>
-    <extensions defaultExtensionNs="com.intellij">
-        <projectService
-            serviceInterface="com.codingtestkit.service.TestDebugService"
-            serviceImplementation="com.codingtestkit.service.java.JvmDebugServiceImpl"/>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.service.java.JvmDebugAdapter"/>
     </extensions>
 </idea-plugin>

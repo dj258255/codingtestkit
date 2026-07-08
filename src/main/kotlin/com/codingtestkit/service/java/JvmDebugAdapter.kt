@@ -1,7 +1,7 @@
 package com.codingtestkit.service.java
 
-import com.codingtestkit.service.I18n
-import com.codingtestkit.service.TestDebugService
+import com.codingtestkit.debug.TestDebugAdapter
+import com.codingtestkit.model.Language
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
@@ -11,14 +11,17 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 
 /**
- * JVM(JDWP) 원격 디버그 attach 구현 (이슈 #36 Tier 1).
+ * JVM(JDWP) 원격 디버그 attach 어댑터 (이슈 #36 Tier 1).
  *
- * 이 클래스는 com.intellij.modules.java가 있는 IDE에서만 로드된다
- * (plugin.xml의 optional 의존성 + 별도 config 파일에 등록).
+ * com.intellij.modules.java가 있는 IDE(IntelliJ IDEA 등)에서만 로드된다
+ * (plugin.xml의 optional 의존성 + codingtestkit-java.xml에 EP로 등록).
  */
-class JvmDebugServiceImpl(private val project: Project) : TestDebugService {
+class JvmDebugAdapter : TestDebugAdapter {
 
-    private val log = Logger.getInstance(JvmDebugServiceImpl::class.java)
+    private val log = Logger.getInstance(JvmDebugAdapter::class.java)
+
+    override fun supports(language: Language): Boolean =
+        language == Language.JAVA || language == Language.KOTLIN
 
     override fun isAvailable(): Boolean = try {
         RemoteConfigurationType.getInstance() != null
@@ -26,7 +29,7 @@ class JvmDebugServiceImpl(private val project: Project) : TestDebugService {
         false
     }
 
-    override fun attachJvm(project: Project, sessionName: String, port: Int): Boolean {
+    override fun attachToPort(project: Project, sessionName: String, port: Int): Boolean {
         return try {
             val type = RemoteConfigurationType.getInstance()
             val runManager = RunManager.getInstance(project)
@@ -46,10 +49,4 @@ class JvmDebugServiceImpl(private val project: Project) : TestDebugService {
             false
         }
     }
-
-    @Suppress("unused")
-    private fun help(): String = I18n.t(
-        "Java/Kotlin 디버깅은 IntelliJ IDEA에서 지원됩니다.",
-        "Java/Kotlin debugging is supported in IntelliJ IDEA."
-    )
 }

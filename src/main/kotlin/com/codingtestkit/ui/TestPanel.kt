@@ -519,8 +519,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
-     * 케이스 하나를 IDE 디버거로 실행 (카드의 🐞 버튼, 이슈 #36 Tier 1).
-     * Java/Kotlin을 JDWP suspend로 띄우고 TestDebugService로 attach한다.
+     * 케이스 하나를 IDE 디버거로 실행 (카드의 🐞 버튼, 이슈 #36).
+     * 언어에 맞는 TestDebugAdapter(EP)를 찾아 디버그 서버에 attach한다.
+     * 어댑터가 없으면(그 언어의 디버거가 이 IDE에 없음) 맞는 IDE를 안내한다.
      */
     private fun debugTestAt(index: Int) {
         if (running) return
@@ -530,12 +531,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         val tc = testCases.getOrNull(index) ?: return
         val language = getSelectedLanguage()
 
-        val debugService = com.codingtestkit.service.TestDebugService.getInstance(project)
-        if (debugService == null || !debugService.isAvailable()) {
-            Messages.showInfoMessage(project, I18n.t(
-                "이 IDE에서는 디버깅을 사용할 수 없습니다.\nJava/Kotlin 디버깅은 IntelliJ IDEA에서 지원됩니다.",
-                "Debugging is not available in this IDE.\nJava/Kotlin debugging is supported in IntelliJ IDEA."
-            ), "CodingTestKit")
+        val adapter = com.codingtestkit.debug.TestDebugAdapter.forLanguage(language)
+        if (adapter == null) {
+            Messages.showInfoMessage(project, debugUnsupportedMessage(language), "CodingTestKit")
             return
         }
 
@@ -555,7 +553,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
                 statusLabel.icon = AllIcons.Actions.StartDebugger
                 statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
-                val attached = debugService.attachJvm(project, "CodingTestKit #${index + 1}", handle.port)
+                val attached = adapter.attachToPort(project, "CodingTestKit #${index + 1}", handle.port)
                 if (!attached) {
                     handle.cleanup()
                     Messages.showWarningDialog(project, I18n.t(
@@ -571,6 +569,25 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
             }
         }
+    }
+
+    /** 현재 IDE에 해당 언어 디버그 어댑터가 없을 때, 어느 IDE에서 되는지 안내 */
+    private fun debugUnsupportedMessage(language: Language): String {
+        val ide = when (language) {
+            Language.JAVA, Language.KOTLIN -> "IntelliJ IDEA"
+            Language.GO -> "GoLand"
+            Language.RUST -> "RustRover"
+            Language.CPP -> "CLion"
+            Language.RUBY -> "RubyMine"
+            Language.PYTHON -> "PyCharm"
+            Language.JAVASCRIPT -> "WebStorm"
+        }
+        return I18n.t(
+            "이 IDE에서는 ${language.displayName} 디버깅을 사용할 수 없습니다.\n" +
+                "${language.displayName} 디버깅은 $ide 에서 지원됩니다.",
+            "${language.displayName} debugging is not available in this IDE.\n" +
+                "It is supported in $ide."
+        )
     }
 
     /** 케이스 하나만 실행 (카드의 ▶ 버튼, 이슈 #36) */
