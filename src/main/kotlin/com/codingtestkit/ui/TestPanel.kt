@@ -22,6 +22,21 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         /** 이 길이를 넘는 입력은 카드에 미리보기만 표시 (렌더링·sync 보호, 이슈 #36) */
         private const val LARGE_INPUT_CHARS = 100_000
 
+        /**
+         * 문제 설명에서 "아무 답이나 출력" 류 문구를 감지하는 휴리스틱 (이슈 #36).
+         * 감지되면 불일치를 FAIL 대신 '직접 확인(중립)'으로 완화한다 —
+         * 오탐이 나도 FAIL→중립 방향의 완화라 해가 적다 (PASS 판정은 영향 없음).
+         */
+        fun detectsMultipleAnswers(description: String): Boolean {
+            val d = description.lowercase()
+            return listOf(
+                "any of them", "any one of them", "print any", "output any",
+                "multiple valid answer", "multiple answers", "multiple solutions",
+                "multiple correct", "any valid answer", "any correct answer",
+                "여러 개일 경우", "여러 개인 경우", "여러 가지일 경우", "아무 것이나", "아무거나"
+            ).any { it in d }
+        }
+
         private fun largeInputPreview(input: String): String =
             input.take(500) + "\n… " + I18n.t(
                 "[총 %,d자 — 대량 입력은 표시를 생략하며 실행 시 원본을 사용합니다]",
@@ -52,6 +67,13 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     /** 커스텀 체커 (세션 레벨, 이슈 #36). null이면 미사용 → 문자열 비교/중립 판정 */
     private var checkerCode: String? = null
     private var checkerLanguage: Language = Language.PYTHON
+
+    /** 복수 정답 허용 문제 힌트 (문제 설명에서 자동 감지, 이슈 #36) */
+    private var multipleAnswersAllowed = false
+
+    fun setMultipleAnswersHint(allowed: Boolean) {
+        multipleAnswersAllowed = allowed
+    }
     private val statusLabel = JLabel("").apply {
         border = JBUI.Borders.empty(0, 4)
     }
@@ -325,7 +347,13 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 .replace(Regex("""\s*,\s*"""), ",")  // [0, 1] → [0,1]
                 .replace(Regex("""\[\s+"""), "[")
                 .replace(Regex("""\s+]"""), "]")
-            tc.passed = normalize(stdout) == normalize(expected)
+            val matched = normalize(stdout) == normalize(expected)
+            tc.passed = when {
+                matched -> true
+                // 복수 정답 허용 문제면 불일치를 FAIL이 아닌 '직접 확인(중립)'으로 (이슈 #36)
+                multipleAnswersAllowed -> null
+                else -> false
+            }
         }
         return ExecOutcome(result)
     }
@@ -355,9 +383,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         return ok to out
     }
 
-    /** 실행됐지만 판정 없는 중립 케이스인가 (예상 출력 없음, 이슈 #36) */
+    /** 실행됐지만 판정이 없는 중립 케이스인가 (예상 출력 없음 또는 복수 정답 불일치, 이슈 #36) */
     private fun isNeutralRan(tc: TestCase): Boolean =
-        tc.passed == null && tc.expectedOutput.isBlank() && tc.actualOutput.isNotBlank()
+        tc.passed == null && tc.actualOutput.isNotBlank()
 
     /** 실행 결과를 해당 카드에 반영 (EDT에서 호출할 것) */
     private fun applyResultToCard(index: Int, tc: TestCase, outcome: ExecOutcome) {
@@ -385,8 +413,8 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (neutral > 0) {
             // 판정 없는(중립) 케이스가 섞이면 pass/total 형식이 오해를 부르므로 분리 표기
             statusLabel.text = I18n.t(
-                "통과 $pass · 실패 $fail · 실행만 $neutral",
-                "pass $pass · fail $fail · ran $neutral"
+                "통과 $pass · 실패 $fail · 판정없음 $neutral",
+                "pass $pass · fail $fail · no verdict $neutral"
             )
             when {
                 fail > 0 -> { statusLabel.icon = AllIcons.General.Error; statusLabel.foreground = red }
@@ -514,6 +542,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             background = JBColor(Color(255, 250, 230), Color(50, 48, 40))
         }
         private val debugPanel = JPanel(BorderLayout()).apply { isVisible = false }
+        private lateinit var actualFieldPanel: JPanel
 
         init {
             border = BorderFactory.createCompoundBorder(
@@ -601,7 +630,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
             contentPanel.add(createFieldPanel(I18n.t("예상 출력 (비우면 판정 없이 실행만)", "Expected (empty = run without verdict)"), expectedArea))
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
-            contentPanel.add(createFieldPanel(I18n.t("실제 출력", "Actual"), actualArea))
+            // 실제 출력은 첫 실행 전까지 숨김 (빈 박스가 자리만 차지, 이슈 #36 피드백)
+            actualFieldPanel = createFieldPanel(I18n.t("실제 출력", "Actual"), actualArea)
+            actualFieldPanel.isVisible = testCase.actualOutput.isNotBlank()
+            contentPanel.add(actualFieldPanel)
 
             // 디버그 출력 (stderr, 조건부 표시)
             contentPanel.add(Box.createVerticalStrut(JBUI.scale(4)))
@@ -788,6 +820,11 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             titleLabel.text = "#$number ${I18n.t("실행 중...", "Running...")}"
             actualArea.text = ""
             actualArea.foreground = defaultActualFg
+            // 첫 실행이 시작되면 실제 출력 박스 표시
+            if (!actualFieldPanel.isVisible) {
+                actualFieldPanel.isVisible = true
+                updateMaxSize()
+            }
             debugPanel.isVisible = false
             debugArea.text = ""
         }
@@ -834,9 +871,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
                 null -> {
                     if (isNeutralRan(tc)) {
-                        // 판정 없는 중립 실행 (예상 출력 없음) — 시간/메모리가 주 정보 (이슈 #36)
+                        // 판정 없는 중립 실행 — 예상 출력 없음(실행만) 또는 복수 정답 불일치(직접 확인)
                         statusIcon.icon = AllIcons.General.Information
-                        titleLabel.text = "#$number ${I18n.t("실행됨", "DONE")}$timeStr"
+                        val label = if (tc.expectedOutput.isBlank()) {
+                            I18n.t("실행됨", "DONE")
+                        } else {
+                            I18n.t("직접 확인 (복수 정답 가능)", "CHECK (multiple answers possible)")
+                        }
+                        titleLabel.text = "#$number $label$timeStr"
                         titleLabel.foreground = JBColor(Color(70, 110, 180), Color(120, 160, 230))
                         headerPanel.background = JBColor(Color(238, 243, 250), Color(42, 46, 55))
                     } else {

@@ -75,6 +75,7 @@ class MainPanel(
         problemPanel.onProblemFetched = { problem ->
             testPanel.setProblemSource(problem.source)
             testPanel.setParameterNames(problem.parameterNames)
+            testPanel.setMultipleAnswersHint(TestPanel.detectsMultipleAnswers(problem.description))
             testPanel.setTestCases(problem.testCases)
             CodingTestKitActionService.getInstance(project).updateStatus(
                 problem.source.localizedName(), problem.id
@@ -152,6 +153,7 @@ class MainPanel(
         problemPanel.loadExistingProblem(problem, folder)
         testPanel.setProblemSource(problem.source)
         testPanel.setParameterNames(problem.parameterNames)
+        testPanel.setMultipleAnswersHint(TestPanel.detectsMultipleAnswers(problem.description))
         testPanel.setTestCases(problem.testCases)
         CodingTestKitActionService.getInstance(project).updateStatus(
             problem.source.localizedName(), problem.id
