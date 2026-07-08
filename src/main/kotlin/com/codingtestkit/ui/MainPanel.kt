@@ -75,6 +75,8 @@ class MainPanel(
         problemPanel.onProblemFetched = { problem ->
             testPanel.setProblemSource(problem.source)
             testPanel.setParameterNames(problem.parameterNames)
+            testPanel.setParameterTypes(problem.parameterTypes ?: emptyList())
+            testPanel.setMultipleAnswersHint(TestPanel.detectsMultipleAnswers(problem.description))
             testPanel.setTestCases(problem.testCases)
             CodingTestKitActionService.getInstance(project).updateStatus(
                 problem.source.localizedName(), problem.id
@@ -97,6 +99,7 @@ class MainPanel(
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            testPanel.setMultipleAnswersHint(false)
                             CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                         } else {
                             detectAndLoadProblem(selected, basePath)
@@ -108,6 +111,7 @@ class MainPanel(
                             lastLoadedFolder = null
                             problemPanel.clearProblem()
                             testPanel.setTestCases(emptyList())
+                            testPanel.setMultipleAnswersHint(false)
                             CodingTestKitActionService.getInstance(project).updateStatus(null, null)
                             return
                         }
@@ -152,6 +156,8 @@ class MainPanel(
         problemPanel.loadExistingProblem(problem, folder)
         testPanel.setProblemSource(problem.source)
         testPanel.setParameterNames(problem.parameterNames)
+        testPanel.setParameterTypes(problem.parameterTypes ?: emptyList())
+        testPanel.setMultipleAnswersHint(TestPanel.detectsMultipleAnswers(problem.description))
         testPanel.setTestCases(problem.testCases)
         CodingTestKitActionService.getInstance(project).updateStatus(
             problem.source.localizedName(), problem.id

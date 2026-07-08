@@ -572,6 +572,40 @@ class CodeRunnerTest {
     }
 
     /**
+     * 자식이 대량 입력을 읽지 않고 종료해도 Broken pipe로 실패하면 안 된다 (이슈 #36).
+     * 파이프 버퍼(~64KB)를 넘는 입력에서만 재현되므로 ~2MB로 검증.
+     */
+    @Test
+    fun `run with large unconsumed input does not fail with broken pipe`() {
+        if (!isPythonAvailable()) return
+
+        val code = """print("ok")"""  // stdin을 전혀 읽지 않음
+        val bigInput = buildString(2_000_000) { repeat(250_000) { append("1234567\n") } }
+        val tc = TestCase(input = bigInput, expectedOutput = "ok")
+        val result = CodeRunner.run(code, Language.PYTHON, tc)
+
+        assertEquals(0, result.exitCode, "Broken pipe로 실패하면 안 됨: ${result.error}")
+        assertEquals("ok", result.output.trim())
+    }
+
+    /**
+     * 대량 출력도 파이프 블로킹 없이 수집되어야 한다 (이슈 #36).
+     * 종료 후에 읽는 구조면 자식이 stdout 버퍼를 채우고 블로킹되어 허위 시간 초과가 난다.
+     */
+    @Test
+    fun `run with large output does not falsely time out`() {
+        if (!isPythonAvailable()) return
+
+        val code = "for i in range(200000): print(i)"  // ~1.3MB 출력
+        val tc = TestCase(input = "", expectedOutput = "")
+        val result = CodeRunner.run(code, Language.PYTHON, tc, timeoutSeconds = 10)
+
+        assertFalse(result.timedOut, "대량 출력이 시간 초과로 오판되면 안 됨: ${result.error}")
+        assertEquals(0, result.exitCode, "Exit code should be 0: ${result.error}")
+        assertTrue(result.output.lines().size >= 200_000, "출력 전체가 수집되어야 함")
+    }
+
+    /**
      * 빈 입력이어도 자식 프로세스의 stdin이 닫혀 EOF가 전달되어야 한다.
      * 닫지 않으면 stdin을 읽는 코드가 타임아웃까지 블로킹되어 허위 시간 초과가 발생한다.
      */

@@ -134,8 +134,9 @@ object LeetCodeApi {
         // 테스트 케이스 추출
         val testCases = extractTestCases(content, question.get("exampleTestcases")?.asString)
 
-        // metaData에서 파라미터 이름 추출
+        // metaData에서 파라미터 이름·타입 추출
         val paramNames = extractParamNames(question.get("metaData")?.asString)
+        val paramTypes = extractParamTypes(question.get("metaData")?.asString)
 
         return Problem(
             source = ProblemSource.LEETCODE,
@@ -145,6 +146,7 @@ object LeetCodeApi {
             testCases = testCases,
             difficulty = difficulty,
             parameterNames = paramNames,
+            parameterTypes = paramTypes,
             initialCode = initialCode,
             contestProbId = slug  // titleSlug 저장 (제출 URL에 필요)
         )
@@ -297,6 +299,19 @@ object LeetCodeApi {
             val meta = JsonParser.parseString(metaDataJson).asJsonObject
             meta.getAsJsonArray("params")?.map {
                 it.asJsonObject.get("name")?.asString ?: ""
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /** metaData에서 파라미터 타입 추출 (integer[], integer, string 등 — 테스트 생성기 자동화용, 이슈 #36) */
+    private fun extractParamTypes(metaDataJson: String?): List<String> {
+        if (metaDataJson.isNullOrBlank()) return emptyList()
+        return try {
+            val meta = JsonParser.parseString(metaDataJson).asJsonObject
+            meta.getAsJsonArray("params")?.map {
+                it.asJsonObject.get("type")?.asString ?: ""
             } ?: emptyList()
         } catch (_: Exception) {
             emptyList()
