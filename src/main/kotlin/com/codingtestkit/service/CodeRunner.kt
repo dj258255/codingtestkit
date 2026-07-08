@@ -1084,11 +1084,35 @@ end
 
         // 입력이 없어도 stdin을 닫아 EOF를 전달해야 함.
         // 닫지 않으면 stdin을 읽는 코드가 타임아웃까지 블로킹되어 허위 시간 초과가 발생하고 파이프 FD가 누수됨.
+        //
+        // stdin 쓰기는 별도 스레드로 (대량 입력 대응, 이슈 #36):
+        // - 자식이 입력을 다 읽지 않고 종료하면(예: 첫 토큰만 읽는 프로그램) Broken pipe가
+        //   나는데, 이는 정상 시나리오이므로 실행을 실패로 만들지 않는다.
+        // - 자식이 입력을 안 읽으면 파이프 버퍼(~64KB)가 차서 쓰기가 블로킹되는데,
+        //   메인 흐름에서 쓰면 waitFor 타임아웃 자체가 무력화된다.
         if (input.isNotBlank()) {
-            process.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(input) }
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(input) }
+                } catch (_: java.io.IOException) {
+                    // 자식이 stdin을 다 읽지 않고 종료 (Broken pipe) — 무시
+                }
+            }.apply { isDaemon = true; start() }
         } else {
             process.outputStream.close()
         }
+
+        // stdout/stderr는 실행과 동시에 수집 (대량 출력 대응, 이슈 #36):
+        // 종료 후에 읽으면 자식이 파이프 버퍼를 채우고 블로킹되어
+        // 대량 출력 프로그램이 허위 시간 초과가 된다.
+        val stdoutRef = java.util.concurrent.atomic.AtomicReference("")
+        val stderrRef = java.util.concurrent.atomic.AtomicReference("")
+        val stdoutReader = Thread {
+            runCatching { stdoutRef.set(process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }) }
+        }.apply { isDaemon = true; start() }
+        val stderrReader = Thread {
+            runCatching { stderrRef.set(process.errorStream.bufferedReader(Charsets.UTF_8).use { it.readText() }) }
+        }.apply { isDaemon = true; start() }
 
         // 메모리 폴링 스레드 시작
         val peakMemory = AtomicLong(0)
@@ -1134,8 +1158,11 @@ end
             return RunResult(output = "", error = I18n.t("시간 초과 (${timeout}초)", "Time Limit Exceeded (${timeout}s)"), exitCode = -1, timedOut = true, executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
         }
 
-        val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trimEnd()
-        val error = process.errorStream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trimEnd()
+        // 리더 스레드가 남은 버퍼를 마저 읽을 시간을 줌 (프로세스는 이미 종료됨)
+        stdoutReader.join(5000)
+        stderrReader.join(5000)
+        val output = stdoutRef.get().trimEnd()
+        val error = stderrRef.get().trimEnd()
 
         return RunResult(output = output, error = error, exitCode = process.exitValue(), executionTimeMs = elapsedMs, peakMemoryKB = peakMemory.get())
     }
