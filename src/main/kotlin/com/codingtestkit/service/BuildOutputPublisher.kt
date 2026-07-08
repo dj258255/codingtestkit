@@ -102,8 +102,73 @@ object BuildOutputPublisher {
         Language.CPP -> parseByPattern(output, Regex("""^(.+\.(?:cpp|cc|cxx|h|hpp)):(\d+):(\d+):\s*(error|warning|note):\s*(.+)$"""), colGroup = 3)
         Language.GO -> parseGo(output)
         Language.RUST -> parseRustc(output)
-        // 인터프리터 언어는 컴파일 단계가 없음 (런타임 에러는 테스트 패널 담당)
-        Language.PYTHON, Language.JAVASCRIPT, Language.RUBY -> emptyList()
+        // 인터프리터 언어: 컴파일 단계는 없지만 문법 에러(시작 실패)는 컴파일 에러의
+        // 대응물이므로 파싱해 Build 창에 게시 (케이스별 런타임 예외는 테스트 패널 담당)
+        Language.PYTHON -> parsePython(output)
+        Language.JAVASCRIPT -> parseNode(output)
+        Language.RUBY -> output.lineSequence().mapNotNull { line ->
+            Regex("""^(.+\.rb):(\d+):\s*(syntax error.*)$""").find(line.trim())?.let { m ->
+                Diagnostic(File(m.groupValues[1]).name, m.groupValues[2].toIntOrNull() ?: -1, -1,
+                    MessageEvent.Kind.ERROR, m.groupValues[3].trim())
+            }
+        }.toList()
+    }
+
+    /**
+     * 인터프리터 언어에서 '프로그램이 시작조차 못 한' 문법 에러인가 (이슈 #32).
+     * true면 Build 창에 게시할 가치가 있음. 케이스별 런타임 예외는 제외.
+     */
+    fun isStartupError(language: Language, stderr: String): Boolean = when (language) {
+        Language.PYTHON -> listOf("SyntaxError", "IndentationError", "TabError").any { it in stderr }
+        Language.JAVASCRIPT -> "SyntaxError" in stderr
+        Language.RUBY -> "syntax error" in stderr
+        else -> false
+    }
+
+    /**
+     * python:
+     *   File "/tmp/.../solution.py", line 3
+     *     def foo(:
+     *   SyntaxError: invalid syntax
+     */
+    private fun parsePython(output: String): List<Diagnostic> {
+        val fileLine = Regex("""^\s*File "(.+)", line (\d+)""")
+        var lastFile: String? = null
+        var lastLine = -1
+        var message = ""
+        for (line in output.lineSequence()) {
+            fileLine.find(line)?.let { m ->
+                lastFile = File(m.groupValues[1]).name
+                lastLine = m.groupValues[2].toIntOrNull() ?: -1
+            }
+            if (Regex("""^\w*(Error|Warning):\s*.+""").matches(line.trim())) message = line.trim()
+        }
+        if (lastFile == null) return emptyList()
+        return listOf(Diagnostic(lastFile, lastLine, -1, MessageEvent.Kind.ERROR,
+            message.ifBlank { I18n.t("문법 에러", "Syntax error") }))
+    }
+
+    /**
+     * node:
+     *   /tmp/.../solution.js:3
+     *   def foo(:
+     *   SyntaxError: Unexpected identifier
+     */
+    private fun parseNode(output: String): List<Diagnostic> {
+        val header = Regex("""^(.+\.(?:js|mjs|cjs)):(\d+)\s*$""")
+        var file: String? = null
+        var lineNo = -1
+        var message = ""
+        for (line in output.lineSequence()) {
+            if (file == null) header.find(line.trim())?.let { m ->
+                file = File(m.groupValues[1]).name
+                lineNo = m.groupValues[2].toIntOrNull() ?: -1
+            }
+            if (message.isBlank() && Regex("""^\w*Error:\s*.+""").matches(line.trim())) message = line.trim()
+        }
+        if (file == null) return emptyList()
+        return listOf(Diagnostic(file, lineNo, -1, MessageEvent.Kind.ERROR,
+            message.ifBlank { I18n.t("문법 에러", "Syntax error") }))
     }
 
     /** "file:line[:col]: severity: message" 꼴 공통 파서 (javac/kotlinc/g++) */

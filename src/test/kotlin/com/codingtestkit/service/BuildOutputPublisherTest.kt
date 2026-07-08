@@ -80,9 +80,58 @@ class BuildOutputPublisherTest {
     }
 
     @Test
-    fun `interpreted languages produce no compile diagnostics`() {
-        assertTrue(BuildOutputPublisher.parse(Language.PYTHON, "SyntaxError: x").isEmpty())
-        assertTrue(BuildOutputPublisher.parse(Language.JAVASCRIPT, "x").isEmpty())
-        assertTrue(BuildOutputPublisher.parse(Language.RUBY, "x").isEmpty())
+    fun `parse python syntax error`() {
+        // 실제 python3 출력 형식
+        val out = """
+              File "/tmp/ctk_run_1/solution.py", line 3
+                def foo(:
+                        ^
+            SyntaxError: invalid syntax
+        """.trimIndent()
+        val d = BuildOutputPublisher.parse(Language.PYTHON, out)
+        assertEquals(1, d.size)
+        assertEquals("solution.py", d[0].fileName)
+        assertEquals(3, d[0].line)
+        assertEquals("SyntaxError: invalid syntax", d[0].message)
+    }
+
+    @Test
+    fun `parse node syntax error`() {
+        // 실제 node 출력 형식
+        val out = """
+            /tmp/ctk_run_1/solution.js:3
+            def foo(:
+                ^^^
+
+            SyntaxError: Unexpected identifier
+        """.trimIndent()
+        val d = BuildOutputPublisher.parse(Language.JAVASCRIPT, out)
+        assertEquals(1, d.size)
+        assertEquals("solution.js", d[0].fileName)
+        assertEquals(3, d[0].line)
+        assertTrue(d[0].message.startsWith("SyntaxError"))
+    }
+
+    @Test
+    fun `parse ruby syntax error only`() {
+        // 실제 ruby 출력 형식
+        val out = "solution.rb:3: syntax error, unexpected ':', expecting ')'"
+        val d = BuildOutputPublisher.parse(Language.RUBY, out)
+        assertEquals(1, d.size)
+        assertEquals(3, d[0].line)
+        assertTrue(d[0].message.startsWith("syntax error"))
+        // 런타임 에러 형식은 매칭되지 않아야 함
+        assertTrue(BuildOutputPublisher.parse(Language.RUBY, "solution.rb:5:in '<main>': divided by 0 (ZeroDivisionError)").isEmpty())
+    }
+
+    @Test
+    fun `isStartupError gates interpreted languages`() {
+        assertTrue(BuildOutputPublisher.isStartupError(Language.PYTHON, "SyntaxError: invalid syntax"))
+        assertFalse(BuildOutputPublisher.isStartupError(Language.PYTHON, "IndexError: list index out of range"))
+        assertTrue(BuildOutputPublisher.isStartupError(Language.JAVASCRIPT, "SyntaxError: Unexpected token"))
+        assertFalse(BuildOutputPublisher.isStartupError(Language.JAVASCRIPT, "TypeError: undefined is not a function"))
+        assertTrue(BuildOutputPublisher.isStartupError(Language.RUBY, "solution.rb:1: syntax error, unexpected ':'"))
+        assertFalse(BuildOutputPublisher.isStartupError(Language.RUBY, "divided by 0 (ZeroDivisionError)"))
+        assertFalse(BuildOutputPublisher.isStartupError(Language.JAVA, "SyntaxError"))
     }
 }
