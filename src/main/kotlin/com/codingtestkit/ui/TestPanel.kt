@@ -237,7 +237,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun openGeneratorDialog() {
         // 파라미터형 플랫폼(리트코드/프로그래머스)은 배열 리터럴 형식을 기본으로
         val parameterStyle = problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
-        val dialog = TestCaseGeneratorDialog(parameterStyle, parameterNames, parameterTypes)
+        // 타입 정보가 없으면(프로그래머스 — API가 타입 미제공) 첫 예제 케이스의 값 모양에서 추론
+        val types = parameterTypes.ifEmpty { inferTypesFromFirstCase() }
+        val dialog = TestCaseGeneratorDialog(parameterStyle, parameterNames, types)
         if (!dialog.showAndGet()) return
         syncCardsToTestCases() // 기존 카드 편집 내용 보존
         for (input in dialog.generateInputs()) {
@@ -277,6 +279,29 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun getCurrentCode(): String {
         val editor = FileEditorManager.getInstance(project).selectedTextEditor
         return editor?.document?.text ?: ""
+    }
+
+    /**
+     * 첫 예제 케이스의 값 모양에서 파라미터 타입 추론 (이슈 #36).
+     * 프로그래머스는 API가 타입을 주지 않지만 예제가 항상 있으므로,
+     * 각 줄의 리터럴 형태([..]=배열, ".."=문자열, 숫자, true/false)로 판별한다.
+     * 판별 불가(2차원 배열 등)면 빈 문자열 → 생성기가 안내 모드로 폴백.
+     */
+    private fun inferTypesFromFirstCase(): List<String> {
+        val first = testCases.firstOrNull() ?: return emptyList()
+        val lines = first.input.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.isEmpty() || lines.size != parameterNames.size) return emptyList()
+        return lines.map { v ->
+            when {
+                v.startsWith("[[") -> ""  // 2차원 — v1 미지원
+                v.startsWith("[") -> if (v.contains("\"")) "string[]" else "integer[]"
+                v.startsWith("\"") -> "string"
+                v == "true" || v == "false" -> "boolean"
+                v.toLongOrNull() != null -> "integer"
+                v.toDoubleOrNull() != null -> "double"
+                else -> ""
+            }
+        }
     }
 
     /** 실행 중 중복 실행 방지 (Run All / 개별 실행 공용) */
