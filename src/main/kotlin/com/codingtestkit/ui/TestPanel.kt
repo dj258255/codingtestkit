@@ -39,7 +39,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         horizontalAlignment = SwingConstants.CENTER
         margin = JBUI.emptyInsets()
     }
-    private val generateButton = JButton(I18n.t("생성", "Generate"), AllIcons.Actions.New).apply {
+    private val generateButton = JButton(I18n.t("생성", "Generate"), AllIcons.Actions.AddList).apply {
         toolTipText = I18n.t("대량 테스트 케이스 생성 (랜덤/정렬/순열)", "Generate large test cases (random/sorted/permutation)")
     }
     private val checkerButton = JButton(I18n.t("체커", "Checker"), AllIcons.Actions.Checked).apply {
