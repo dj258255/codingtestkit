@@ -60,6 +60,14 @@ class RustDebugAdapter : TestDebugAdapter {
             )
             val inputFile = File(cargoDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
 
+            // 임시 Cargo 프로젝트를 IDE 프로젝트 모델에 등록해야 실행 구성이 동작한다
+            // ("Cannot run on <default>" 방지). attach는 cargo metadata를 돌려 수 초 걸릴 수 있어
+            // 백그라운드 스레드에서 blocking 대기한다 (launchDebug는 이미 pooled 스레드에서 호출됨).
+            val cargoService = project.getService(org.rust.cargo.project.model.CargoProjectsService::class.java)
+            kotlinx.coroutines.runBlocking {
+                cargoService.attachCargoProject(File(cargoDir, "Cargo.toml").toPath()).await()
+            }
+
             val type = ConfigurationTypeUtil.findConfigurationType(CargoCommandConfigurationType::class.java)
             val runManager = RunManager.getInstance(project)
             val settings = runManager.createConfiguration(sessionName, type.configurationFactories[0])

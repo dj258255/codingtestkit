@@ -569,19 +569,12 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             running = true
             setRunningStatus()
             ApplicationManager.getApplication().executeOnPooledThread {
-                // C++는 -g -O0 바이너리를 미리 빌드해 어댑터에 넘긴다 (수 초 걸릴 수 있어 백그라운드)
-                val artifact = if (language == Language.CPP) CodeRunner.prepareCppDebugBinary(code, userFile) else null
+                // launchDebug는 Cargo 프로젝트 attach 등 blocking 작업을 포함할 수 있어 백그라운드에서 호출.
+                // 내부에서 실제 실행(executeConfiguration)만 EDT로 넘긴다.
+                // C++/Python/Rust 모두 IDE가 컴파일·실행을 담당하므로 우리는 소스 파일 경로만 넘긴다.
+                val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile, null)
                 SwingUtilities.invokeLater {
-                    running = false
-                    runButton.isEnabled = true
-                    if (artifact != null && !artifact.ok) {
-                        statusLabel.icon = AllIcons.General.Warning
-                        statusLabel.text = ""
-                        Messages.showWarningDialog(project, artifact.errorMessage
-                            ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
-                        return@invokeLater
-                    }
-                    val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile, artifact?.file)
+                    running = false; runButton.isEnabled = true
                     if (!ok) {
                         statusLabel.text = ""
                         Messages.showWarningDialog(project, I18n.t(

@@ -73,50 +73,6 @@ object CodeRunner {
         ))
     }
 
-    /** 실행-소유 디버그(ownsLaunch) 어댑터에 넘길 사전 빌드 결과 */
-    data class DebugArtifact(
-        val ok: Boolean,
-        val file: File? = null,
-        val errorMessage: String? = null
-    )
-
-    /**
-     * C++ 디버그용 바이너리 사전 빌드 (이슈 #36 Tier 3).
-     * CLion 어댑터가 이 바이너리를 Custom Build Application 구성으로 debug 실행한다.
-     * -g -O0: 디버그 심볼 포함 + 최적화 없음. 사용자 실제 파일로 빌드해야
-     * 브레이크포인트가 소스 경로로 바인딩된다.
-     */
-    fun prepareCppDebugBinary(code: String, userFile: File?): DebugArtifact {
-        if (!code.contains("int main(")) {
-            return DebugArtifact(false, errorMessage = I18n.t(
-                "C++ 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.",
-                "C++ debugging supports code with a main function (Codeforces/SWEA style)."
-            ))
-        }
-        if (gppPath.isBlank()) {
-            return DebugArtifact(false, errorMessage = I18n.t(
-                "C++ 컴파일러를 찾을 수 없습니다.", "C++ compiler not found."
-            ))
-        }
-        val dir = createTempDir()
-        return try {
-            val sourceFile = if (userFile != null && userFile.exists()) userFile
-                             else File(dir, "solution.cpp").apply { writeText(code, StandardCharsets.UTF_8) }
-            val bin = File(dir, if (isWindows) "solution.exe" else "solution")
-            val compile = executeProcess(
-                listOf(gppPath, "-g", "-O0", "-std=c++17", sourceFile.absolutePath, "-o", bin.absolutePath),
-                dir, "", COMPILE_TIMEOUT_SECONDS
-            )
-            if (compile.exitCode != 0) {
-                dir.deleteRecursively()
-                return DebugArtifact(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
-            }
-            DebugArtifact(true, file = bin)
-        } catch (e: Exception) {
-            dir.deleteRecursively()
-            DebugArtifact(false, errorMessage = e.message ?: "compile failed")
-        }
-    }
 
     /**
      * Go 코드를 dlv headless 서버로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 3).

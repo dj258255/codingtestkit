@@ -19,6 +19,8 @@ dependencies {
     intellijPlatform {
         clion("2026.1.4")
         bundledPlugin("com.intellij.clion")
+        // "C/C++ File" 실행 구성(CppFileRunConfiguration)은 clion 플러그인의 별도 모듈에 있음
+        bundledModule("intellij.clion.runFile")
     }
     compileOnly(project(":core"))
 }
