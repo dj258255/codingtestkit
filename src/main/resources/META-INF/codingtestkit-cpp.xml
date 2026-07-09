@@ -1,0 +1,7 @@
+<!-- com.intellij.clion 플러그인이 있는 IDE(CLion)에서만 로드되는 확장.
+     Custom Build Application 구성으로 바이너리를 debug 실행하는 C++ 어댑터를 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.cpp.CppDebugAdapter"/>
+    </extensions>
+</idea-plugin>

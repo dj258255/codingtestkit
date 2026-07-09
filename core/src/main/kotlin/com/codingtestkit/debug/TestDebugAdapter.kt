@@ -28,29 +28,20 @@ interface TestDebugAdapter {
     fun isAvailable(): Boolean = true
 
     /**
-     * PID attach 방식 여부 (Rust/C++ 네이티브). 디버그 서버 없이 프로세스를 먼저 실행하고
-     * 실행 중인 PID에 IDE 디버거(LLDB 등)를 붙인다. 프로그램이 첫 stdin 읽기에서 블록된
-     * 동안 attach하고, 완료 후 입력을 흘려보내는 방식으로 정지 시점을 확보한다.
-     */
-    fun attachesToPid(): Boolean = false
-
-    /** PID attach 방식 어댑터 전용. 백그라운드 스레드에서 호출해도 된다. */
-    fun attachToPid(project: Project, sessionName: String, pid: Long): Boolean = false
-
-    /**
-     * IDE가 실행까지 소유하는 방식 여부 (Python 등). true면 CodeRunner는 프로세스를
-     * 띄우지 않고, 어댑터가 IDE의 실행 구성으로 스크립트를 디버그 실행한다.
-     * (Java/Go의 서버-attach, 네이티브 PID-attach와 구분되는 세 번째 패턴)
+     * IDE가 실행까지 소유하는 방식 여부 (Python/Rust/C++). true면 CodeRunner는 프로세스를
+     * 띄우지 않고, 어댑터가 IDE의 실행 구성으로 프로그램을 처음부터 디버거 아래에서 실행한다.
+     * 케이스 입력은 실행 구성의 입력 리다이렉션으로 전달돼 attach 방식의 레이스가 없다.
      */
     fun ownsLaunch(): Boolean = false
 
     /**
-     * 실행-소유 어댑터 전용: 소스 파일을 IDE 디버거로 직접 실행한다.
+     * 실행-소유 어댑터 전용: 소스 파일(또는 미리 빌드된 artifact)을 IDE 디버거로 실행한다.
      * @param sourceFile 에디터의 실제 소스 파일 (브레이크포인트 바인딩 대상)
      * @param input 케이스 표준입력 (파일 리다이렉션으로 전달)
      * @param workingDir 임시 파일(입력 등)을 둘 작업 디렉토리
+     * @param artifact 미리 빌드된 실행 파일 (C++ 등 사전 컴파일 언어만, 그 외 null)
      */
-    fun launchDebug(project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File): Boolean = false
+    fun launchDebug(project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File, artifact: File? = null): Boolean = false
 
     /**
      * 디버그 서버(JDWP/dlv 등)가 127.0.0.1의 지정 포트에서 대기 중인 프로세스에

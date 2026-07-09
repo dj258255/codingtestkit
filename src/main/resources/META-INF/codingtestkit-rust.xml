@@ -1,0 +1,7 @@
+<!-- com.jetbrains.rust 플러그인이 있는 IDE(RustRover 등)에서만 로드되는 확장.
+     Cargo 실행 구성을 debug로 돌리는 Rust 디버그 어댑터를 여기서 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.rust.RustDebugAdapter"/>
+    </extensions>
+</idea-plugin>

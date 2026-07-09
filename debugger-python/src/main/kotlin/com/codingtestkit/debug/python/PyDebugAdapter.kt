@@ -38,7 +38,7 @@ class PyDebugAdapter : TestDebugAdapter {
         false
     }
 
-    override fun launchDebug(project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File): Boolean {
+    override fun launchDebug(project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File, artifact: File?): Boolean {
         return try {
             val type = ConfigurationTypeUtil.findConfigurationType(PythonConfigurationType::class.java)
             val runManager = RunManager.getInstance(project)

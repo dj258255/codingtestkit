@@ -556,7 +556,8 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val sessionName = "CodingTestKit #${index + 1}"
 
-        // 실행-소유(Python): IDE가 스크립트를 직접 디버그 실행 (우리는 프로세스 안 띄움)
+        // 실행-소유(Python/Rust/C++): IDE가 프로그램을 처음부터 디버거 아래에서 실행.
+        // 케이스 입력은 실행 구성의 입력 리다이렉션으로 전달돼 attach 레이스가 없다.
         if (adapter.ownsLaunch()) {
             if (userFile == null || !userFile.exists()) {
                 Messages.showWarningDialog(project, I18n.t(
@@ -565,49 +566,29 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             }
             statusLabel.icon = AllIcons.Actions.StartDebugger
             statusLabel.text = I18n.t("디버거 시작 중...", "Starting debugger...")
-            val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile)
-            if (!ok) {
-                statusLabel.text = ""
-                Messages.showWarningDialog(project, I18n.t(
-                    "디버깅을 시작할 수 없습니다. 프로젝트에 인터프리터가 설정돼 있는지 확인하세요.",
-                    "Cannot start debugging. Make sure an interpreter is configured for the project."), "CodingTestKit")
-            } else {
-                statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
-            }
-            return
-        }
-
-        // PID attach(Rust/C++ 네이티브): 실행 → 첫 stdin 읽기에서 블록 → LLDB attach → 입력 전달
-        if (adapter.attachesToPid()) {
             running = true
             setRunningStatus()
             ApplicationManager.getApplication().executeOnPooledThread {
-                val handle = CodeRunner.startDebug(code, language, tc, parameterNames, problemSource, userFile)
-                if (!handle.ok) {
-                    SwingUtilities.invokeLater { finishDebugLaunch(handle, null) }
-                    return@executeOnPooledThread
-                }
+                // C++는 -g -O0 바이너리를 미리 빌드해 어댑터에 넘긴다 (수 초 걸릴 수 있어 백그라운드)
+                val artifact = if (language == Language.CPP) CodeRunner.prepareCppDebugBinary(code, userFile) else null
                 SwingUtilities.invokeLater {
-                    statusLabel.icon = AllIcons.Actions.StartDebugger
-                    statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
-                }
-                val pid = handle.process?.pid() ?: -1L
-                val attached = adapter.attachToPid(project, sessionName, pid)
-                if (attached) {
-                    // 디버그 세션이 브레이크포인트를 등록할 시간 여유 후 입력 전달
-                    Thread.sleep(2500)
-                    handle.sendPendingInput()
-                }
-                SwingUtilities.invokeLater {
-                    if (!attached) {
-                        handle.cleanup()
-                        running = false
-                        runButton.isEnabled = true
+                    running = false
+                    runButton.isEnabled = true
+                    if (artifact != null && !artifact.ok) {
+                        statusLabel.icon = AllIcons.General.Warning
+                        statusLabel.text = ""
+                        Messages.showWarningDialog(project, artifact.errorMessage
+                            ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
+                        return@invokeLater
+                    }
+                    val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile, artifact?.file)
+                    if (!ok) {
                         statusLabel.text = ""
                         Messages.showWarningDialog(project, I18n.t(
-                            "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
+                            "디버깅을 시작할 수 없습니다. 언어 도구(인터프리터/툴체인)가 설정돼 있는지 확인하세요.",
+                            "Cannot start debugging. Make sure the language toolchain is configured."), "CodingTestKit")
                     } else {
-                        finishDebugLaunch(handle, null)
+                        statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
                     }
                 }
             }

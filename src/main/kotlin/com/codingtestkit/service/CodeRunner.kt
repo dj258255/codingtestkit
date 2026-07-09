@@ -38,27 +38,11 @@ object CodeRunner {
         val port: Int = -1,
         val errorMessage: String? = null,
         val process: Process? = null,
-        val workDir: File? = null,
-        /** PID attach 방식(네이티브): attach 완료 후에 전달할 케이스 입력 */
-        val pendingInput: String? = null
+        val workDir: File? = null
     ) {
         fun cleanup() {
             try { process?.destroyForcibly() } catch (_: Exception) {}
             try { workDir?.deleteRecursively() } catch (_: Exception) {}
-        }
-
-        /**
-         * 지연된 케이스 입력을 지금 전달한다 (네이티브 PID attach 전용).
-         * 프로그램은 첫 stdin 읽기에서 블록돼 있다가 이 호출로 진행을 시작한다.
-         */
-        fun sendPendingInput() {
-            val p = process ?: return
-            val data = pendingInput ?: return
-            Thread {
-                try {
-                    p.outputStream.bufferedWriter(Charsets.UTF_8).use { if (data.isNotBlank()) it.write(data) }
-                } catch (_: Exception) {}
-            }.apply { isDaemon = true; start() }
         }
     }
 
@@ -83,60 +67,54 @@ object CodeRunner {
     ): DebugHandle = when (language) {
         Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source)
         Language.GO -> startGoDebug(code, testCase.input, userFile)
-        Language.RUST, Language.CPP -> startNativeDebug(code, language, testCase.input, userFile)
         else -> DebugHandle(false, errorMessage = I18n.t(
             "${language.displayName} 디버깅은 아직 지원되지 않습니다.",
             "${language.displayName} debugging is not supported yet."
         ))
     }
 
-    /**
-     * Rust/C++를 디버그 심볼 포함으로 빌드해 실행한다 (이슈 #36 Tier 3, PID attach 방식).
-     * 디버그 서버 없이 프로그램을 바로 실행하되 입력은 pendingInput으로 미뤄둔다 —
-     * 프로그램이 첫 stdin 읽기에서 블록된 사이 어댑터가 PID로 LLDB를 붙이고,
-     * attach 완료 후 sendPendingInput()으로 입력을 흘려보내 진행시킨다.
-     */
-    private fun startNativeDebug(code: String, language: Language, input: String, userFile: File?): DebugHandle {
-        val mainMarker = if (language == Language.RUST) "fn main(" else "int main("
-        if (!code.contains(mainMarker)) {
-            return DebugHandle(false, errorMessage = I18n.t(
-                "${language.displayName} 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.",
-                "${language.displayName} debugging supports code with a main function (Codeforces/SWEA style)."
-            ))
-        }
-        val compilerPath = if (language == Language.RUST) rustcPath else gppPath
-        if (compilerPath.isBlank()) {
-            return DebugHandle(false, errorMessage = I18n.t(
-                "${language.displayName} 컴파일러를 찾을 수 없습니다.",
-                "${language.displayName} compiler not found."
-            ))
-        }
+    /** 실행-소유 디버그(ownsLaunch) 어댑터에 넘길 사전 빌드 결과 */
+    data class DebugArtifact(
+        val ok: Boolean,
+        val file: File? = null,
+        val errorMessage: String? = null
+    )
 
+    /**
+     * C++ 디버그용 바이너리 사전 빌드 (이슈 #36 Tier 3).
+     * CLion 어댑터가 이 바이너리를 Custom Build Application 구성으로 debug 실행한다.
+     * -g -O0: 디버그 심볼 포함 + 최적화 없음. 사용자 실제 파일로 빌드해야
+     * 브레이크포인트가 소스 경로로 바인딩된다.
+     */
+    fun prepareCppDebugBinary(code: String, userFile: File?): DebugArtifact {
+        if (!code.contains("int main(")) {
+            return DebugArtifact(false, errorMessage = I18n.t(
+                "C++ 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.",
+                "C++ debugging supports code with a main function (Codeforces/SWEA style)."
+            ))
+        }
+        if (gppPath.isBlank()) {
+            return DebugArtifact(false, errorMessage = I18n.t(
+                "C++ 컴파일러를 찾을 수 없습니다.", "C++ compiler not found."
+            ))
+        }
         val dir = createTempDir()
         return try {
-            val ext = if (language == Language.RUST) "rs" else "cpp"
-            // 실제 파일로 빌드해야 브레이크포인트가 소스 경로로 바인딩된다
             val sourceFile = if (userFile != null && userFile.exists()) userFile
-                             else File(dir, "solution.$ext").apply { writeText(code, StandardCharsets.UTF_8) }
+                             else File(dir, "solution.cpp").apply { writeText(code, StandardCharsets.UTF_8) }
             val bin = File(dir, if (isWindows) "solution.exe" else "solution")
-            val compileCmd = if (language == Language.RUST)
-                listOf(compilerPath, "-g", "-C", "opt-level=0", sourceFile.absolutePath, "-o", bin.absolutePath)
-            else
-                listOf(compilerPath, "-g", "-O0", "-std=c++17", sourceFile.absolutePath, "-o", bin.absolutePath)
-            val compile = executeProcess(compileCmd, dir, "", COMPILE_TIMEOUT_SECONDS)
+            val compile = executeProcess(
+                listOf(gppPath, "-g", "-O0", "-std=c++17", sourceFile.absolutePath, "-o", bin.absolutePath),
+                dir, "", COMPILE_TIMEOUT_SECONDS
+            )
             if (compile.exitCode != 0) {
                 dir.deleteRecursively()
-                return DebugHandle(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
+                return DebugArtifact(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
             }
-
-            val process = ProcessBuilder(listOf(bin.absolutePath)).directory(dir).start()
-            drainToVoid(process.inputStream)
-            drainToVoid(process.errorStream)
-            // 입력은 아직 안 씀 — attach 완료 후 sendPendingInput()으로 전달
-            DebugHandle(true, process = process, workDir = dir, pendingInput = input)
+            DebugArtifact(true, file = bin)
         } catch (e: Exception) {
             dir.deleteRecursively()
-            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+            DebugArtifact(false, errorMessage = e.message ?: "compile failed")
         }
     }
 
