@@ -29,7 +29,16 @@ class PluginSettingsService : PersistentStateComponent<PluginSettingsService.Set
 
     var embedTheme: EmbedTheme
         get() = try { EmbedTheme.valueOf(state.embedTheme) } catch (_: Exception) { EmbedTheme.FOLLOW_IDE }
-        set(value) { state.embedTheme = value.name }
+        set(value) {
+            if (state.embedTheme == value.name) return
+            state.embedTheme = value.name
+            embedThemeListeners.forEach { runCatching { it() } }
+        }
+
+    /** 임베드 테마 변경 리스너 — 이미 렌더된 지문을 즉시 다시 그리기 위해 (I18n과 같은 패턴) */
+    private val embedThemeListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+    fun addEmbedThemeListener(listener: () -> Unit) { embedThemeListeners.add(listener) }
+    fun removeEmbedThemeListener(listener: () -> Unit) { embedThemeListeners.remove(listener) }
 
     companion object {
         fun getInstance(): PluginSettingsService =
