@@ -1412,15 +1412,15 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val onClick = q.inject("'toggle'")          // 클릭 시 브릿지 호출 JS
         val overlay = """
             <style>
-              #ctk-hot{position:fixed;top:0;right:0;width:96px;height:60px;z-index:2147483647;}
               #ctk-max-btn{position:fixed;top:8px;right:10px;opacity:0;transition:opacity .16s ease;
-                border:none;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:15px;line-height:1;
-                background:rgba(128,128,128,.20);color:inherit;
+                z-index:2147483647;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;
+                font-size:15px;line-height:1;background:rgba(128,128,128,.20);color:inherit;
                 -webkit-user-select:none;user-select:none;box-shadow:0 1px 4px rgba(0,0,0,.18);}
-              #ctk-hot:hover #ctk-max-btn,#ctk-max-btn:focus{opacity:1;}
+              /* 지문 어디든 마우스가 올라오면 버튼이 나타남 (마우스가 창 밖으로 나가면 사라짐) */
+              body:hover #ctk-max-btn,#ctk-max-btn:focus{opacity:1;}
               #ctk-max-btn:hover{background:rgba(128,128,128,.38);}
             </style>
-            <div id="ctk-hot"><button id="ctk-max-btn" title="maximize" onclick="$onClick">$glyph</button></div>
+            <button id="ctk-max-btn" title="maximize" onclick="$onClick">$glyph</button>
         """.trimIndent()
         // </body> 직전에 삽입 (없으면 그냥 뒤에 붙임)
         val idx = html.lastIndexOf("</body>")
