@@ -10,8 +10,12 @@ import com.intellij.openapi.components.Storage
 @State(name = "CodingTestKitSettings", storages = [Storage("codingtestkit-settings.xml")])
 class PluginSettingsService : PersistentStateComponent<PluginSettingsService.SettingsState> {
 
+    /** 임베드 웹페이지(제출·로그인·가져오기 등) 테마 (이슈 #34) */
+    enum class EmbedTheme { FOLLOW_IDE, LIGHT, DARK }
+
     data class SettingsState(
-        var generateReadme: Boolean = false
+        var generateReadme: Boolean = false,
+        var embedTheme: String = EmbedTheme.FOLLOW_IDE.name
     )
 
     private var state = SettingsState()
@@ -22,6 +26,10 @@ class PluginSettingsService : PersistentStateComponent<PluginSettingsService.Set
     var generateReadme: Boolean
         get() = state.generateReadme
         set(value) { state.generateReadme = value }
+
+    var embedTheme: EmbedTheme
+        get() = try { EmbedTheme.valueOf(state.embedTheme) } catch (_: Exception) { EmbedTheme.FOLLOW_IDE }
+        set(value) { state.embedTheme = value.name }
 
     companion object {
         fun getInstance(): PluginSettingsService =

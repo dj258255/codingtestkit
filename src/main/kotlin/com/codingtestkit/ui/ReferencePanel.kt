@@ -122,6 +122,7 @@ class ReferencePanel : JPanel(BorderLayout()) {
 
     private fun initCefUI() {
         cefBrowser = JBCefBrowser(languages[0].homeUrl)
+        CefDarkMode.attach(cefBrowser!!)  // 임베드 페이지 다크 모드 (이슈 #34)
 
         // ── 상단 바: [언어 콤보] [홈] [◀] [▶]  |  바로가기 칩들 ──
         val toolbar = JPanel(BorderLayout()).apply {

@@ -57,6 +57,7 @@ class GitHubLoginDialog(private val project: Project?) : DialogWrapper(project) 
         panel.preferredSize = Dimension(JBUI.scale(920), JBUI.scale(680))
 
         val jbBrowser = JBCefBrowser(TOKEN_URL)
+        CefDarkMode.attach(jbBrowser)  // 임베드 페이지 다크 모드 (이슈 #34)
         this.browser = jbBrowser
 
         // 상단 안내

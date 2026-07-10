@@ -101,6 +101,7 @@ class SweaFetchDialog(
         // JCEF 브라우저: 목록 페이지로 시작 (세션 수립용)
         val listUrl = "https://swexpertacademy.com/main/code/problem/problemList.do"
         val browser = JBCefBrowser(listUrl)
+        CefDarkMode.attach(browser)  // 임베드 페이지 다크 모드 (이슈 #34)
 
         val bWrapper = browser.component
         bWrapper.preferredSize = Dimension(1024, 768)
