@@ -66,6 +66,7 @@ class LoginDialog(project: Project, private val source: ProblemSource) : DialogW
 
         val loginUrl = AuthService.getInstance().getLoginUrl(source)
         val browser = JBCefBrowser(loginUrl)
+        CefDarkMode.attach(browser)  // 임베드 페이지 다크 모드 (이슈 #34)
 
         // JS → Java 브릿지: 유저네임 추출용
         val usernameQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)

@@ -86,6 +86,7 @@ class CodeSubmitDialog(
         panel.preferredSize = Dimension(930, 700)
 
         val browser = JBCefBrowser(getSubmitUrl())
+        CefDarkMode.attach(browser)  // 임베드 페이지 다크 모드 (이슈 #34)
 
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT))
         topPanel.add(JLabel("<html>${getGuideText()}</html>"))

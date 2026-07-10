@@ -305,8 +305,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
 
-            // 초기 플레이스홀더
-            val isDark = !JBColor.isBright()
+            // 초기 플레이스홀더 (임베드 테마 설정 연동, 이슈 #34)
+            val isDark = CefDarkMode.isDarkEnabled()
             val pc = if (isDark) "#999" else "#888"
             val bg = if (isDark) "#2b2d30" else "#ffffff"
             currentProblemHtml = "<!DOCTYPE html><html><head><meta charset='utf-8'></head>" +
@@ -383,6 +383,13 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         swBarReset.addActionListener { timerService.stopwatchReset() }
         timerService.addListener { syncTimerBar() }
         syncTimerBar()
+
+        // 임베드 테마 설정 변경 시 이미 로드된 지문을 새 테마로 즉시 다시 그림 (이슈 #34)
+        com.codingtestkit.service.PluginSettingsService.getInstance().addEmbedThemeListener {
+            SwingUtilities.invokeLater {
+                currentProblem?.let { displayProblem(it) }
+            }
+        }
 
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
@@ -1455,7 +1462,8 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             else -> problem.source.localizedName()
         }
 
-        val isDark = !JBColor.isBright()
+        // 임베드 페이지 테마 설정 연동 (이슈 #34) — IDE 따라감/항상 밝게/항상 어둡게
+        val isDark = CefDarkMode.isDarkEnabled()
 
         val html = buildString {
             append("<!DOCTYPE html>")

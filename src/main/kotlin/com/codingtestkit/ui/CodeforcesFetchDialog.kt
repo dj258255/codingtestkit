@@ -76,6 +76,7 @@ class CodeforcesFetchDialog(
 
         // 사용자에게 보이는 브라우저 (챌린지 직접 통과용)
         val browser = JBCefBrowser(url)
+        CefDarkMode.attach(browser)  // 임베드 페이지 다크 모드 (이슈 #34)
         val bWrapper = browser.component
         bWrapper.preferredSize = Dimension(860, 580)
         panel.add(bWrapper, BorderLayout.CENTER)

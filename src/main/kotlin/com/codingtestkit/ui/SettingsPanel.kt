@@ -73,6 +73,31 @@ class SettingsPanel(private val project: Project) : JPanel() {
         add(langSection)
         add(Box.createVerticalStrut(JBUI.scale(8)))
 
+        // 임베드 페이지 테마 (이슈 #34) — 제출·로그인·가져오기 등 플러그인 안에서 여는 웹페이지
+        val embedSection = createSection(I18n.t("임베드 페이지 테마", "Embedded Page Theme"))
+        val embedPanel = WrapPanel(FlowLayout.LEFT, JBUI.scale(6), 0).apply {
+            alignmentX = LEFT_ALIGNMENT
+        }
+        val embedOptions = listOf(
+            I18n.t("IDE 테마 따라감", "Follow IDE theme"),
+            I18n.t("항상 밝게", "Always light"),
+            I18n.t("항상 어둡게", "Always dark")
+        )
+        val embedCombo = ComboBox(embedOptions.toTypedArray()).apply {
+            selectedIndex = com.codingtestkit.service.PluginSettingsService.getInstance().embedTheme.ordinal
+        }
+        embedPanel.add(JLabel(I18n.t("제출·로그인 등 웹페이지:", "Submit/login web pages:")).apply {
+            font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
+        })
+        embedPanel.add(embedCombo)
+        embedSection.add(embedPanel)
+        embedCombo.addActionListener {
+            com.codingtestkit.service.PluginSettingsService.getInstance().embedTheme =
+                com.codingtestkit.service.PluginSettingsService.EmbedTheme.entries[embedCombo.selectedIndex]
+        }
+        add(embedSection)
+        add(Box.createVerticalStrut(JBUI.scale(8)))
+
         // 토글 섹션
         val toggleSection = createSection(I18n.t("코딩 환경", "Coding Environment"))
         val toggles = listOf(autoCompleteToggle, inspectionToggle, codeVisionToggle, pasteBlockToggle, focusAlertToggle)
