@@ -7,3 +7,5 @@ rootProject.name = "CodingTestKit"
 include(":core")
 include(":debugger-go")
 include(":debugger-python")
+include(":debugger-rust")
+include(":debugger-cpp")
