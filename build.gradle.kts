@@ -84,6 +84,8 @@ intellijPlatformTesting {
         register("runPyCharm") { localPath = file("$home/Applications/PyCharm.app") }
         register("runCLion") { localPath = file("$home/Applications/CLion.app") }
         register("runRustRover") { localPath = file("$home/Applications/RustRover.app") }
+        register("runRubyMine") { localPath = file("$home/Applications/RubyMine.app") }
+        register("runWebStorm") { localPath = file("$home/Applications/WebStorm.app") }
     }
 }
 
