@@ -76,8 +76,24 @@ class RustDebugAdapter : TestDebugAdapter {
             // attach는 cargo metadata를 돌려 수 초 걸릴 수 있어 백그라운드에서 blocking 대기
             // (launchDebug는 이미 pooled 스레드에서 호출됨).
             val cargoService = project.getService(org.rust.cargo.project.model.CargoProjectsService::class.java)
-            kotlinx.coroutines.runBlocking {
+            val cargoProject = kotlinx.coroutines.runBlocking {
                 cargoService.attachCargoProject(File(cargoDir, "Cargo.toml").toPath()).await()
+            } ?: run {
+                log.warn("[CodingTestKit] Rust debug: cargo project attach failed")
+                return false
+            }
+            // attach의 Deferred는 등록 시점에 완료되고 cargo metadata 동기화는 계속 진행 중일
+            // 수 있다 — workspace(타깃 목록)가 준비되기 전에 실행하면 실행 대상 해석이 실패해
+            // "Cannot run on <default>"가 난다. workspace가 뜰 때까지 대기 (최대 30초).
+            run {
+                val deadline = System.currentTimeMillis() + 30_000
+                while (cargoProject.workspace == null && System.currentTimeMillis() < deadline) {
+                    Thread.sleep(300)
+                }
+                if (cargoProject.workspace == null) {
+                    log.warn("[CodingTestKit] Rust debug: cargo workspace not ready after 30s")
+                    return false
+                }
             }
 
             val type = ConfigurationTypeUtil.findConfigurationType(CargoCommandConfigurationType::class.java)
