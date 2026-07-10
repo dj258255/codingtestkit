@@ -6,6 +6,7 @@ import com.intellij.execution.InputRedirectAware
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.RunManager
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.execution.executors.DefaultDebugExecutor
@@ -59,6 +60,7 @@ class CppDebugAdapter : TestDebugAdapter {
                 val text = psiFile.text
                 val offsets = listOf(text.indexOf("main("), text.indexOf("int main"), 0).filter { it >= 0 }
                 var fromContext: com.intellij.execution.actions.ConfigurationFromContext? = null
+                var matchedContext: ConfigurationContext? = null
                 outer@ for (off in offsets) {
                     var element: com.intellij.psi.PsiElement? = psiFile.findElementAt(off) ?: psiFile
                     var depth = 0
@@ -66,12 +68,12 @@ class CppDebugAdapter : TestDebugAdapter {
                         val location: Location<*> = PsiLocation.fromPsiElement(element)
                         val context = ConfigurationContext.createEmptyContextForLocation(location)
                         fromContext = context.configurationsFromContext?.firstOrNull()
-                        if (fromContext != null) break@outer
+                        if (fromContext != null) { matchedContext = context; break@outer }
                         element = element.parent
                         depth++
                     }
                 }
-                if (fromContext == null) {
+                if (fromContext == null || matchedContext == null) {
                     log.warn("[CodingTestKit] C++ debug: no run configuration producer matched the file")
                     return@invokeAndWait
                 }
@@ -86,8 +88,12 @@ class CppDebugAdapter : TestDebugAdapter {
                     }
                 }
                 settings.isTemporary = true
-
-                ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
+                // gutter와 동일: 임시 구성으로 등록 후 onFirstRun 콜백 안에서 실행 —
+                // producer가 onFirstRun에서 빌드 타깃 등록 등 비동기 마무리를 한다
+                RunManager.getInstance(project).setTemporaryConfiguration(settings)
+                fromContext.onFirstRun(matchedContext) {
+                    ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
+                }
                 ok = true
             } catch (e: Throwable) {
                 log.warn("[CodingTestKit] C++ debug launch failed", e)
