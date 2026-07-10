@@ -71,6 +71,9 @@ class MainPanel(
         problemPanel.onLanguageChanged = { testPanel.setLanguage(it) }
         testPanel.onLanguageChanged = { problemPanel.setLanguage(it) }
 
+        // 지문 최대화 (이슈 #33): 탭 스트립까지 제거해 지문이 도구창 전체를 차지
+        problemPanel.onMaximizeToggle = { maximized -> setProblemMaximized(maximized) }
+
         // 문제를 가져오면 테스트 패널에 테스트 케이스 전달
         problemPanel.onProblemFetched = { problem ->
             testPanel.setProblemSource(problem.source)
@@ -177,6 +180,26 @@ class MainPanel(
      * 도구 창의 콘텐츠(이 MainPanel)를 새 MainPanel로 교체한다.
      * 기존 콘텐츠를 dispose하면 이 인스턴스의 languageListener도 함께 해제된다.
      */
+    /**
+     * 지문 최대화/복원 (이슈 #33). 최대화 시 탭 컨테이너를 떼고 ProblemPanel을
+     * 직접 중앙에 재부모화해 탭 스트립 공간까지 지문이 쓴다. 복원 시 ProblemPanel을
+     * 문제 탭 자리(index 0)로 되돌린다 — Swing은 부모가 하나뿐이라 재부모화 시
+     * 탭에서 자동으로 빠지므로 복원 때 setComponentAt으로 명시 복구가 필요하다.
+     */
+    private fun setProblemMaximized(maximized: Boolean) {
+        if (maximized) {
+            remove(tabbedPane)
+            add(problemPanel, BorderLayout.CENTER)
+        } else {
+            remove(problemPanel)
+            tabbedPane.setComponentAt(0, problemPanel)
+            add(tabbedPane, BorderLayout.CENTER)
+            tabbedPane.selectedIndex = 0
+        }
+        revalidate()
+        repaint()
+    }
+
     private fun rebuildToolWindow() {
         val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("CodingTestKit") ?: return
         val contentManager = toolWindow.contentManager
