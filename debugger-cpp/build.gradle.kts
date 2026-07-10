@@ -17,10 +17,9 @@ repositories {
 
 dependencies {
     intellijPlatform {
+        // 어댑터는 구성 타입을 ID로 찾고 리플렉션으로 설정하므로 CLion 클래스 직접 참조가 없다.
+        // (CppFileRunConfiguration은 V2 콘텐츠 모듈이라 컴파일해도 런타임 클래스로더가 격리됨)
         clion("2026.1.4")
-        bundledPlugin("com.intellij.clion")
-        // "C/C++ File" 실행 구성(CppFileRunConfiguration)은 clion 플러그인의 별도 모듈에 있음
-        bundledModule("intellij.clion.runFile")
     }
     compileOnly(project(":core"))
 }
