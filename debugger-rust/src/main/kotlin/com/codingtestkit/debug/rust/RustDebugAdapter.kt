@@ -60,9 +60,21 @@ class RustDebugAdapter : TestDebugAdapter {
             )
             val inputFile = File(cargoDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
 
-            // 임시 Cargo 프로젝트를 IDE 프로젝트 모델에 등록해야 실행 구성이 동작한다
-            // ("Cannot run on <default>" 방지). attach는 cargo metadata를 돌려 수 초 걸릴 수 있어
-            // 백그라운드 스레드에서 blocking 대기한다 (launchDebug는 이미 pooled 스레드에서 호출됨).
+            // 툴체인이 미설정이면(샌드박스/새 설치) 실행 구성 getState가 null을 돌려
+            // "Cannot run on <default>"가 난다 — rustup 표준 경로에서 자동 탐지해 설정
+            val rustSettings = project.getService(org.rust.cargo.project.settings.RustProjectSettingsService::class.java)
+            if (rustSettings.toolchain == null) {
+                val suggested = org.rust.cargo.toolchain.RsToolchainBase.suggest()
+                if (suggested == null) {
+                    log.warn("[CodingTestKit] Rust toolchain not found (rustup not installed?)")
+                    return false
+                }
+                rustSettings.modify { it.toolchain = suggested }
+            }
+
+            // 임시 Cargo 프로젝트를 IDE 프로젝트 모델에 등록해야 실행 구성이 동작한다.
+            // attach는 cargo metadata를 돌려 수 초 걸릴 수 있어 백그라운드에서 blocking 대기
+            // (launchDebug는 이미 pooled 스레드에서 호출됨).
             val cargoService = project.getService(org.rust.cargo.project.model.CargoProjectsService::class.java)
             kotlinx.coroutines.runBlocking {
                 cargoService.attachCargoProject(File(cargoDir, "Cargo.toml").toPath()).await()

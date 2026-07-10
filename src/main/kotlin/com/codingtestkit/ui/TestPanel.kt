@@ -576,11 +576,14 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 SwingUtilities.invokeLater {
                     running = false; runButton.isEnabled = true
                     if (!ok) {
+                        statusLabel.icon = AllIcons.General.Warning
                         statusLabel.text = ""
                         Messages.showWarningDialog(project, I18n.t(
                             "디버깅을 시작할 수 없습니다. 언어 도구(인터프리터/툴체인)가 설정돼 있는지 확인하세요.",
                             "Cannot start debugging. Make sure the language toolchain is configured."), "CodingTestKit")
                     } else {
+                        // 실행 중 스피너 아이콘을 리셋 — 디버그 세션 수명은 IDE가 관리하므로 여기서 완료 표시
+                        statusLabel.icon = AllIcons.Actions.StartDebugger
                         statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
                     }
                 }
