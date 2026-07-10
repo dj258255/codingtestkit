@@ -26,8 +26,6 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":debugger-go"))
     implementation(project(":debugger-python"))
-    implementation(project(":debugger-rust"))
-    implementation(project(":debugger-cpp"))
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("junit:junit:4.13.2")
