@@ -97,26 +97,60 @@ class RustDebugAdapter : TestDebugAdapter {
                 }
             }
 
-            val type = ConfigurationTypeUtil.findConfigurationType(CargoCommandConfigurationType::class.java)
-            val runManager = RunManager.getInstance(project)
-            val settings = runManager.createConfiguration(sessionName, type.configurationFactories[0])
-            val cfg = settings.configuration as CargoCommandConfiguration
-            // command·workingDirectory는 setFromCmd가 정석 경로 (2026.1에서 직접 setter 없음)
-            cfg.setFromCmd(org.rust.cargo.toolchain.CargoCommandLine(
-                "run", cargoDir.toPath(), listOf("--bin", "solution")))
-            if (input.isNotBlank()) {
-                cfg.isRedirectInput = true
-                cfg.redirectInputPath = inputFile.absolutePath
-            }
-            settings.isTemporary = true
-
-            var ok = true
+            // 수동 조립한 구성은 실행 대상 해석이 안 돼("Cannot run on <default>") 실패한다.
+            // C++에서 증명된 producer 경로: 사용자 파일의 fn main 위치로 ConfigurationContext를
+            // 만들어 CargoExecutableRunConfigurationProducer가 완전한 구성을 생성하게 한다
+            // (파일이 attach된 임시 Cargo 프로젝트의 bin 타깃이므로 이제 producer가 인식한다).
+            var ok = false
             ApplicationManager.getApplication().invokeAndWait {
                 try {
-                    ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
+                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+                        .refreshAndFindFileByIoFile(sourceFile)
+                    val psiFile = vFile?.let { com.intellij.psi.PsiManager.getInstance(project).findFile(it) }
+                    if (psiFile == null) {
+                        log.warn("[CodingTestKit] Rust debug: PSI file not found for ${sourceFile.path}")
+                        return@invokeAndWait
+                    }
+                    val mainOffset = psiFile.text.indexOf("fn main").takeIf { it >= 0 } ?: 0
+                    var fromContext: com.intellij.execution.actions.ConfigurationFromContext? = null
+                    var matchedContext: com.intellij.execution.actions.ConfigurationContext? = null
+                    var element: com.intellij.psi.PsiElement? = psiFile.findElementAt(mainOffset) ?: psiFile
+                    var depth = 0
+                    while (element != null && depth < 6) {
+                        val location = com.intellij.execution.PsiLocation.fromPsiElement(element)
+                        val dataContext = com.intellij.openapi.actionSystem.impl.SimpleDataContext.builder()
+                            .add(com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT, project)
+                            .add(com.intellij.execution.Location.DATA_KEY, location)
+                            .build()
+                        val context = com.intellij.execution.actions.ConfigurationContext.getFromContext(
+                            dataContext, com.intellij.openapi.actionSystem.ActionPlaces.UNKNOWN)
+                        fromContext = context.configurationsFromContext?.firstOrNull {
+                            it.configuration is CargoCommandConfiguration
+                        }
+                        if (fromContext != null) { matchedContext = context; break }
+                        element = element.parent
+                        depth++
+                    }
+                    if (fromContext == null || matchedContext == null) {
+                        log.warn("[CodingTestKit] Rust debug: no run configuration producer matched fn main")
+                        return@invokeAndWait
+                    }
+                    val settings = fromContext.configurationSettings
+                    settings.name = sessionName
+                    if (input.isNotBlank()) {
+                        (settings.configuration as? com.intellij.execution.InputRedirectAware.InputRedirectOptions)?.let {
+                            it.isRedirectInput = true
+                            it.redirectInputPath = inputFile.absolutePath
+                        }
+                    }
+                    settings.isTemporary = true
+                    RunManager.getInstance(project).setTemporaryConfiguration(settings)
+                    fromContext.onFirstRun(matchedContext) {
+                        ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
+                    }
+                    ok = true
                 } catch (e: Throwable) {
                     log.warn("[CodingTestKit] Rust debug launch failed", e)
-                    ok = false
                 }
             }
             ok
