@@ -127,25 +127,15 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     // ─── 지문 최대화 토글 (이슈 #33) ───
     /** 최대화 시 탭 스트립 제거/복원은 MainPanel 담당 — 생성 직후 MainPanel이 연결 */
     var onMaximizeToggle: ((Boolean) -> Unit)? = null
-    private val maximizeButton = JButton(AllIcons.General.ExpandComponent).apply {
-        toolTipText = I18n.t("지문 최대화 — 도구창 전체로 확장", "Maximize problem view to the whole tool window")
+    private var maximized = false
+    /** 지문 우상단 얇은 바의 최대화/복원 토글 — 최대화 여부와 무관하게 항상 같은 자리에 고정 */
+    private val viewToggleButton = JButton(AllIcons.General.ExpandComponent).apply {
+        toolTipText = I18n.t("지문 최대화", "Maximize problem view")
         preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
     }
-    private val restoreButton = JButton(AllIcons.General.CollapseComponent).apply {
-        toolTipText = I18n.t("원래 화면으로", "Restore normal layout")
-        preferredSize = Dimension(JBUI.scale(26), JBUI.scale(24))
-    }
-    /** 최대화 중에만 보이는 얇은 복원 바 (이게 없으면 돌아올 방법이 없다) */
-    private val restoreBar = JPanel(BorderLayout()).apply {
-        isVisible = false
-        border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
-        add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
-            isOpaque = false
-            add(restoreButton)
-        }, BorderLayout.EAST)
-    }
-    private lateinit var headerWrapper: JPanel
+    private lateinit var topPanel: JPanel
     private lateinit var timerBar: JPanel
+    private lateinit var timerBarControls: JPanel
 
     private val problemDisplay = JEditorPane().apply {
         contentType = "text/html"
@@ -174,7 +164,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     init {
         border = JBUI.Borders.empty()
 
-        val topPanel = JPanel().apply {
+        topPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
@@ -214,21 +204,18 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         row3.add(translateButton)
         topPanel.add(row3)
 
-        // 헤더 + 우상단 최대화 버튼 + (최대화 중에만 보이는) 복원 바 (이슈 #33)
-        headerWrapper = JPanel(BorderLayout()).apply {
-            add(topPanel, BorderLayout.CENTER)
-            add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), JBUI.scale(4))).apply {
-                isOpaque = false
-                add(maximizeButton)
-            }, BorderLayout.EAST)
+        // 헤더(툴바) + 그 아래 얇은 뷰 바(지문 최대화 토글). BorderLayout이라 세로 스트레치 없음.
+        // topPanel은 NORTH, viewHeaderBar는 SOUTH — 최대화로 topPanel을 숨겨도 토글은
+        // 지문 바로 위 같은 자리에 남는다 (이슈 #33).
+        val viewHeaderBar = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply {
+            isOpaque = false
+            add(viewToggleButton)
         }
-        add(JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            add(headerWrapper)
-            add(restoreBar)
+        add(JPanel(BorderLayout()).apply {
+            add(topPanel, BorderLayout.NORTH)
+            add(viewHeaderBar, BorderLayout.SOUTH)
         }, BorderLayout.NORTH)
-        maximizeButton.addActionListener { setMaximized(true) }
-        restoreButton.addActionListener { setMaximized(false) }
+        viewToggleButton.addActionListener { setMaximized(!maximized) }
 
         // 문제 표시 영역 (JCEF 지원 시 KaTeX LaTeX 렌더링 가능)
         if (useCef) {
@@ -321,25 +308,27 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         // 하단 타이머 바 — 타이머 탭·상태바와 같은 TimerService를 공유.
         // 상단에 얇은 프로그레스 바, 왼쪽에 타이머 그룹, 오른쪽에 스톱워치 그룹.
+        // 컨트롤(라벨·버튼)은 timerBarControls로 분리 — 최대화 시 숨기되 프로그레스 바는 남긴다
+        timerBarControls = JPanel(BorderLayout()).apply {
+            isOpaque = false
+            border = JBUI.Borders.empty(2, 8, 2, 4)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(2), 0)).apply {
+                isOpaque = false
+                add(timerBarLabel)
+                add(timerBarToggle)
+                add(timerBarReset)
+            }, BorderLayout.WEST)
+            add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
+                isOpaque = false
+                add(swBarLabel)
+                add(swBarToggle)
+                add(swBarReset)
+            }, BorderLayout.EAST)
+        }
         timerBar = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0)
             add(timerBarProgress, BorderLayout.NORTH)
-            add(JPanel(BorderLayout()).apply {
-                isOpaque = false
-                border = JBUI.Borders.empty(2, 8, 2, 4)
-                add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(2), 0)).apply {
-                    isOpaque = false
-                    add(timerBarLabel)
-                    add(timerBarToggle)
-                    add(timerBarReset)
-                }, BorderLayout.WEST)
-                add(JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(2), 0)).apply {
-                    isOpaque = false
-                    add(swBarLabel)
-                    add(swBarToggle)
-                    add(swBarReset)
-                }, BorderLayout.EAST)
-            }, BorderLayout.CENTER)
+            add(timerBarControls, BorderLayout.CENTER)
         }
         add(timerBar, BorderLayout.SOUTH)
 
@@ -350,15 +339,19 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
-     * 지문 최대화 토글 (이슈 #33). 헤더(플랫폼/가져오기/제출 툴바)와 타이머 바를 숨기고,
+     * 지문 최대화 토글 (이슈 #33). 헤더(플랫폼/가져오기/제출 툴바)와 타이머 컨트롤을 숨기고
      * MainPanel 콜백으로 탭 스트립까지 제거해 지문이 도구창 전체를 차지하게 한다.
-     * 최대화 중에는 우상단의 얇은 복원 바로 원래 화면으로 돌아온다.
+     * 단, 하단 타이머 프로그레스 바는 남겨 시간 감각을 유지한다. 토글 버튼은 지문 우상단
+     * 같은 자리에 고정돼 아이콘만 최대화↔복원으로 바뀐다.
      */
-    private fun setMaximized(maximized: Boolean) {
-        headerWrapper.isVisible = !maximized
-        timerBar.isVisible = !maximized
-        restoreBar.isVisible = maximized
-        onMaximizeToggle?.invoke(maximized)
+    private fun setMaximized(max: Boolean) {
+        maximized = max
+        topPanel.isVisible = !max
+        timerBarControls.isVisible = !max   // 컨트롤만 숨김 — 프로그레스 바(NORTH)는 유지
+        viewToggleButton.icon = if (max) AllIcons.General.CollapseComponent else AllIcons.General.ExpandComponent
+        viewToggleButton.toolTipText = if (max) I18n.t("원래 화면으로", "Restore normal layout")
+                                        else I18n.t("지문 최대화", "Maximize problem view")
+        onMaximizeToggle?.invoke(max)
         revalidate()
         repaint()
         swBarToggle.addActionListener {
