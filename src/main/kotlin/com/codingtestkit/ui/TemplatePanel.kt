@@ -174,23 +174,44 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             return
         }
 
-        val code = getCurrentEditorCode()
+        val service = TemplateService.getInstance(project)
+        val existing = service.getTemplate(name)
+        // 에디터가 비어도 기존 템플릿의 메타데이터(언어·플랫폼 기본)만 바꾸는 건 허용 — 기존 코드 유지 (이슈 #35)
+        val code = getCurrentEditorCode().ifBlank { existing?.code ?: "" }
         if (code.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t("에디터에 코드가 없습니다.", "No code in editor."), "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t(
+                "에디터에 코드가 없습니다. (기존 템플릿 수정은 리스트에서 선택 후 저장)",
+                "No code in editor. (To edit an existing template, select it in the list first, then Save.)"
+            ), "CodingTestKit")
             return
         }
 
         val language = Language.entries[languageCombo.selectedIndex]
         // 플랫폼 기본 지정 (0 = 지정 안 함, 이슈 #35)
         val platformIdx = platformDefaultCombo.selectedIndex
-        val template = CodeTemplate(
-            name = name,
-            language = language.displayName,
-            code = code,
-            defaultForPlatform = if (platformIdx > 0) ProblemSource.entries[platformIdx - 1].name else null
-        )
+        val newPlatform = if (platformIdx > 0) ProblemSource.entries[platformIdx - 1].name else null
 
-        TemplateService.getInstance(project).saveTemplate(template)
+        // 같은 (플랫폼, 언어)에 이미 다른 기본 템플릿이 있으면 교체 여부 확인
+        if (newPlatform != null) {
+            val displaced = service.getTemplates().find {
+                it.name != name && it.defaultForPlatform == newPlatform && it.language == language.displayName
+            }
+            if (displaced != null) {
+                val platformLabel = ProblemSource.entries.first { it.name == newPlatform }.localizedName()
+                val ok = Messages.showYesNoDialog(
+                    project,
+                    I18n.t(
+                        "'${displaced.name}'이(가) 현재 $platformLabel($language) 기본입니다.\n'$name'으로 교체할까요?",
+                        "'${displaced.name}' is currently the $platformLabel ($language) default.\nReplace it with '$name'?"
+                    ),
+                    I18n.t("기본 템플릿 교체", "Replace Default Template"),
+                    Messages.getQuestionIcon()
+                )
+                if (ok != Messages.YES) return
+            }
+        }
+
+        service.saveTemplate(CodeTemplate(name = name, language = language.displayName, code = code, defaultForPlatform = newPlatform))
         refreshTemplateList()
         Messages.showInfoMessage(project, I18n.t("'$name' 템플릿이 저장되었습니다.", "Template '$name' saved."), "CodingTestKit")
     }
