@@ -977,6 +977,16 @@ end
     }
 
     private fun detectKotlinc(): String {
+        // 0. 지금 실행 중인 IDE에 번들된 Kotlin 플러그인의 kotlinc — 가장 신뢰할 수 있는 소스.
+        //    (사용자 디렉토리의 IntelliJIdea* 잔재는 구버전 찌꺼기로 깨진 경우가 있음)
+        try {
+            val kotlinPlugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
+                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.kotlin"))
+            val bin = kotlinPlugin?.pluginPath?.toFile()
+                ?.let { File(it, "kotlinc/bin/" + if (isWindows) "kotlinc.bat" else "kotlinc") }
+            if (bin != null && bin.exists()) return bin.absolutePath
+        } catch (_: Throwable) {}
+
         // 1. PATH나 일반적인 설치 경로
         val found = findExecutable("kotlinc", "/usr/local/bin/kotlinc", "/opt/homebrew/bin/kotlinc")
         if (found.isNotBlank()) return found
