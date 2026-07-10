@@ -65,7 +65,7 @@ object CodeRunner {
         source: com.codingtestkit.model.ProblemSource,
         userFile: File? = null
     ): DebugHandle = when (language) {
-        Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source)
+        Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source, userFile)
         Language.GO -> startGoDebug(code, testCase.input, userFile)
         else -> DebugHandle(false, errorMessage = I18n.t(
             "${language.displayName} 디버깅은 아직 지원되지 않습니다.",
@@ -174,7 +174,8 @@ object CodeRunner {
         language: Language,
         testCase: TestCase,
         parameterNames: List<String>,
-        source: com.codingtestkit.model.ProblemSource
+        source: com.codingtestkit.model.ProblemSource,
+        userFile: File? = null
     ): DebugHandle {
         if (language != Language.JAVA && language != Language.KOTLIN) {
             return DebugHandle(false, errorMessage = I18n.t(
@@ -210,7 +211,7 @@ object CodeRunner {
                 compileJavaForDebug(runCode, dir) ?: return DebugHandle(false, errorMessage =
                     I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
             } else {
-                compileKotlinForDebug(runCode, dir) ?: return DebugHandle(false, errorMessage =
+                compileKotlinForDebug(runCode, dir, userFile?.name) ?: return DebugHandle(false, errorMessage =
                     I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
             }.let { entry -> javaCommand(jdwp) + entry }
 
@@ -247,6 +248,10 @@ object CodeRunner {
         }
     }
 
+    /** 디버그용 javac 커맨드 — -g로 지역변수 이름까지 디버그 정보에 포함 */
+    private fun javacDebugCommand(vararg sourceFiles: File): List<String> =
+        listOf(javacPath, "-g", "-encoding", "UTF-8") + sourceFiles.map { it.absolutePath }
+
     /** Java 디버그용 컴파일 → 실행 인자(-cp DIR MainClass) 반환, 실패 시 null */
     private fun compileJavaForDebug(code: String, dir: File): List<String>? {
         val sep = "///MAIN_SEPARATOR///"
@@ -254,22 +259,27 @@ object CodeRunner {
             val parts = code.split(sep)
             File(dir, "Solution.java").writeText(parts[0].trim(), StandardCharsets.UTF_8)
             File(dir, "Main.java").writeText(parts[1].trim(), StandardCharsets.UTF_8)
-            val c = executeProcess(javacCommand(File(dir, "Solution.java"), File(dir, "Main.java")), dir, "", COMPILE_TIMEOUT_SECONDS)
+            val c = executeProcess(javacDebugCommand(File(dir, "Solution.java"), File(dir, "Main.java")), dir, "", COMPILE_TIMEOUT_SECONDS)
             if (c.exitCode != 0) return null
             return listOf("-cp", dir.absolutePath, "Main")
         }
         val className = detectJavaClassName(code)
         val src = File(dir, "$className.java")
         src.writeText(code, StandardCharsets.UTF_8)
-        val c = executeProcess(javacCommand(src), dir, "", COMPILE_TIMEOUT_SECONDS)
+        val c = executeProcess(javacDebugCommand(src), dir, "", COMPILE_TIMEOUT_SECONDS)
         if (c.exitCode != 0) return null
         return listOf("-cp", dir.absolutePath, className)
     }
 
-    /** Kotlin 디버그용 컴파일 → 실행 인자(-jar solution.jar) 반환, 실패 시 null */
-    private fun compileKotlinForDebug(code: String, dir: File): List<String>? {
+    /**
+     * Kotlin 디버그용 컴파일 → 실행 인자(-jar solution.jar) 반환, 실패 시 null.
+     * 임시 소스 파일명은 사용자 파일명과 같아야 한다 — Kotlin 브레이크포인트는
+     * 파일명에서 파생된 파사드 클래스(Main.kt → MainKt)로 바인딩되기 때문.
+     */
+    private fun compileKotlinForDebug(code: String, dir: File, userFileName: String? = null): List<String>? {
         if (kotlincPath.isBlank()) return null
-        val src = File(dir, "Solution.kt")
+        val srcName = userFileName?.takeIf { it.endsWith(".kt") } ?: "Main.kt"
+        val src = File(dir, srcName)
         src.writeText(code, StandardCharsets.UTF_8)
         val jar = File(dir, "solution.jar")
         val c = executeProcess(
