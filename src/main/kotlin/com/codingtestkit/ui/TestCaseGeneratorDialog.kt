@@ -214,10 +214,13 @@ class TestCaseGeneratorDialog(
         }
         val baseSeed = seedField.text.trim().toLongOrNull()
 
-        // anti-hash는 숫자 배열이 아니라 충돌하는 두 문자열 — 형식·타입 설정을 무시하고 특수 출력
+        // anti-hash는 숫자 배열이 아니라 충돌하는 두 문자열 — 형식·타입 설정을 무시하고 특수 출력.
+        // 플랫폼 인식: stdin형(코드포스/SWEA)은 두 줄, 파라미터형(리트코드/프로그래머스)은
+        // 각 문자열을 따옴표 리터럴 케이스로 (함수 시그니처 문자열 파라미터 입력에 맞춤).
         if (pattern == Pattern.ANTI_HASH) {
             val (a, b) = TestCaseGenerators.thueMorseAntiHash(n)
-            return (0 until cases).map { "$a\n$b" }  // 두 줄: 충돌하는 문자열 A, B
+            return if (parameterStyle) listOf("\"$a\"", "\"$b\"")  // 충돌하는 두 문자열, 각각 한 케이스
+                   else (0 until cases).map { "$a\n$b" }           // stdin: 두 줄(A, B)
         }
 
         return (0 until cases).map { caseIdx ->
