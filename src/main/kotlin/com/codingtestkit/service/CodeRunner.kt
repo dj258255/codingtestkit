@@ -221,9 +221,24 @@ object CodeRunner {
                     process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (stdin.isNotBlank()) it.write(stdin) }
                 } catch (_: Exception) {}
             }.apply { isDaemon = true; start() }
-            // 자식 출력은 콘솔에 안 붙지만 파이프가 차면 블로킹되므로 흘려보냄
             drainToVoid(process.inputStream)
-            drainToVoid(process.errorStream)
+
+            // JDWP 에이전트가 소켓을 열기 전에 IDE가 attach하면 "Connection refused"가 난다.
+            // 에이전트는 준비되면 stderr에 "Listening for transport..."를 출력하므로 그 줄을 기다린다.
+            val listening = java.util.concurrent.CountDownLatch(1)
+            Thread {
+                try {
+                    process.errorStream.bufferedReader(Charsets.UTF_8).use { r ->
+                        var line = r.readLine()
+                        while (line != null) {
+                            if (line.contains("Listening for transport")) listening.countDown()
+                            line = r.readLine()
+                        }
+                    }
+                } catch (_: Exception) {} finally { listening.countDown() }
+            }.apply { isDaemon = true; start() }
+            // 최대 10초 대기 (컴파일은 이미 끝났고 JVM 부팅만 남음)
+            listening.await(10, java.util.concurrent.TimeUnit.SECONDS)
 
             DebugHandle(true, port = port, process = process, workDir = dir)
         } catch (e: Exception) {
