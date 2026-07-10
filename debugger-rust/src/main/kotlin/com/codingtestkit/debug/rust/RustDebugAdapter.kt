@@ -1,0 +1,162 @@
+package com.codingtestkit.debug.rust
+
+import com.codingtestkit.debug.TestDebugAdapter
+import com.codingtestkit.model.Language
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.RunManager
+import com.intellij.execution.configurations.ConfigurationTypeUtil
+import com.intellij.execution.executors.DefaultDebugExecutor
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
+import org.rust.cargo.runconfig.command.CargoCommandConfiguration
+import org.rust.cargo.runconfig.command.CargoCommandConfigurationType
+import java.io.File
+
+/**
+ * Rust 디버그 어댑터 (이슈 #36 Tier 3) — IDE가 실행까지 소유하는 방식.
+ *
+ * PID attach는 attach 시 블로킹 read가 EINTR로 깨지고 attach 완료와 프로그램 종료가
+ * 경쟁하는 구조적 결함이 있어 폐기했다. 대신 RustRover의 Cargo 실행 구성을 debug
+ * 실행자로 돌린다 — 프로그램이 처음부터 디버거 아래에서 시작되고, 케이스 입력은
+ * 구성에 내장된 입력 리다이렉션으로 안정적으로 전달된다.
+ *
+ * 브레이크포인트 경로 보존: 임시 Cargo 프로젝트의 [[bin]] path가 사용자 실제 파일을
+ * 가리키므로, cargo가 그 파일을 직접 빌드해 디버그 정보에 실제 경로가 기록된다.
+ * (cargo의 debug 프로파일은 기본이 최적화 없음 + 디버그 심볼 포함)
+ */
+class RustDebugAdapter : TestDebugAdapter {
+
+    private val log = Logger.getInstance(RustDebugAdapter::class.java)
+
+    override fun supports(language: Language): Boolean = language == Language.RUST
+
+    override fun ownsLaunch(): Boolean = true
+
+    override fun isAvailable(): Boolean = try {
+        ConfigurationTypeUtil.findConfigurationType(CargoCommandConfigurationType::class.java) != null
+    } catch (e: Throwable) {
+        log.warn("[CodingTestKit] Rust debug adapter unavailable: ${e.javaClass.simpleName}: ${e.message}")
+        false
+    }
+
+    override fun launchDebug(
+        project: Project, sessionName: String, sourceFile: File, input: String, workingDir: File, artifact: File?
+    ): Boolean {
+        return try {
+            // 임시 Cargo 프로젝트 — bin path가 사용자 파일을 직접 가리킨다
+            val cargoDir = java.nio.file.Files.createTempDirectory("ctk-rust-debug").toFile()
+            File(cargoDir, "Cargo.toml").writeText(
+                """
+                [package]
+                name = "ctk-debug"
+                version = "0.0.1"
+                edition = "2021"
+
+                [[bin]]
+                name = "solution"
+                path = "${sourceFile.absolutePath.replace("\\", "\\\\")}"
+                """.trimIndent(), Charsets.UTF_8
+            )
+            val inputFile = File(cargoDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
+
+            // 툴체인이 미설정이면(샌드박스/새 설치) 실행 구성 getState가 null을 돌려
+            // "Cannot run on <default>"가 난다 — rustup 표준 경로에서 자동 탐지해 설정
+            val rustSettings = project.getService(org.rust.cargo.project.settings.RustProjectSettingsService::class.java)
+            if (rustSettings.toolchain == null) {
+                val suggested = org.rust.cargo.toolchain.RsToolchainBase.suggest()
+                if (suggested == null) {
+                    log.warn("[CodingTestKit] Rust toolchain not found (rustup not installed?)")
+                    return false
+                }
+                rustSettings.modify { it.toolchain = suggested }
+            }
+
+            // 임시 Cargo 프로젝트를 IDE 프로젝트 모델에 등록해야 실행 구성이 동작한다.
+            // attach는 cargo metadata를 돌려 수 초 걸릴 수 있어 백그라운드에서 blocking 대기
+            // (launchDebug는 이미 pooled 스레드에서 호출됨).
+            val cargoService = project.getService(org.rust.cargo.project.model.CargoProjectsService::class.java)
+            val manifestPath = File(cargoDir, "Cargo.toml").toPath()
+            kotlinx.coroutines.runBlocking {
+                cargoService.attachCargoProject(manifestPath).await()
+            }
+            // metadata 동기화가 끝나 workspace(타깃 목록)가 준비될 때까지 대기 (최대 60초).
+            // 주의: CargoProject는 불변 스냅샷 — attach가 돌려준 객체는 갱신되지 않으므로
+            // 매 폴링마다 서비스에서 최신 스냅샷을 다시 조회해야 한다.
+            run {
+                val deadline = System.currentTimeMillis() + 60_000
+                var ready = false
+                while (System.currentTimeMillis() < deadline) {
+                    val current = cargoService.allProjects.find { it.manifest == manifestPath }
+                    if (current?.workspace != null) { ready = true; break }
+                    Thread.sleep(300)
+                }
+                if (!ready) {
+                    log.warn("[CodingTestKit] Rust debug: cargo workspace not ready after 60s")
+                    return false
+                }
+            }
+
+            // 수동 조립한 구성은 실행 대상 해석이 안 돼("Cannot run on <default>") 실패한다.
+            // C++에서 증명된 producer 경로: 사용자 파일의 fn main 위치로 ConfigurationContext를
+            // 만들어 CargoExecutableRunConfigurationProducer가 완전한 구성을 생성하게 한다
+            // (파일이 attach된 임시 Cargo 프로젝트의 bin 타깃이므로 이제 producer가 인식한다).
+            var ok = false
+            ApplicationManager.getApplication().invokeAndWait {
+                try {
+                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+                        .refreshAndFindFileByIoFile(sourceFile)
+                    val psiFile = vFile?.let { com.intellij.psi.PsiManager.getInstance(project).findFile(it) }
+                    if (psiFile == null) {
+                        log.warn("[CodingTestKit] Rust debug: PSI file not found for ${sourceFile.path}")
+                        return@invokeAndWait
+                    }
+                    val mainOffset = psiFile.text.indexOf("fn main").takeIf { it >= 0 } ?: 0
+                    var fromContext: com.intellij.execution.actions.ConfigurationFromContext? = null
+                    var matchedContext: com.intellij.execution.actions.ConfigurationContext? = null
+                    var element: com.intellij.psi.PsiElement? = psiFile.findElementAt(mainOffset) ?: psiFile
+                    var depth = 0
+                    while (element != null && depth < 6) {
+                        val location = com.intellij.execution.PsiLocation.fromPsiElement(element)
+                        val dataContext = com.intellij.openapi.actionSystem.impl.SimpleDataContext.builder()
+                            .add(com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT, project)
+                            .add(com.intellij.execution.Location.DATA_KEY, location)
+                            .build()
+                        val context = com.intellij.execution.actions.ConfigurationContext.getFromContext(
+                            dataContext, com.intellij.openapi.actionSystem.ActionPlaces.UNKNOWN)
+                        fromContext = context.configurationsFromContext?.firstOrNull {
+                            it.configuration is CargoCommandConfiguration
+                        }
+                        if (fromContext != null) { matchedContext = context; break }
+                        element = element.parent
+                        depth++
+                    }
+                    if (fromContext == null || matchedContext == null) {
+                        log.warn("[CodingTestKit] Rust debug: no run configuration producer matched fn main")
+                        return@invokeAndWait
+                    }
+                    val settings = fromContext.configurationSettings
+                    settings.name = sessionName
+                    if (input.isNotBlank()) {
+                        (settings.configuration as? com.intellij.execution.InputRedirectAware.InputRedirectOptions)?.let {
+                            it.isRedirectInput = true
+                            it.redirectInputPath = inputFile.absolutePath
+                        }
+                    }
+                    settings.isTemporary = true
+                    RunManager.getInstance(project).setTemporaryConfiguration(settings)
+                    fromContext.onFirstRun(matchedContext) {
+                        ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
+                    }
+                    ok = true
+                } catch (e: Throwable) {
+                    log.warn("[CodingTestKit] Rust debug launch failed", e)
+                }
+            }
+            ok
+        } catch (e: Throwable) {
+            log.warn("[CodingTestKit] Rust debug launch failed", e)
+            false
+        }
+    }
+}

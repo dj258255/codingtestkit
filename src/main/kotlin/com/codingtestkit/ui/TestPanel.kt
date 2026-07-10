@@ -10,6 +10,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
@@ -517,6 +518,143 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         }
     }
 
+    /**
+     * 케이스 하나를 IDE 디버거로 실행 (카드의 🐞 버튼, 이슈 #36).
+     * 언어에 맞는 TestDebugAdapter(EP)를 찾아 디버그 서버에 attach한다.
+     * 어댑터가 없으면(그 언어의 디버거가 이 IDE에 없음) 맞는 IDE를 안내한다.
+     */
+    private fun debugTestAt(index: Int) {
+        if (running) return
+        val code = getCurrentCode()
+        if (code.isBlank()) { warnStatus(I18n.t("코드 없음", "No code")); return }
+        syncCardsToTestCases()
+        val tc = testCases.getOrNull(index) ?: return
+        val language = getSelectedLanguage()
+
+        val adapter = com.codingtestkit.debug.TestDebugAdapter.forLanguage(language)
+        if (adapter == null) {
+            val all = com.codingtestkit.debug.TestDebugAdapter.EP_NAME.extensionList
+            com.intellij.openapi.diagnostic.Logger.getInstance(TestPanel::class.java).warn(
+                "[CodingTestKit] no debug adapter for $language; loaded adapters=" +
+                    all.joinToString { "${it.javaClass.simpleName}(supports=${it.supports(language)},avail=${runCatching { it.isAvailable() }.getOrNull()})" })
+            Messages.showInfoMessage(project, debugUnsupportedMessage(language), "CodingTestKit")
+            return
+        }
+
+        // Go 등 네이티브 디버깅은 소스 파일 경로로 브레이크포인트를 바인딩하므로
+        // 에디터 문서를 디스크에 저장하고 실제 파일 경로를 넘긴다
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+        val userFile = editor?.let {
+            val fdm = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            // saveDocument는 write-intent 잠금 필요 — 마우스 리스너의 EDT는 잠금이 없어
+            // (2026.1부터 엄격) runWriteAction으로 감싼다
+            ApplicationManager.getApplication().runWriteAction {
+                fdm.saveDocument(it.document)
+            }
+            fdm.getFile(it.document)?.toNioPath()?.toFile()
+        }
+
+        val sessionName = "CodingTestKit #${index + 1}"
+
+        // 실행-소유(Python/Rust/C++): IDE가 프로그램을 처음부터 디버거 아래에서 실행.
+        // 케이스 입력은 실행 구성의 입력 리다이렉션으로 전달돼 attach 레이스가 없다.
+        if (adapter.ownsLaunch()) {
+            if (userFile == null || !userFile.exists()) {
+                Messages.showWarningDialog(project, I18n.t(
+                    "디버깅하려면 소스 파일을 먼저 저장하세요.", "Please save the source file before debugging."), "CodingTestKit")
+                return
+            }
+            statusLabel.icon = AllIcons.Actions.StartDebugger
+            statusLabel.text = I18n.t("디버거 시작 중...", "Starting debugger...")
+            running = true
+            setRunningStatus()
+            ApplicationManager.getApplication().executeOnPooledThread {
+                // launchDebug는 Cargo 프로젝트 attach 등 blocking 작업을 포함할 수 있어 백그라운드에서 호출.
+                // 내부에서 실제 실행(executeConfiguration)만 EDT로 넘긴다.
+                // C++/Python/Rust 모두 IDE가 컴파일·실행을 담당하므로 우리는 소스 파일 경로만 넘긴다.
+                val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile, null)
+                SwingUtilities.invokeLater {
+                    running = false; runButton.isEnabled = true
+                    if (!ok) {
+                        statusLabel.icon = AllIcons.General.Warning
+                        statusLabel.text = ""
+                        Messages.showWarningDialog(project, I18n.t(
+                            "디버깅을 시작할 수 없습니다. 언어 도구(인터프리터/툴체인)가 설정돼 있는지 확인하세요.",
+                            "Cannot start debugging. Make sure the language toolchain is configured."), "CodingTestKit")
+                    } else {
+                        // 실행 중 스피너 아이콘을 리셋 — 디버그 세션 수명은 IDE가 관리하므로 여기서 완료 표시
+                        statusLabel.icon = AllIcons.Actions.StartDebugger
+                        statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
+                    }
+                }
+            }
+            return
+        }
+
+        // 정방향(JVM/Go): 프로세스가 디버그 서버로 대기 → IDE가 attach
+        running = true
+        setRunningStatus()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val handle = CodeRunner.startDebug(code, language, tc, parameterNames, problemSource, userFile)
+            SwingUtilities.invokeLater {
+                finishDebugLaunch(handle) { adapter.attachToPort(project, sessionName, handle.port) }
+            }
+        }
+    }
+
+    /**
+     * 디버그 실행 마무리 공통 처리: 실패 안내, attach(정방향만), 프로세스 종료 시 임시 파일 정리.
+     * @param attach 정방향 어댑터의 attach 동작 (역방향은 이미 listen 중이므로 null)
+     */
+    private fun finishDebugLaunch(handle: CodeRunner.DebugHandle, attach: (() -> Boolean)?) {
+        running = false
+        runButton.isEnabled = true
+        if (!handle.ok) {
+            statusLabel.icon = AllIcons.General.Warning
+            statusLabel.text = ""
+            Messages.showWarningDialog(project, handle.errorMessage
+                ?: I18n.t("디버깅을 시작할 수 없습니다.", "Cannot start debugging."), "CodingTestKit")
+            return
+        }
+        if (attach != null) {
+            statusLabel.icon = AllIcons.Actions.StartDebugger
+            statusLabel.text = I18n.t("디버거 연결 중...", "Attaching debugger...")
+            if (!attach()) {
+                handle.cleanup()
+                Messages.showWarningDialog(project, I18n.t(
+                    "디버거 연결에 실패했습니다.", "Failed to attach the debugger."), "CodingTestKit")
+                statusLabel.text = ""
+                return
+            }
+        }
+        // 프로세스가 끝나면 임시 파일 정리 (디버그 세션이 잡고 있던 리소스)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try { handle.process?.waitFor() } catch (_: Exception) {}
+            handle.cleanup()
+        }
+        statusLabel.icon = AllIcons.Actions.StartDebugger
+        statusLabel.text = I18n.t("디버그 세션 시작됨", "Debug session started")
+    }
+
+    /** 현재 IDE에 해당 언어 디버그 어댑터가 없을 때, 어느 IDE에서 되는지 안내 */
+    private fun debugUnsupportedMessage(language: Language): String {
+        val ide = when (language) {
+            Language.JAVA, Language.KOTLIN -> "IntelliJ IDEA"
+            Language.GO -> "GoLand"
+            Language.RUST -> "RustRover"
+            Language.CPP -> "CLion"
+            Language.RUBY -> "RubyMine"
+            Language.PYTHON -> "PyCharm"
+            Language.JAVASCRIPT -> "WebStorm"
+        }
+        return I18n.t(
+            "이 IDE에서는 ${language.displayName} 디버깅을 사용할 수 없습니다.\n" +
+                "${language.displayName} 디버깅은 $ide 에서 지원됩니다.",
+            "${language.displayName} debugging is not available in this IDE.\n" +
+                "It is supported in $ide."
+        )
+    }
+
     /** 케이스 하나만 실행 (카드의 ▶ 버튼, 이슈 #36) */
     private fun runTestAt(index: Int) {
         val code = prepareRun() ?: return
@@ -664,6 +802,19 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             })
 
+            // 디버그 버튼 (이슈 #36 Tier 1) — ▶ 옆, tanmay 스케치 위치
+            val debugBtn = JLabel(AllIcons.Actions.StartDebugger).apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                toolTipText = I18n.t("이 케이스로 디버그 (Java/Kotlin)", "Debug this case (Java/Kotlin)")
+                border = JBUI.Borders.empty(0, 4)
+            }
+            debugBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    val idx = cards.indexOf(this@TestCaseCard)
+                    if (idx >= 0) debugTestAt(idx)
+                }
+            })
+
             // 삭제 버튼
             val deleteBtn = JLabel(AllIcons.Actions.Close).apply {
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -679,6 +830,7 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
             val headerButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 0, 0)).apply { isOpaque = false }
             headerButtons.add(runBtn)
+            headerButtons.add(debugBtn)
             headerButtons.add(deleteBtn)
             headerPanel.add(headerButtons, BorderLayout.EAST)
 

@@ -30,6 +30,273 @@ object CodeRunner {
     )
 
     /**
+     * 디버그 세션 시작 결과 (이슈 #36 Tier 1).
+     * ok=true면 port로 IDE 디버거를 attach하고, 세션이 끝나면 cleanup()을 호출해야 한다.
+     */
+    data class DebugHandle(
+        val ok: Boolean,
+        val port: Int = -1,
+        val errorMessage: String? = null,
+        val process: Process? = null,
+        val workDir: File? = null
+    ) {
+        fun cleanup() {
+            try { process?.destroyForcibly() } catch (_: Exception) {}
+            try { workDir?.deleteRecursively() } catch (_: Exception) {}
+        }
+    }
+
+    /** OS가 비워둔 TCP 포트 하나 확보 (loopback 기준 — 디버그 포트도 127.0.0.1에 바인딩) */
+    fun findFreePort(): Int =
+        java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { it.localPort }
+
+    /**
+     * 언어별 디버그 실행 진입점 (이슈 #36). 케이스 입력으로 디버그 서버를 띄우고,
+     * 반환된 port에 TestDebugAdapter가 IDE 디버거를 attach한다.
+     *
+     * @param userFile 에디터에 열린 실제 파일. Go 등 네이티브 디버깅은 브레이크포인트를
+     *                 소스 파일 경로로 바인딩하므로, 임시 사본이 아닌 실제 파일로 빌드해야 한다.
+     */
+    fun startDebug(
+        code: String,
+        language: Language,
+        testCase: TestCase,
+        parameterNames: List<String>,
+        source: com.codingtestkit.model.ProblemSource,
+        userFile: File? = null
+    ): DebugHandle = when (language) {
+        Language.JAVA, Language.KOTLIN -> startJvmDebug(code, language, testCase, parameterNames, source, userFile)
+        Language.GO -> startGoDebug(code, testCase.input, userFile)
+        else -> DebugHandle(false, errorMessage = I18n.t(
+            "${language.displayName} 디버깅은 아직 지원되지 않습니다.",
+            "${language.displayName} debugging is not supported yet."
+        ))
+    }
+
+
+    /**
+     * Go 코드를 dlv headless 서버로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 3).
+     * dlv도 JDWP suspend=y처럼 클라이언트가 붙기 전까지 프로그램을 정지시켜 두므로
+     * attach 전에 끝나버리는 레이스가 없다.
+     *
+     * 브레이크포인트는 바이너리에 기록된 소스 파일 경로로 바인딩되므로, 에디터의 실제
+     * 파일(userFile)로 빌드한다 — 임시 사본으로 빌드하면 브레이크포인트가 잡히지 않는다.
+     */
+    private fun startGoDebug(code: String, input: String, userFile: File?): DebugHandle {
+        if (goPath.isBlank()) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "Go를 찾을 수 없습니다.\nhttps://go.dev/dl 에서 Go를 설치하세요.",
+                "Go not found.\nPlease install Go via https://go.dev/dl"
+            ))
+        }
+        val dlv = findDlv() ?: return DebugHandle(false, errorMessage = I18n.t(
+            "dlv(Delve 디버거)를 찾을 수 없습니다.\nGoLand에서 실행 중인지 확인하거나 `go install github.com/go-delve/delve/cmd/dlv@latest`로 설치하세요.",
+            "dlv (Delve debugger) not found.\nMake sure you are running GoLand, or install it: `go install github.com/go-delve/delve/cmd/dlv@latest`"
+        ))
+        if (!code.contains("func main(")) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "Go 디버깅은 main 함수가 있는 코드(Codeforces/SWEA 스타일)에서 지원됩니다.\nLeetCode/프로그래머스 래퍼 스타일은 추후 지원 예정입니다.",
+                "Go debugging supports code with a main function (Codeforces/SWEA style).\nLeetCode/Programmers wrapper style is planned."
+            ))
+        }
+
+        val dir = createTempDir()
+        return try {
+            // 실제 파일 경로로 빌드해야 브레이크포인트가 바인딩된다 (에디터 저장은 호출부 책임)
+            val sourceFile = if (userFile != null && userFile.exists()) userFile
+                             else File(dir, "solution.go").apply { writeText(code, StandardCharsets.UTF_8) }
+            val bin = File(dir, if (isWindows) "solution.exe" else "solution")
+            // -gcflags all=-N -l: 최적화·인라이닝 비활성화 (디버그 정보 보존, dlv 표준 플래그)
+            val compile = executeProcess(
+                listOf(goPath, "build", "-gcflags", "all=-N -l", "-o", bin.absolutePath, sourceFile.absolutePath),
+                dir, "", COMPILE_TIMEOUT_SECONDS
+            )
+            if (compile.exitCode != 0) {
+                dir.deleteRecursively()
+                return DebugHandle(false, errorMessage = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}")
+            }
+
+            val port = findFreePort()
+            val process = ProcessBuilder(
+                listOf(dlv, "--listen=127.0.0.1:$port", "--headless=true", "--api-version=2", "exec", bin.absolutePath)
+            ).directory(dir).start()
+            // 케이스 입력 전달 — dlv headless는 자기 stdin을 안 읽고 대상 프로그램에 물려준다
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (input.isNotBlank()) it.write(input) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+            drainToVoid(process.inputStream)
+            drainToVoid(process.errorStream)
+
+            DebugHandle(true, port = port, process = process, workDir = dir)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
+    }
+
+    /**
+     * dlv 탐색: 1) Go 플러그인(GoLand)에 번들된 dlv → 2) PATH/GOPATH의 dlv.
+     * 번들 경로: <go-plugin>/lib/dlv/<os><arch>/dlv
+     */
+    private fun findDlv(): String? {
+        try {
+            val plugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
+                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.plugins.go"))
+            val base = plugin?.pluginPath?.toFile()
+            if (base != null) {
+                val os = System.getProperty("os.name").lowercase()
+                val arm = System.getProperty("os.arch").lowercase().let { it.contains("aarch64") || it.contains("arm") }
+                val osDir = when {
+                    os.contains("win") -> if (arm) "windowsarm" else "windows"
+                    os.contains("mac") -> if (arm) "macarm" else "mac"
+                    else -> if (arm) "linuxarm" else "linux"
+                }
+                val f = File(base, "lib/dlv/$osDir/" + if (os.contains("win")) "dlv.exe" else "dlv")
+                if (f.exists()) return f.absolutePath
+            }
+        } catch (_: Throwable) {}
+        val fallback = findExecutable("dlv", "${System.getProperty("user.home")}/go/bin/dlv")
+        return fallback.ifBlank { null }
+    }
+
+    /**
+     * Java/Kotlin 코드를 JDWP suspend=y 로 실행해 디버거 attach를 대기시킨다 (이슈 #36 Tier 1).
+     * suspend=y라 디버거가 붙기 전까지 사용자 코드가 실행되지 않아, attach 전에 끝나버리는
+     * 레이스가 없다. 반환된 process는 디버그 세션이 잡고 있으므로 호출부가 정리 시점을 관리.
+     *
+     * 지원: JAVA, KOTLIN. 그 외 언어는 ok=false + 안내 메시지.
+     * 컴파일 에러 시에도 ok=false + 에러 메시지.
+     */
+    private fun startJvmDebug(
+        code: String,
+        language: Language,
+        testCase: TestCase,
+        parameterNames: List<String>,
+        source: com.codingtestkit.model.ProblemSource,
+        userFile: File? = null
+    ): DebugHandle {
+        if (language != Language.JAVA && language != Language.KOTLIN) {
+            return DebugHandle(false, errorMessage = I18n.t(
+                "현재 디버깅은 IntelliJ IDEA의 Java/Kotlin만 지원합니다.\n" +
+                    "(C++/Rust/Go/Ruby는 CLion/RustRover/GoLand/RubyMine에서 지원 예정)",
+                "Debugging currently supports Java/Kotlin in IntelliJ IDEA only.\n" +
+                    "(C++/Rust/Go/Ruby will be supported in CLion/RustRover/GoLand/RubyMine)"
+            ))
+        }
+
+        // 래퍼가 필요한 경우(프로그래머스/리트코드, main 없음) 래핑
+        val wrapperStyle = source == com.codingtestkit.model.ProblemSource.PROGRAMMERS ||
+            source == com.codingtestkit.model.ProblemSource.LEETCODE
+        val runCode: String
+        val stdin: String
+        if (wrapperStyle && !hasMainFunction(code, language)) {
+            val inputValues = testCase.input.split("\n").map { it.trim() }
+            runCode = if (language == Language.JAVA) wrapJava(code, inputValues, parameterNames)
+                      else wrapKotlin(code, inputValues, parameterNames)
+            stdin = ""
+        } else {
+            runCode = code
+            stdin = testCase.input
+        }
+
+        val dir = createTempDir()
+        return try {
+            val port = findFreePort()
+            // 127.0.0.1로 바인딩해 로컬 IDE만 attach 가능하게 한다.
+            // address=*:port 또는 bare port는 모든 인터페이스에 노출돼 원격 코드 실행 위험.
+            val jdwp = "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=127.0.0.1:$port"
+            val command = if (language == Language.JAVA) {
+                compileJavaForDebug(runCode, dir) ?: return DebugHandle(false, errorMessage =
+                    I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
+            } else {
+                compileKotlinForDebug(runCode, dir, userFile?.name) ?: return DebugHandle(false, errorMessage =
+                    I18n.t("컴파일 에러로 디버깅을 시작할 수 없습니다.", "Cannot start debugging due to a compile error.")).also { dir.deleteRecursively() }
+            }.let { entry -> javaCommand(jdwp) + entry }
+
+            val process = ProcessBuilder(command).directory(dir).redirectErrorStream(false).start()
+            // stdin 전달 (suspend 상태여도 파이프에 미리 써둘 수 있음)
+            Thread {
+                try {
+                    process.outputStream.bufferedWriter(Charsets.UTF_8).use { if (stdin.isNotBlank()) it.write(stdin) }
+                } catch (_: Exception) {}
+            }.apply { isDaemon = true; start() }
+            drainToVoid(process.inputStream)
+
+            // JDWP 에이전트가 소켓을 열기 전에 IDE가 attach하면 "Connection refused"가 난다.
+            // 에이전트는 준비되면 stderr에 "Listening for transport..."를 출력하므로 그 줄을 기다린다.
+            val listening = java.util.concurrent.CountDownLatch(1)
+            Thread {
+                try {
+                    process.errorStream.bufferedReader(Charsets.UTF_8).use { r ->
+                        var line = r.readLine()
+                        while (line != null) {
+                            if (line.contains("Listening for transport")) listening.countDown()
+                            line = r.readLine()
+                        }
+                    }
+                } catch (_: Exception) {} finally { listening.countDown() }
+            }.apply { isDaemon = true; start() }
+            // 최대 10초 대기 (컴파일은 이미 끝났고 JVM 부팅만 남음)
+            listening.await(10, java.util.concurrent.TimeUnit.SECONDS)
+
+            DebugHandle(true, port = port, process = process, workDir = dir)
+        } catch (e: Exception) {
+            dir.deleteRecursively()
+            DebugHandle(false, errorMessage = e.message ?: "debug start failed")
+        }
+    }
+
+    /** 디버그용 javac 커맨드 — -g로 지역변수 이름까지 디버그 정보에 포함 */
+    private fun javacDebugCommand(vararg sourceFiles: File): List<String> =
+        listOf(javacPath, "-g", "-encoding", "UTF-8") + sourceFiles.map { it.absolutePath }
+
+    /** Java 디버그용 컴파일 → 실행 인자(-cp DIR MainClass) 반환, 실패 시 null */
+    private fun compileJavaForDebug(code: String, dir: File): List<String>? {
+        val sep = "///MAIN_SEPARATOR///"
+        if (code.contains(sep)) {
+            val parts = code.split(sep)
+            File(dir, "Solution.java").writeText(parts[0].trim(), StandardCharsets.UTF_8)
+            File(dir, "Main.java").writeText(parts[1].trim(), StandardCharsets.UTF_8)
+            val c = executeProcess(javacDebugCommand(File(dir, "Solution.java"), File(dir, "Main.java")), dir, "", COMPILE_TIMEOUT_SECONDS)
+            if (c.exitCode != 0) return null
+            return listOf("-cp", dir.absolutePath, "Main")
+        }
+        val className = detectJavaClassName(code)
+        val src = File(dir, "$className.java")
+        src.writeText(code, StandardCharsets.UTF_8)
+        val c = executeProcess(javacDebugCommand(src), dir, "", COMPILE_TIMEOUT_SECONDS)
+        if (c.exitCode != 0) return null
+        return listOf("-cp", dir.absolutePath, className)
+    }
+
+    /**
+     * Kotlin 디버그용 컴파일 → 실행 인자(-jar solution.jar) 반환, 실패 시 null.
+     * 임시 소스 파일명은 사용자 파일명과 같아야 한다 — Kotlin 브레이크포인트는
+     * 파일명에서 파생된 파사드 클래스(Main.kt → MainKt)로 바인딩되기 때문.
+     */
+    private fun compileKotlinForDebug(code: String, dir: File, userFileName: String? = null): List<String>? {
+        if (kotlincPath.isBlank()) return null
+        val srcName = userFileName?.takeIf { it.endsWith(".kt") } ?: "Main.kt"
+        val src = File(dir, srcName)
+        src.writeText(code, StandardCharsets.UTF_8)
+        val jar = File(dir, "solution.jar")
+        val c = executeProcess(
+            listOf(kotlincPath, "-J-Dfile.encoding=UTF-8", src.absolutePath, "-include-runtime", "-d", jar.absolutePath),
+            dir, "", COMPILE_TIMEOUT_SECONDS
+        )
+        if (c.exitCode != 0) return null
+        return listOf("-jar", jar.absolutePath)
+    }
+
+    private fun drainToVoid(stream: java.io.InputStream) {
+        Thread {
+            try { stream.bufferedReader(Charsets.UTF_8).use { while (it.readLine() != null) {} } } catch (_: Exception) {}
+        }.apply { isDaemon = true; start() }
+    }
+
+    /**
      * stdin 방식: 입력을 표준입력으로 전달하고 stdout 결과를 비교
      */
     fun run(
@@ -337,12 +604,13 @@ class Main {
             "_result = $methodName($args)"
         }
 
+        // 사용자 코드가 1번 줄부터 원형 그대로 시작해야 브레이크포인트·진단 줄번호가
+        // 1:1로 맞는다 (이슈 #36 디버깅 / #32 소스 이동). import는 하단 하네스로.
         return """
-import sys as _sys
-
 $code
 
 # 사용자 print()를 stderr로 리다이렉트
+import sys as _sys
 _orig_stdout = _sys.stdout
 _sys.stdout = _sys.stderr
 $callExpr
@@ -368,13 +636,16 @@ else:
             .map { it.groupValues[1] }
             .filter { it !in excluded && !it.startsWith("~") }.toList()
         val methodName = cppMethods.find { it == "solution" } ?: cppMethods.lastOrNull() ?: "solution"
+        // 사용자 코드가 1번 줄부터 원형 유지되도록, include가 이미 있으면(일반적)
+        // 아무것도 프리펜드하지 않는다. include가 없을 때만 보충 (줄이 밀리지만 드묾)
         val hasInclude = code.contains("#include")
-        val includes = if (hasInclude) "" else """
+        val prefix = if (hasInclude) "" else """
 #include <iostream>
 #include <vector>
 #include <string>
 using namespace std;
-""".trimIndent()
+
+""".trimStart('\n')
 
         val callExpr = if (hasClass) {
             "    Solution sol;\n    auto _result = sol.$methodName($args);"
@@ -382,8 +653,7 @@ using namespace std;
             "    auto _result = $methodName($args);"
         }
 
-        return """
-$includes
+        return prefix + """
 $code
 
 template<typename T> void _print(T r) { cout << r; }
@@ -549,14 +819,16 @@ else console.log(_result);
             .filter { it != "main" }.toList()
         val methodName = rsFns.find { it == "solution" } ?: rsFns.lastOrNull() ?: "solution"
 
-        // LeetCode 스타일(impl Solution)이면 struct 선언 보충 후 연관 함수로 호출
+        // LeetCode 스타일(impl Solution)이면 struct 선언 보충 후 연관 함수로 호출.
+        // Rust는 모듈 아이템 선언 순서가 무관하므로 struct를 코드 '아래'에 둬서
+        // 사용자 코드 줄번호를 원형 그대로 보존한다 (이슈 #36 디버깅 / #32 소스 이동)
         val hasImpl = code.contains("impl Solution")
-        val structDecl = if (hasImpl && !code.contains("struct Solution")) "struct Solution;\n\n" else ""
+        val structDecl = if (hasImpl && !code.contains("struct Solution")) "\nstruct Solution;\n" else ""
         val callExpr = if (hasImpl) "Solution::$methodName($args)" else "$methodName($args)"
 
         return """
-$structDecl$code
-
+$code
+$structDecl
 fn main() {
     let _result = $callExpr;
     // {:?}는 문자열을 "따옴표 포함"으로, 벡터를 [a, b]로 출력 → 공백 제거로 [a,b] 형태 통일
@@ -604,12 +876,12 @@ func main() {
             .filter { it != "initialize" }.toList()
         val methodName = rbMethods.find { it == "solution" } ?: rbMethods.lastOrNull() ?: "solution"
 
+        // require는 하단 하네스로 — 사용자 코드 줄번호 원형 보존 (이슈 #36/#32)
         return """
-require 'json'
-
 $code
 
 # 사용자 puts를 stderr로 리다이렉트
+require 'json'
 _orig_stdout = ${'$'}stdout
 ${'$'}stdout = ${'$'}stderr
 _result = $methodName($args)
@@ -705,6 +977,16 @@ end
     }
 
     private fun detectKotlinc(): String {
+        // 0. 지금 실행 중인 IDE에 번들된 Kotlin 플러그인의 kotlinc — 가장 신뢰할 수 있는 소스.
+        //    (사용자 디렉토리의 IntelliJIdea* 잔재는 구버전 찌꺼기로 깨진 경우가 있음)
+        try {
+            val kotlinPlugin = com.intellij.ide.plugins.PluginManagerCore.getPlugin(
+                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.kotlin"))
+            val bin = kotlinPlugin?.pluginPath?.toFile()
+                ?.let { File(it, "kotlinc/bin/" + if (isWindows) "kotlinc.bat" else "kotlinc") }
+            if (bin != null && bin.exists()) return bin.absolutePath
+        } catch (_: Throwable) {}
+
         // 1. PATH나 일반적인 설치 경로
         val found = findExecutable("kotlinc", "/usr/local/bin/kotlinc", "/opt/homebrew/bin/kotlinc")
         if (found.isNotBlank()) return found

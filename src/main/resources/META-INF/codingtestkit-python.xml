@@ -1,0 +1,7 @@
+<!-- PythonCore 플러그인이 있는 IDE(PyCharm Community/Professional, IDEA+Python)에서만
+     로드되는 확장. 일반 Python 실행 구성을 debug로 돌리는 어댑터를 여기서 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.python.PyDebugAdapter"/>
+    </extensions>
+</idea-plugin>

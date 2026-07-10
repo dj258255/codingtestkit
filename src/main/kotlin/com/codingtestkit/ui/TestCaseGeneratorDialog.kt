@@ -33,11 +33,15 @@ class TestCaseGeneratorDialog(
         private val INT_ARRAY_TYPES = setOf("integer[]", "long[]", "list<integer>", "list<long>")
         private val STRING_ARRAY_TYPES = setOf("string[]", "list<string>")
         private val SCALAR_INT_TYPES = setOf("integer", "long")
+        private val INT_2D_TYPES = setOf("integer[][]", "int[][]", "long[][]",
+            "list<list<integer>>", "list<list<long>>")
+        private val TREE_TYPES = setOf("treenode", "treenode*")
 
-        /** 자동 생성을 지원하는 파라미터 타입인가 (TreeNode·2차원 배열 등은 v2) */
+        /** 자동 생성을 지원하는 파라미터 타입인가 (이슈 #36: 2차원 배열·TreeNode 추가) */
         fun isSupportedType(type: String): Boolean {
             val t = type.trim().lowercase()
             return t in INT_ARRAY_TYPES || t in STRING_ARRAY_TYPES || t in SCALAR_INT_TYPES ||
+                t in INT_2D_TYPES || t in TREE_TYPES ||
                 t == "string" || t == "boolean" || t == "double"
         }
     }
@@ -61,7 +65,13 @@ class TestCaseGeneratorDialog(
         INCREASING("증가 (min부터 연속)", "Increasing (consecutive from min)"),
         DECREASING("감소 (max부터 연속)", "Decreasing (consecutive from max)"),
         CONSTANT("상수 (모두 min)", "Constant (all = min)"),
-        PERMUTATION("순열 셔플 (1..N)", "Shuffled permutation (1..N)");
+        PERMUTATION("순열 셔플 (1..N)", "Shuffled permutation (1..N)"),
+        QUICKSORT_KILLER(
+            "퀵정렬 킬러 (고전 단일피벗 O(n²) 저격 — introsort/TimSort는 무효)",
+            "Quicksort killer (forces O(n²) on classic single-pivot sort — no effect on introsort/TimSort)"),
+        ANTI_HASH(
+            "anti-hash (mod 2^64 overflow 해시 충돌 — base 무관, 두 문자열 출력)",
+            "anti-hash (collides mod-2^64 overflow polynomial hash — any base, outputs two strings)");
 
         fun label(): String = I18n.t(ko, en)
     }
@@ -204,6 +214,15 @@ class TestCaseGeneratorDialog(
         }
         val baseSeed = seedField.text.trim().toLongOrNull()
 
+        // anti-hash는 숫자 배열이 아니라 충돌하는 두 문자열 — 형식·타입 설정을 무시하고 특수 출력.
+        // 플랫폼 인식: stdin형(코드포스/SWEA)은 두 줄, 파라미터형(리트코드/프로그래머스)은
+        // 각 문자열을 따옴표 리터럴 케이스로 (함수 시그니처 문자열 파라미터 입력에 맞춤).
+        if (pattern == Pattern.ANTI_HASH) {
+            val (a, b) = TestCaseGenerators.thueMorseAntiHash(n)
+            return if (parameterStyle) listOf("\"$a\"", "\"$b\"")  // 충돌하는 두 문자열, 각각 한 케이스
+                   else (0 until cases).map { "$a\n$b" }           // stdin: 두 줄(A, B)
+        }
+
         return (0 until cases).map { caseIdx ->
             // 시드 지정 시 케이스마다 파생 시드로 재현 가능 + 케이스 간 서로 다름
             val rng = if (baseSeed != null) Random(baseSeed + caseIdx) else Random.Default
@@ -250,6 +269,15 @@ class TestCaseGeneratorDialog(
                     sb.append(v)
                 }
             }
+            Pattern.QUICKSORT_KILLER -> {
+                // 고전 단일피벗 퀵정렬을 O(n²)로 모는 킬러 순열 (0..n-1)
+                val killer = TestCaseGenerators.quicksortKiller(n)
+                for ((i, v) in killer.withIndex()) {
+                    if (i > 0) sb.append(sep)
+                    sb.append(v)
+                }
+            }
+            Pattern.ANTI_HASH -> { /* generateInputs에서 특수 처리 (문자열 쌍) */ }
         }
     }
 
@@ -260,6 +288,8 @@ class TestCaseGeneratorDialog(
             t in INT_ARRAY_TYPES -> buildString(n * 8) {
                 append('['); appendSeries(this, rng, ",", n, min, max, pattern); append(']')
             }
+            t in INT_2D_TYPES -> TestCaseGenerators.int2dArray(n) { randLong(rng, min, max) }
+            t in TREE_TYPES -> TestCaseGenerators.completeTree(n) { randLong(rng, min, max) }
             t in STRING_ARRAY_TYPES -> (0 until n).joinToString(",", "[", "]") { "\"${randomWord(rng, 5)}\"" }
             t in SCALAR_INT_TYPES -> randLong(rng, min, max).toString()
             t == "string" -> "\"${randomWord(rng, n.coerceAtMost(100_000))}\""

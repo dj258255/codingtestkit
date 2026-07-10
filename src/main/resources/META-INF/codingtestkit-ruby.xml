@@ -1,0 +1,7 @@
+<!-- Ruby 플러그인이 있는 IDE(RubyMine 등)에서만 로드되는 확장.
+     runner.rb($stdin.reopen + load)로 입력을 우회하는 Ruby 어댑터를 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.ruby.RubyDebugAdapter"/>
+    </extensions>
+</idea-plugin>

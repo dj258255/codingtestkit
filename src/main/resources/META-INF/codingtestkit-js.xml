@@ -1,0 +1,7 @@
+<!-- NodeJS 플러그인이 있는 IDE(WebStorm, IDEA Ultimate 등)에서만 로드되는 확장.
+     Node.js 실행 구성을 debug로 돌리는 JS 어댑터를 여기서 등록한다. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.codingtestkit">
+        <testDebugAdapter implementation="com.codingtestkit.debug.js.JsDebugAdapter"/>
+    </extensions>
+</idea-plugin>
