@@ -21,7 +21,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class SwexpertRandomDialog(private val project: Project) : DialogWrapper(project) {
+class SwexpertRandomDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     // ─── 난이도 필터 (칩 방식) ───
 

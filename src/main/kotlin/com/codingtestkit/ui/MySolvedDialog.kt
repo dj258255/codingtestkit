@@ -18,7 +18,7 @@ import javax.swing.table.DefaultTableModel
 class MySolvedDialog(
     private val project: Project,
     private val source: ProblemSource
-) : DialogWrapper(project) {
+, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private val username: String = AuthService.getInstance().getUsername(source)
 

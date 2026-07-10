@@ -21,7 +21,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class CodeforcesRandomDialog(private val project: Project) : DialogWrapper(project) {
+class CodeforcesRandomDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     // ─── 태그 다중선택 (동적 로딩) ───
 

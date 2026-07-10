@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class LeetCodeRandomDialog(private val project: Project) : DialogWrapper(project) {
+class LeetCodeRandomDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     // ─── 난이도 ───
 

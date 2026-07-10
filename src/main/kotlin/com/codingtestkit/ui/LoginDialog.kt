@@ -21,7 +21,7 @@ import java.awt.Dimension
 import java.awt.FlowLayout
 import javax.swing.*
 
-class LoginDialog(project: Project, private val source: ProblemSource) : DialogWrapper(project) {
+class LoginDialog(project: Project, private val source: ProblemSource, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private var cookies = ""
     private var username = ""
