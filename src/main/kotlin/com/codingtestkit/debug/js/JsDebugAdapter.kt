@@ -74,10 +74,32 @@ class JsDebugAdapter : TestDebugAdapter {
                 val settings = fromContext.configurationSettings
                 settings.name = sessionName
                 if (input.isNotBlank()) {
-                    val inputFile = File(workingDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
+                    // Node 구성엔 stdin 리다이렉트가 없다 (inputPath = 실행할 스크립트 경로!).
+                    // 러너가 stdin 읽기(fs.readFileSync('/dev/stdin'|0), process.stdin)를
+                    // 입력 파일로 우회한 뒤 사용자 실제 파일을 require — 브레이크포인트는
+                    // 사용자 파일 경로로 정상 바인딩된다.
+                    val runnerDir = java.nio.file.Files.createTempDirectory("ctk-js-debug").toFile()
+                    val inputFile = File(runnerDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
+                    fun js(path: String) = path.replace("\\", "\\\\").replace("'", "\\'")
+                    val runner = File(runnerDir, "ctk_runner.js").apply {
+                        writeText(
+                            """
+                            const fs = require('fs');
+                            const INPUT = '${js(inputFile.absolutePath)}';
+                            const data = fs.readFileSync(INPUT);
+                            const orig = fs.readFileSync.bind(fs);
+                            fs.readFileSync = (p, ...a) => (p === '/dev/stdin' || p === 0) ? orig(INPUT, ...a) : orig(p, ...a);
+                            const { Readable } = require('stream');
+                            const fake = Readable.from([data]);
+                            fake.isTTY = false; fake.setRawMode = () => fake;
+                            Object.defineProperty(process, 'stdin', { get: () => fake, configurable: true });
+                            require('${js(sourceFile.absolutePath)}');
+                            """.trimIndent(), Charsets.UTF_8
+                        )
+                    }
                     val cfg = settings.configuration
                     cfg.javaClass.getMethod("setInputPath", String::class.java)
-                        .invoke(cfg, inputFile.absolutePath)
+                        .invoke(cfg, runner.absolutePath)
                 }
                 settings.isTemporary = true
                 RunManager.getInstance(project).setTemporaryConfiguration(settings)
