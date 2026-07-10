@@ -54,13 +54,23 @@ class CppDebugAdapter : TestDebugAdapter {
                     log.warn("[CodingTestKit] C++ debug: PSI file not found for ${sourceFile.path}")
                     return@invokeAndWait
                 }
-                // gutter와 동일: producer는 main 함수 요소 위치를 요구한다 (파일 전체는 매칭 안 됨)
-                val mainOffset = psiFile.text.indexOf("int main").takeIf { it >= 0 }
-                    ?: psiFile.text.indexOf("main").takeIf { it >= 0 } ?: 0
-                val element = psiFile.findElementAt(mainOffset) ?: psiFile
-                val location: Location<*> = PsiLocation.fromPsiElement(element)
-                val context = ConfigurationContext.createEmptyContextForLocation(location)
-                val fromContext = context.configurationsFromContext?.firstOrNull()
+                // gutter와 동일: producer는 main 함수(식별자) 요소 위치를 요구한다.
+                // 어느 리프/부모에 앵커되는지 버전마다 달라 후보 위치·조상들을 순회하며 첫 매칭을 쓴다.
+                val text = psiFile.text
+                val offsets = listOf(text.indexOf("main("), text.indexOf("int main"), 0).filter { it >= 0 }
+                var fromContext: com.intellij.execution.actions.ConfigurationFromContext? = null
+                outer@ for (off in offsets) {
+                    var element: com.intellij.psi.PsiElement? = psiFile.findElementAt(off) ?: psiFile
+                    var depth = 0
+                    while (element != null && depth < 6) {
+                        val location: Location<*> = PsiLocation.fromPsiElement(element)
+                        val context = ConfigurationContext.createEmptyContextForLocation(location)
+                        fromContext = context.configurationsFromContext?.firstOrNull()
+                        if (fromContext != null) break@outer
+                        element = element.parent
+                        depth++
+                    }
+                }
                 if (fromContext == null) {
                     log.warn("[CodingTestKit] C++ debug: no run configuration producer matched the file")
                     return@invokeAndWait
