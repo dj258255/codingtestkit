@@ -54,8 +54,11 @@ class CppDebugAdapter : TestDebugAdapter {
                     log.warn("[CodingTestKit] C++ debug: PSI file not found for ${sourceFile.path}")
                     return@invokeAndWait
                 }
-                // gutter와 동일: PSI 위치에서 producer가 구성을 생성 (빌드 타깃 등록 포함)
-                val location: Location<*> = PsiLocation.fromPsiElement(psiFile)
+                // gutter와 동일: producer는 main 함수 요소 위치를 요구한다 (파일 전체는 매칭 안 됨)
+                val mainOffset = psiFile.text.indexOf("int main").takeIf { it >= 0 }
+                    ?: psiFile.text.indexOf("main").takeIf { it >= 0 } ?: 0
+                val element = psiFile.findElementAt(mainOffset) ?: psiFile
+                val location: Location<*> = PsiLocation.fromPsiElement(element)
                 val context = ConfigurationContext.createEmptyContextForLocation(location)
                 val fromContext = context.configurationsFromContext?.firstOrNull()
                 if (fromContext == null) {
