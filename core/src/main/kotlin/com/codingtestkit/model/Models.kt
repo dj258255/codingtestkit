@@ -48,7 +48,10 @@ data class CodeTemplate(
     var name: String = "",
     var language: String = "java",
     var code: String = "",
-    var inputTemplate: String = ""
+    var inputTemplate: String = "",
+    // nullable: 기존 저장 JSON에 없는 필드라 Gson이 null을 넣음 (하위호환, 이슈 #35).
+    // 값은 ProblemSource.name — 해당 플랫폼에서 새 문제를 열 때 이 템플릿이 초기 코드가 된다.
+    var defaultForPlatform: String? = null
 )
 
 enum class Language(
