@@ -76,22 +76,23 @@ class RustDebugAdapter : TestDebugAdapter {
             // attach는 cargo metadata를 돌려 수 초 걸릴 수 있어 백그라운드에서 blocking 대기
             // (launchDebug는 이미 pooled 스레드에서 호출됨).
             val cargoService = project.getService(org.rust.cargo.project.model.CargoProjectsService::class.java)
-            val cargoProject = kotlinx.coroutines.runBlocking {
-                cargoService.attachCargoProject(File(cargoDir, "Cargo.toml").toPath()).await()
-            } ?: run {
-                log.warn("[CodingTestKit] Rust debug: cargo project attach failed")
-                return false
+            val manifestPath = File(cargoDir, "Cargo.toml").toPath()
+            kotlinx.coroutines.runBlocking {
+                cargoService.attachCargoProject(manifestPath).await()
             }
-            // attach의 Deferred는 등록 시점에 완료되고 cargo metadata 동기화는 계속 진행 중일
-            // 수 있다 — workspace(타깃 목록)가 준비되기 전에 실행하면 실행 대상 해석이 실패해
-            // "Cannot run on <default>"가 난다. workspace가 뜰 때까지 대기 (최대 30초).
+            // metadata 동기화가 끝나 workspace(타깃 목록)가 준비될 때까지 대기 (최대 60초).
+            // 주의: CargoProject는 불변 스냅샷 — attach가 돌려준 객체는 갱신되지 않으므로
+            // 매 폴링마다 서비스에서 최신 스냅샷을 다시 조회해야 한다.
             run {
-                val deadline = System.currentTimeMillis() + 30_000
-                while (cargoProject.workspace == null && System.currentTimeMillis() < deadline) {
+                val deadline = System.currentTimeMillis() + 60_000
+                var ready = false
+                while (System.currentTimeMillis() < deadline) {
+                    val current = cargoService.allProjects.find { it.manifest == manifestPath }
+                    if (current?.workspace != null) { ready = true; break }
                     Thread.sleep(300)
                 }
-                if (cargoProject.workspace == null) {
-                    log.warn("[CodingTestKit] Rust debug: cargo workspace not ready after 30s")
+                if (!ready) {
+                    log.warn("[CodingTestKit] Rust debug: cargo workspace not ready after 60s")
                     return false
                 }
             }
