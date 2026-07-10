@@ -16,6 +16,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefJSQuery
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.handler.CefRequestHandlerAdapter
@@ -136,6 +137,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private lateinit var topPanel: JPanel
     private lateinit var timerBar: JPanel
     private lateinit var timerBarControls: JPanel
+    /** 지문 HTML 안의 최대화 버튼 클릭을 Kotlin으로 넘기는 JS→Java 브릿지 (JCEF 전용) */
+    private var maximizeQuery: JBCefJSQuery? = null
+    private lateinit var viewHeaderBar: JPanel
 
     private val problemDisplay = JEditorPane().apply {
         contentType = "text/html"
@@ -207,8 +211,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 헤더(툴바) + 그 아래 얇은 뷰 바(지문 최대화 토글). BorderLayout이라 세로 스트레치 없음.
         // topPanel은 NORTH, viewHeaderBar는 SOUTH — 최대화로 topPanel을 숨겨도 토글은
         // 지문 바로 위 같은 자리에 남는다 (이슈 #33).
-        val viewHeaderBar = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply {
+        // JCEF에선 지문 HTML 안에 hover 오버레이 버튼을 심으므로 이 얇은 바는 숨긴다.
+        // 폴백(JEditorPane)에서만 이 바의 버튼으로 토글한다.
+        viewHeaderBar = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), JBUI.scale(2))).apply {
             isOpaque = false
+            isVisible = !useCef
             add(viewToggleButton)
         }
         add(JPanel(BorderLayout()).apply {
@@ -220,6 +227,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 문제 표시 영역 (JCEF 지원 시 KaTeX LaTeX 렌더링 가능)
         if (useCef) {
             cefBrowser = JBCefBrowser()
+
+            // 지문 HTML의 hover 최대화 버튼 클릭 → Kotlin 토글 (이슈 #33)
+            maximizeQuery = JBCefJSQuery.create(cefBrowser as com.intellij.ui.jcef.JBCefBrowserBase).also { q ->
+                q.addHandler { _ ->
+                    SwingUtilities.invokeLater { setMaximized(!maximized) }
+                    null
+                }
+            }
 
             // http://localhost/* 요청을 가로채서 JAR 리소스를 서빙
             val panel = this
@@ -351,6 +366,14 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         viewToggleButton.icon = if (max) AllIcons.General.CollapseComponent else AllIcons.General.ExpandComponent
         viewToggleButton.toolTipText = if (max) I18n.t("원래 화면으로", "Restore normal layout")
                                         else I18n.t("지문 최대화", "Maximize problem view")
+        // JCEF 오버레이 버튼 글리프를 재로드 없이 즉시 갱신
+        if (useCef && cefBrowser != null) {
+            val glyph = if (max) "⤡" else "⤢"
+            cefBrowser!!.cefBrowser.executeJavaScript(
+                "var b=document.getElementById('ctk-max-btn'); if(b) b.textContent='$glyph';",
+                cefBrowser!!.cefBrowser.url, 0
+            )
+        }
         onMaximizeToggle?.invoke(max)
         revalidate()
         repaint()
@@ -1370,12 +1393,38 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
      */
     private fun setDisplayHtml(html: String) {
         if (useCef && cefBrowser != null) {
-            currentProblemHtml = html
+            currentProblemHtml = injectMaximizeOverlay(html)
             cefBrowser!!.loadURL("http://localhost/problem.html?t=${System.currentTimeMillis()}")
         } else {
             problemDisplay.text = html
             problemDisplay.caretPosition = 0
         }
+    }
+
+    /**
+     * 지문 HTML 우상단에 hover로 나타나는 최대화/복원 버튼을 심는다 (이슈 #33, JCEF 전용).
+     * 평소엔 반투명하게 숨었다가 우상단 코너에 마우스를 대면 또렷해진다. 클릭은 JBCefJSQuery
+     * 브릿지로 Kotlin의 setMaximized를 호출한다.
+     */
+    private fun injectMaximizeOverlay(html: String): String {
+        val q = maximizeQuery ?: return html
+        val glyph = if (maximized) "⤡" else "⤢"   // 최대화 / 복원
+        val onClick = q.inject("'toggle'")          // 클릭 시 브릿지 호출 JS
+        val overlay = """
+            <style>
+              #ctk-hot{position:fixed;top:0;right:0;width:96px;height:60px;z-index:2147483647;}
+              #ctk-max-btn{position:fixed;top:8px;right:10px;opacity:0;transition:opacity .16s ease;
+                border:none;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:15px;line-height:1;
+                background:rgba(128,128,128,.20);color:inherit;
+                -webkit-user-select:none;user-select:none;box-shadow:0 1px 4px rgba(0,0,0,.18);}
+              #ctk-hot:hover #ctk-max-btn,#ctk-max-btn:focus{opacity:1;}
+              #ctk-max-btn:hover{background:rgba(128,128,128,.38);}
+            </style>
+            <div id="ctk-hot"><button id="ctk-max-btn" title="maximize" onclick="$onClick">$glyph</button></div>
+        """.trimIndent()
+        // </body> 직전에 삽입 (없으면 그냥 뒤에 붙임)
+        val idx = html.lastIndexOf("</body>")
+        return if (idx >= 0) html.substring(0, idx) + overlay + html.substring(idx) else html + overlay
     }
 
     /**
