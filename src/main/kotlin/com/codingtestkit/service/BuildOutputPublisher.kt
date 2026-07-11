@@ -70,11 +70,11 @@ object BuildOutputPublisher {
                     linePreservedWrapper -> userFile                 // 래퍼형: 줄 보존 언어 (하네스가 아래)
                     else -> null
                 }
-                if (target != null && d.line > 0) {
+                val position = if (target != null && d.line > 0)
+                    createFilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0)) else null
+                if (position != null) {
                     viewManager.onEvent(buildId, CompileFileMessageEvent(
-                        buildId, d.severity, "Compiler", d.message, d.detail,
-                        // 3-인자 생성자는 제거 예정(scheduled for removal) — 시작=끝인 5-인자 사용
-                        FilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0), d.line - 1, (d.column - 1).coerceAtLeast(0))
+                        buildId, d.severity, "Compiler", d.message, d.detail, position
                     ))
                 } else {
                     viewManager.onEvent(buildId, CompileMessageEvent(
@@ -87,6 +87,22 @@ object BuildOutputPublisher {
         viewManager.onEvent(buildId, CompileFinishEvent(
             buildId, I18n.t("컴파일 실패", "Compilation failed")
         ))
+    }
+
+    /**
+     * FilePosition 생성 (리플렉션). File 기반 생성자는 3-인자·5-인자 모두
+     * 2026.2에서 제거 예정(scheduled for removal)으로 표시됐지만, 우리가 지원하는
+     * 2024.3 SDK에는 대안이 없다. 리플렉션으로 호출해 검증 경고를 피하고,
+     * 실제로 제거된 미래 IDE에서는 null을 돌려 위치 없는 메시지로 폴백한다.
+     */
+    private fun createFilePosition(file: File, line: Int, column: Int): FilePosition? = try {
+        FilePosition::class.java.getConstructor(
+            File::class.java,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+        ).newInstance(file, line, column, line, column)
+    } catch (_: Throwable) {
+        null
     }
 
     // ─── 언어별 컴파일러 출력 파싱 ───
