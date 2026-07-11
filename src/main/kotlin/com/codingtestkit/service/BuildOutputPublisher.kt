@@ -90,19 +90,33 @@ object BuildOutputPublisher {
     }
 
     /**
-     * FilePosition 생성 (리플렉션). File 기반 생성자는 3-인자·5-인자 모두
-     * 2026.2에서 제거 예정(scheduled for removal)으로 표시됐지만, 우리가 지원하는
-     * 2024.3 SDK에는 대안이 없다. 리플렉션으로 호출해 검증 경고를 피하고,
-     * 실제로 제거된 미래 IDE에서는 null을 돌려 위치 없는 메시지로 폴백한다.
+     * FilePosition 생성 (리플렉션 이중 전략).
+     * File 기반 생성자는 2026.2에서 제거 예정이고 공식 대체재는 Path 기반 생성자인데,
+     * Path 생성자는 우리 지원 하한인 2024.3 SDK에 존재하지 않는다. 그래서:
+     * 1) Path 생성자(2026.2+ 신 API)를 먼저 시도 — File 생성자가 실제로 제거된
+     *    미래 IDE에서도 클릭 이동이 계속 동작한다.
+     * 2) 없으면 File 생성자(2024.3~2026.1의 유일한 API)로 폴백.
+     * 두 경로 모두 리플렉션이라 마켓플레이스 검증 경고도 발생하지 않는다.
      */
-    private fun createFilePosition(file: File, line: Int, column: Int): FilePosition? = try {
-        FilePosition::class.java.getConstructor(
-            File::class.java,
-            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
-        ).newInstance(file, line, column, line, column)
-    } catch (_: Throwable) {
-        null
+    private fun createFilePosition(file: File, line: Int, column: Int): FilePosition? {
+        try {
+            return FilePosition::class.java.getConstructor(
+                java.nio.file.Path::class.java,
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+            ).newInstance(file.toPath(), line, column, line, column)
+        } catch (_: Throwable) {
+            // 2026.1 이하: Path 생성자 없음 → File 생성자로
+        }
+        return try {
+            FilePosition::class.java.getConstructor(
+                File::class.java,
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
+            ).newInstance(file, line, column, line, column)
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     // ─── 언어별 컴파일러 출력 파싱 ───
