@@ -351,32 +351,6 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             if (timerService.isRunning) timerService.pause() else timerService.start()
         }
         timerBarReset.addActionListener { timerService.reset() }
-    }
-
-    /**
-     * 지문 최대화 토글 (이슈 #33). 헤더(플랫폼/가져오기/제출 툴바)와 타이머 컨트롤을 숨기고
-     * MainPanel 콜백으로 탭 스트립까지 제거해 지문이 도구창 전체를 차지하게 한다.
-     * 단, 하단 타이머 프로그레스 바는 남겨 시간 감각을 유지한다. 토글 버튼은 지문 우상단
-     * 같은 자리에 고정돼 아이콘만 최대화↔복원으로 바뀐다.
-     */
-    private fun setMaximized(max: Boolean) {
-        maximized = max
-        topPanel.isVisible = !max
-        timerBarControls.isVisible = !max   // 컨트롤만 숨김 — 프로그레스 바(NORTH)는 유지
-        viewToggleButton.icon = if (max) AllIcons.General.CollapseComponent else AllIcons.General.ExpandComponent
-        viewToggleButton.toolTipText = if (max) I18n.t("원래 화면으로", "Restore normal layout")
-                                        else I18n.t("지문 최대화", "Maximize problem view")
-        // JCEF 오버레이 버튼 글리프를 재로드 없이 즉시 갱신
-        if (useCef && cefBrowser != null) {
-            val glyph = if (max) "⤡" else "⤢"
-            cefBrowser!!.cefBrowser.executeJavaScript(
-                "var b=document.getElementById('ctk-max-btn'); if(b) b.textContent='$glyph';",
-                cefBrowser!!.cefBrowser.url, 0
-            )
-        }
-        onMaximizeToggle?.invoke(max)
-        revalidate()
-        repaint()
         swBarToggle.addActionListener {
             if (timerService.isStopwatchRunning) timerService.stopwatchPause() else timerService.stopwatchStart()
         }
@@ -437,6 +411,32 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             submitAction = { submitButton.doClick() }
             translateAction = { translateButton.doClick() }
         }
+    }
+
+    /**
+     * 지문 최대화 토글 (이슈 #33). 헤더(플랫폼/가져오기/제출 툴바)와 타이머 컨트롤을 숨기고
+     * MainPanel 콜백으로 탭 스트립까지 제거해 지문이 도구창 전체를 차지하게 한다.
+     * 단, 하단 타이머 프로그레스 바는 남겨 시간 감각을 유지한다. 토글 버튼은 지문 우상단
+     * 같은 자리에 고정돼 아이콘만 최대화↔복원으로 바뀐다.
+     */
+    private fun setMaximized(max: Boolean) {
+        maximized = max
+        topPanel.isVisible = !max
+        timerBarControls.isVisible = !max   // 컨트롤만 숨김 — 프로그레스 바(NORTH)는 유지
+        viewToggleButton.icon = if (max) AllIcons.General.CollapseComponent else AllIcons.General.ExpandComponent
+        viewToggleButton.toolTipText = if (max) I18n.t("원래 화면으로", "Restore normal layout")
+                                        else I18n.t("지문 최대화", "Maximize problem view")
+        // JCEF 오버레이 버튼 글리프를 재로드 없이 즉시 갱신
+        if (useCef && cefBrowser != null) {
+            val glyph = if (max) "⤡" else "⤢"
+            cefBrowser!!.cefBrowser.executeJavaScript(
+                "var b=document.getElementById('ctk-max-btn'); if(b) b.textContent='$glyph';",
+                cefBrowser!!.cefBrowser.url, 0
+            )
+        }
+        onMaximizeToggle?.invoke(max)
+        revalidate()
+        repaint()
     }
 
     /**
