@@ -5,12 +5,6 @@ import com.intellij.build.BuildViewManager
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.FilePosition
 import com.intellij.build.events.MessageEvent
-import com.intellij.build.events.impl.FailureResultImpl
-import com.intellij.build.events.impl.FileMessageEventImpl
-import com.intellij.build.events.impl.FinishBuildEventImpl
-import com.intellij.build.events.impl.MessageEventImpl
-import com.intellij.build.events.impl.OutputBuildEventImpl
-import com.intellij.build.events.impl.StartBuildEventImpl
 import com.intellij.openapi.project.Project
 import java.io.File
 
@@ -43,7 +37,7 @@ object BuildOutputPublisher {
         val descriptor = DefaultBuildDescriptor(buildId, title, project.basePath ?: "", System.currentTimeMillis()).apply {
             isActivateToolWindowWhenFailed = true // 컴파일 실패 시 Build 창 자동 표시
         }
-        viewManager.onEvent(buildId, StartBuildEventImpl(descriptor, I18n.t("컴파일 중...", "Compiling...")))
+        viewManager.onEvent(buildId, CompileStartEvent(descriptor, I18n.t("컴파일 중...", "Compiling...")))
 
         // "컴파일 에러:\n" 프리픽스 제거 후 파싱
         val compilerOutput = rawError
@@ -60,7 +54,7 @@ object BuildOutputPublisher {
         val diags = parse(language, compilerOutput)
         if (diags.isEmpty()) {
             // 파싱 실패 시 원문 그대로 (여전히 Build 창에서 보는 게 낫다)
-            viewManager.onEvent(buildId, OutputBuildEventImpl(buildId, compilerOutput + "\n", true))
+            viewManager.onEvent(buildId, CompileOutputEvent(buildId, compilerOutput + "\n", true))
         } else {
             for (d in diags) {
                 // 임시 파일 진단을 실제 소스로 매핑 가능한 경우에만 클릭 이동 부여
@@ -72,21 +66,20 @@ object BuildOutputPublisher {
                     else -> null
                 }
                 if (target != null && d.line > 0) {
-                    viewManager.onEvent(buildId, FileMessageEventImpl(
+                    viewManager.onEvent(buildId, CompileFileMessageEvent(
                         buildId, d.severity, "Compiler", d.message, d.detail,
                         FilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0))
                     ))
                 } else {
-                    viewManager.onEvent(buildId, MessageEventImpl(
+                    viewManager.onEvent(buildId, CompileMessageEvent(
                         buildId, d.severity, "Compiler", d.message, d.detail
                     ))
                 }
             }
         }
 
-        viewManager.onEvent(buildId, FinishBuildEventImpl(
-            buildId, null, System.currentTimeMillis(),
-            I18n.t("컴파일 실패", "Compilation failed"), FailureResultImpl()
+        viewManager.onEvent(buildId, CompileFinishEvent(
+            buildId, I18n.t("컴파일 실패", "Compilation failed")
         ))
     }
 
