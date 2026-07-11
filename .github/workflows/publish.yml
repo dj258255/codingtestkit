@@ -21,46 +21,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Plugin
-        run: ./gradlew buildPlugin
-
-      # 판별 진단: 이미 승인된 1.6.1 zip을 재업로드해본다.
-      # 파이프라인 정상이면 "버전 중복" 400, 서버 고장이면 500이 온다.
-      - name: Diagnostic — re-upload approved 1.6.1
+      # 주의: change-notes가 과도하게 길면 마켓플레이스가 500으로 업로드를 거부한다
+      # (v1.7.0 릴리스 때 확인). plugin.xml에는 최근 1-2개 버전의 노트만 유지할 것.
+      - name: Publish Plugin
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: |
-          UPDATE_ID=$(curl -s "https://plugins.jetbrains.com/api/plugins/30574/updates?size=1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
-          echo "Latest approved update id: $UPDATE_ID"
-          curl -sL -o old-1.6.1.zip "https://plugins.jetbrains.com/plugin/download?updateId=$UPDATE_ID"
-          ls -lh old-1.6.1.zip
-          HTTP_CODE=$(curl -s -o diag.json -w "%{http_code}" \
-            -X POST "https://plugins.jetbrains.com/plugin/uploadPlugin" \
-            -H "Authorization: Bearer $PUBLISH_TOKEN" \
-            -F "xmlId=com.codingtestkit" \
-            -F "channel=default" \
-            -F "file=@old-1.6.1.zip")
-          echo "1.6.1 re-upload HTTP status: $HTTP_CODE"
-          echo "--- server response ---"
-          cat diag.json || true
-          echo
-
-      # Gradle 클라이언트(2.9.0) 우회 진단: 공식 업로드 API를 curl로 직접 호출해
-      # 서버의 원본 응답을 확인한다. 성공하면 이 스텝이 곧 배포다.
-      - name: Upload to Marketplace (direct API)
-        env:
-          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: |
-          ZIP=$(ls build/distributions/CodingTestKit-*.zip | head -1)
-          echo "Uploading: $ZIP"
-          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" \
-            -X POST "https://plugins.jetbrains.com/plugin/uploadPlugin" \
-            -H "Authorization: Bearer $PUBLISH_TOKEN" \
-            -F "xmlId=com.codingtestkit" \
-            -F "channel=default" \
-            -F "file=@$ZIP")
-          echo "HTTP status: $HTTP_CODE"
-          echo "--- server response ---"
-          cat response.json || true
-          echo
-          [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]
+        run: ./gradlew publishPlugin
