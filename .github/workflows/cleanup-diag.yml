@@ -1,0 +1,23 @@
+name: Cleanup diag uploads
+
+# 업로드 500 진단 과정에서 diag 채널에 생긴 테스트 업데이트 4개 삭제 (일회용 — 실행 후 파일 삭제).
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete diag channel updates
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          # 1.7.0-diag-a-no-changenotes / g-new-only / h-drop-160 / i-old-only
+          for ID in 1104800 1104804 1104805 1104806; do
+            HTTP_CODE=$(curl -s -o resp.json -w "%{http_code}" \
+              -X DELETE "https://plugins.jetbrains.com/api/updates/$ID" \
+              -H "Authorization: Bearer $PUBLISH_TOKEN")
+            echo "delete $ID → HTTP $HTTP_CODE"
+            cat resp.json || true
+            echo
+          done
