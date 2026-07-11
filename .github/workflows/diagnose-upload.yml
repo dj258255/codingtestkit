@@ -33,7 +33,8 @@ jobs:
           base = glob.glob('build/distributions/CodingTestKit-*.zip')[0]
 
           def patch_zip(src_zip, dst_zip, version, drop_module_jars=False,
-                        strip_changenotes=False, strip_optional_depends=False):
+                        strip_changenotes=False, strip_optional_depends=False,
+                        replacements=None):
               with zipfile.ZipFile(src_zip) as zin:
                   names = zin.namelist()
                   with zipfile.ZipFile(dst_zip, 'w', zipfile.ZIP_DEFLATED) as zout:
@@ -42,10 +43,10 @@ jobs:
                           if drop_module_jars and re.search(r'lib/CodingTestKit\.(core|debugger-[a-z]+)\.jar$', n):
                               continue  # 모듈 jar 제외
                           if n.endswith('lib/' + os.path.basename(base).replace('.zip', '.jar')) or re.search(r'lib/CodingTestKit-[0-9.]+\.jar$', n):
-                              data = patch_main_jar(data, version, strip_changenotes, strip_optional_depends)
+                              data = patch_main_jar(data, version, strip_changenotes, strip_optional_depends, replacements)
                           zout.writestr(n, data)
 
-          def patch_main_jar(jar_bytes, version, strip_changenotes, strip_optional_depends):
+          def patch_main_jar(jar_bytes, version, strip_changenotes, strip_optional_depends, replacements=None):
               src = io.BytesIO(jar_bytes)
               out = io.BytesIO()
               with zipfile.ZipFile(src) as jin, zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as jout:
@@ -60,14 +61,17 @@ jobs:
                                            xml, flags=re.S)
                           if strip_optional_depends:
                               xml = re.sub(r'\n\s*<depends optional="true"[^>]*>[^<]*</depends>', '', xml)
+                          for old, new in (replacements or []):
+                              xml = xml.replace(old, new)
                           data = xml.encode('utf-8')
                       jout.writestr(n, data)
               return out.getvalue()
 
           variants = [
-              ('a-no-changenotes', dict(strip_changenotes=True)),
-              ('b-no-optdepends',  dict(strip_optional_depends=True)),
-              ('c-single-jar',     dict(drop_module_jars=True)),
+              # 라운드 2: change-notes 내 정확한 유발 문자열 짚기 (전체 노트 유지, 한 요소만 치환)
+              ('d-no-braces', dict(replacements=[('{{SOLUTION}}', 'SOLUTION')])),
+              ('e-no-arrow',  dict(replacements=[('⤢', 'maximize')])),
+              ('f-ascii-sym', dict(replacements=[('★', '*'), ('–', '-'), ('…', '...')])),
           ]
           os.makedirs('variants', exist_ok=True)
           for tag, kw in variants:
