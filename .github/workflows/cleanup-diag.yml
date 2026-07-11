@@ -1,0 +1,19 @@
+name: Cleanup diag uploads
+
+# 게시된 1.7.0(update 1104865, Path 이중 전략 이전 빌드) 삭제용 일회용 워크플로.
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete listed 1.7.0 (update 1104865)
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          HTTP_CODE=$(curl -s -o resp.json -w "%{http_code}" \
+            -X DELETE "https://plugins.jetbrains.com/api/updates/1104865" \
+            -H "Authorization: Bearer $PUBLISH_TOKEN")
+          echo "delete 1104865 → HTTP $HTTP_CODE"
+          cat resp.json || true
