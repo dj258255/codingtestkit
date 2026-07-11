@@ -34,7 +34,7 @@ jobs:
 
           def patch_zip(src_zip, dst_zip, version, drop_module_jars=False,
                         strip_changenotes=False, strip_optional_depends=False,
-                        replacements=None):
+                        replacements=None, notes_slice=None):
               with zipfile.ZipFile(src_zip) as zin:
                   names = zin.namelist()
                   with zipfile.ZipFile(dst_zip, 'w', zipfile.ZIP_DEFLATED) as zout:
@@ -43,10 +43,10 @@ jobs:
                           if drop_module_jars and re.search(r'lib/CodingTestKit\.(core|debugger-[a-z]+)\.jar$', n):
                               continue  # 모듈 jar 제외
                           if n.endswith('lib/' + os.path.basename(base).replace('.zip', '.jar')) or re.search(r'lib/CodingTestKit-[0-9.]+\.jar$', n):
-                              data = patch_main_jar(data, version, strip_changenotes, strip_optional_depends, replacements)
+                              data = patch_main_jar(data, version, strip_changenotes, strip_optional_depends, replacements, notes_slice)
                           zout.writestr(n, data)
 
-          def patch_main_jar(jar_bytes, version, strip_changenotes, strip_optional_depends, replacements=None):
+          def patch_main_jar(jar_bytes, version, strip_changenotes, strip_optional_depends, replacements=None, notes_slice=None):
               src = io.BytesIO(jar_bytes)
               out = io.BytesIO()
               with zipfile.ZipFile(src) as jin, zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as jout:
@@ -63,15 +63,31 @@ jobs:
                               xml = re.sub(r'\n\s*<depends optional="true"[^>]*>[^<]*</depends>', '', xml)
                           for old, new in (replacements or []):
                               xml = xml.replace(old, new)
+                          if notes_slice:
+                              m = re.search(r'(<change-notes><!\[CDATA\[)(.*?)(\]\]></change-notes>)', xml, flags=re.S)
+                              body = m.group(2)
+                              i171 = body.find('<h3>v1.7.0</h3>')
+                              i161 = body.find('<h3>v1.6.1</h3>')
+                              i160 = body.find('<h3>v1.6.0</h3>')
+                              if notes_slice == 'new_only':
+                                  new_body = body[i171:i161]
+                              elif notes_slice == 'drop_160':
+                                  new_body = body[i171:i160]
+                              elif notes_slice == 'old_only':
+                                  new_body = body[:i171] + body[i161:]
+                              xml = xml[:m.start()] + m.group(1) + new_body + m.group(3) + xml[m.end():]
                           data = xml.encode('utf-8')
                       jout.writestr(n, data)
               return out.getvalue()
 
           variants = [
-              # 라운드 2: change-notes 내 정확한 유발 문자열 짚기 (전체 노트 유지, 한 요소만 치환)
-              ('d-no-braces', dict(replacements=[('{{SOLUTION}}', 'SOLUTION')])),
-              ('e-no-arrow',  dict(replacements=[('⤢', 'maximize')])),
-              ('f-ascii-sym', dict(replacements=[('★', '*'), ('–', '-'), ('…', '...')])),
+              # 라운드 3: 섹션 단위 이진 탐색.
+              # g: v1.7.0 섹션만 남김 (구버전 섹션 제거 → 크기 절감)
+              # h: v1.6.0 섹션만 제거 (중간 크기)
+              # i: v1.7.0 섹션 제거 = 1.6.1과 동일한 노트 (성공해야 정상 — 대조군)
+              ('g-new-only',  dict(notes_slice='new_only')),
+              ('h-drop-160',  dict(notes_slice='drop_160')),
+              ('i-old-only',  dict(notes_slice='old_only')),
           ]
           os.makedirs('variants', exist_ok=True)
           for tag, kw in variants:
