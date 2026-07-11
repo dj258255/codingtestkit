@@ -29,7 +29,7 @@ import javax.swing.*
 class CodeforcesFetchDialog(
     project: Project,
     private val problemId: String
-) : DialogWrapper(project) {
+, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private var problem: Problem? = null
     private var extracted = false

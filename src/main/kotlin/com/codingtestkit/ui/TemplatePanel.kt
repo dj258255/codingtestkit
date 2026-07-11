@@ -3,6 +3,7 @@ package com.codingtestkit.ui
 import com.codingtestkit.service.I18n
 import com.codingtestkit.model.CodeTemplate
 import com.codingtestkit.model.Language
+import com.codingtestkit.model.ProblemSource
 import com.codingtestkit.service.TemplateService
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
@@ -31,6 +32,17 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         toolTipText = I18n.t("템플릿 이름을 입력하세요", "Enter template name")
     }
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray())
+    /** 이 템플릿을 어느 플랫폼의 기본으로 쓸지 (이슈 #35) — 0 = 지정 안 함 */
+    private val platformDefaultCombo = ComboBox(
+        (listOf(I18n.t("기본 지정 안 함", "Not a default")) + ProblemSource.entries.map {
+            I18n.t("${it.displayName} 기본", "${it.englishName} default")
+        }).toTypedArray()
+    ).apply {
+        toolTipText = I18n.t(
+            "지정하면 해당 플랫폼에서 새 문제를 열 때 이 템플릿이 초기 코드가 됩니다",
+            "When set, new problems on that platform start with this template"
+        )
+    }
     private val saveButton = JButton(I18n.t("저장", "Save"), AllIcons.Actions.MenuSaveall).apply {
         toolTipText = I18n.t("현재 에디터의 코드를 템플릿으로 저장", "Save current editor code as template")
     }
@@ -69,7 +81,19 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             foreground = JBColor.GRAY
         })
         row1.add(languageCombo)
+        row1.add(platformDefaultCombo)
         topPanel.add(row1)
+
+        // {{SOLUTION}} 자리 표시자 안내 (이슈 #35)
+        topPanel.add(JLabel(I18n.t(
+            "팁: 코드에 {{SOLUTION}}을 넣으면 문제별 스텁(리트코드 Solution 등)이 그 자리에 들어갑니다",
+            "Tip: put {{SOLUTION}} in your code where the per-problem stub (e.g. LeetCode Solution) should go"
+        )).apply {
+            alignmentX = LEFT_ALIGNMENT
+            font = font.deriveFont(JBUI.scaleFontSize(10f).toFloat())
+            foreground = JBColor.GRAY
+            border = JBUI.Borders.empty(2, 0, 0, 0)
+        })
 
         // Row 2: 저장 / 불러오기 / 삭제 버튼
         val row2 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
@@ -135,7 +159,11 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         templateListModel.clear()
         val templates = TemplateService.getInstance(project).getTemplates()
         for (t in templates) {
-            templateListModel.addElement("${t.name}||${t.language}")
+            // 세 번째 조각 = 플랫폼 기본 배지 (없으면 빈 문자열, 이슈 #35)
+            val badge = t.defaultForPlatform?.let { p ->
+                ProblemSource.entries.find { it.name == p }?.localizedName() ?: p
+            } ?: ""
+            templateListModel.addElement("${t.name}||${t.language}||$badge")
         }
     }
 
@@ -146,20 +174,44 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             return
         }
 
-        val code = getCurrentEditorCode()
+        val service = TemplateService.getInstance(project)
+        val existing = service.getTemplate(name)
+        // 에디터가 비어도 기존 템플릿의 메타데이터(언어·플랫폼 기본)만 바꾸는 건 허용 — 기존 코드 유지 (이슈 #35)
+        val code = getCurrentEditorCode().ifBlank { existing?.code ?: "" }
         if (code.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t("에디터에 코드가 없습니다.", "No code in editor."), "CodingTestKit")
+            Messages.showWarningDialog(project, I18n.t(
+                "에디터에 코드가 없습니다. (기존 템플릿 수정은 리스트에서 선택 후 저장)",
+                "No code in editor. (To edit an existing template, select it in the list first, then Save.)"
+            ), "CodingTestKit")
             return
         }
 
         val language = Language.entries[languageCombo.selectedIndex]
-        val template = CodeTemplate(
-            name = name,
-            language = language.displayName,
-            code = code
-        )
+        // 플랫폼 기본 지정 (0 = 지정 안 함, 이슈 #35)
+        val platformIdx = platformDefaultCombo.selectedIndex
+        val newPlatform = if (platformIdx > 0) ProblemSource.entries[platformIdx - 1].name else null
 
-        TemplateService.getInstance(project).saveTemplate(template)
+        // 같은 (플랫폼, 언어)에 이미 다른 기본 템플릿이 있으면 교체 여부 확인
+        if (newPlatform != null) {
+            val displaced = service.getTemplates().find {
+                it.name != name && it.defaultForPlatform == newPlatform && it.language == language.displayName
+            }
+            if (displaced != null) {
+                val platformLabel = ProblemSource.entries.first { it.name == newPlatform }.localizedName()
+                val ok = Messages.showYesNoDialog(
+                    project,
+                    I18n.t(
+                        "'${displaced.name}'이(가) 현재 $platformLabel($language) 기본입니다.\n'$name'으로 교체할까요?",
+                        "'${displaced.name}' is currently the $platformLabel ($language) default.\nReplace it with '$name'?"
+                    ),
+                    I18n.t("기본 템플릿 교체", "Replace Default Template"),
+                    Messages.getQuestionIcon()
+                )
+                if (ok != Messages.YES) return
+            }
+        }
+
+        service.saveTemplate(CodeTemplate(name = name, language = language.displayName, code = code, defaultForPlatform = newPlatform))
         refreshTemplateList()
         Messages.showInfoMessage(project, I18n.t("'$name' 템플릿이 저장되었습니다.", "Template '$name' saved."), "CodingTestKit")
     }
@@ -176,8 +228,37 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             return
         }
 
-        WriteCommandAction.runWriteCommandAction(project) {
-            editor.document.setText(template.code)
+        // 작성 중인 코드가 있으면 통째로 덮어쓰기 전에 확인 — 교체/커서 삽입/취소 (이슈 #35)
+        val current = editor.document.text
+        if (current.isNotBlank()) {
+            val choice = Messages.showDialog(
+                project,
+                I18n.t(
+                    "에디터에 작성 중인 코드가 있습니다. 어떻게 불러올까요?",
+                    "The editor already has code. How should the template be loaded?"
+                ),
+                I18n.t("템플릿 불러오기", "Load Template"),
+                arrayOf(
+                    I18n.t("전체 교체", "Replace all"),
+                    I18n.t("커서 위치에 삽입", "Insert at cursor"),
+                    I18n.t("취소", "Cancel")
+                ),
+                0,
+                Messages.getQuestionIcon()
+            )
+            when (choice) {
+                0 -> WriteCommandAction.runWriteCommandAction(project) {
+                    editor.document.setText(template.code)
+                }
+                1 -> WriteCommandAction.runWriteCommandAction(project) {
+                    editor.document.insertString(editor.caretModel.offset, template.code)
+                }
+                else -> return
+            }
+        } else {
+            WriteCommandAction.runWriteCommandAction(project) {
+                editor.document.setText(template.code)
+            }
         }
 
         Messages.showInfoMessage(project, I18n.t("'${template.name}' 템플릿을 불러왔습니다.", "Template '${template.name}' loaded."), "CodingTestKit")
@@ -203,6 +284,16 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private fun previewSelectedTemplate() {
         val template = getSelectedTemplate()
         updatePreviewEditor(template?.code ?: "", template?.language ?: "Java")
+        // 선택한 템플릿의 속성을 입력 폼에 동기화 — 같은 이름으로 재저장(수정)이 자연스럽도록 (이슈 #35)
+        if (template != null) {
+            nameField.text = template.name
+            Language.entries.indexOfFirst { it.displayName == template.language }
+                .takeIf { it >= 0 }?.let { languageCombo.selectedIndex = it }
+            val platformIdx = template.defaultForPlatform?.let { p ->
+                ProblemSource.entries.indexOfFirst { it.name == p }
+            } ?: -1
+            platformDefaultCombo.selectedIndex = if (platformIdx >= 0) platformIdx + 1 else 0
+        }
     }
 
     private fun updatePreviewEditor(code: String, language: String) {
@@ -273,16 +364,19 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             val parts = str.split("||")
             val name = parts.getOrElse(0) { "" }
             val lang = parts.getOrElse(1) { "" }
+            val badge = parts.getOrElse(2) { "" }  // 플랫폼 기본 배지 (이슈 #35)
 
             text = name
-            icon = AllIcons.FileTypes.Any_type
+            icon = if (badge.isNotBlank()) AllIcons.Nodes.Favorite else AllIcons.FileTypes.Any_type
             border = JBUI.Borders.empty(4, 6)
 
+            val badgeText = if (badge.isNotBlank()) " ★$badge" else ""
             if (!isSelected) {
-                // 언어를 오른쪽에 표시하기 위해 HTML 사용
-                text = "<html><b>$name</b> <font color='#888888'>($lang)</font></html>"
+                // 언어·배지를 오른쪽에 표시하기 위해 HTML 사용
+                text = "<html><b>$name</b> <font color='#888888'>($lang)</font>" +
+                    (if (badge.isNotBlank()) " <font color='#e0a030'>★$badge</font>" else "") + "</html>"
             } else {
-                text = "$name ($lang)"
+                text = "$name ($lang)$badgeText"
             }
             return this
         }

@@ -20,7 +20,7 @@ import javax.swing.*
  * 2. 유저가 "Generate token" 클릭
  * 3. 생성된 토큰(ghp_... 또는 github_pat_...)을 JS로 감지 → 자동 저장 & 닫기
  */
-class GitHubLoginDialog(private val project: Project?) : DialogWrapper(project) {
+class GitHubLoginDialog(private val project: Project?, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private val TOKEN_URL = "https://github.com/settings/tokens/new?description=CodingTestKit&scopes=repo"
 

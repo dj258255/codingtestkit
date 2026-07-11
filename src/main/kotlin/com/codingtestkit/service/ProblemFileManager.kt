@@ -49,12 +49,14 @@ object ProblemFileManager {
             File(problemDir, "README.md").also { it.writeText(generateMarkdown(problem)) }
         } else null
 
-        // 코드 파일 생성
+        // 코드 파일 생성 — 초기 코드 우선순위 (이슈 #35):
+        // ① 호출부가 넘긴 templateCode ② 사용자가 지정한 플랫폼 기본 템플릿 ③ 문제별 스텁/기본 코드
         val codeFileName = "${problem.source.mainClassName}.${language.extension}"
         val codeFile = File(problemDir, codeFileName)
         if (!codeFile.exists()) {
-            val code = templateCode ?: problem.initialCode.ifBlank { language.defaultCode(problem.source) }
-            codeFile.writeText(code)
+            val userTemplate = templateCode
+                ?: TemplateService.getInstance(project).findPlatformDefault(problem.source, language)?.code
+            codeFile.writeText(composeInitialCode(userTemplate, problem, language))
         }
 
         // problem.json 저장 (메타데이터 + 테스트 케이스)
@@ -78,6 +80,31 @@ object ProblemFileManager {
         }
 
         return CreatedFiles(problemDir, codeFile, markdownFile)
+    }
+
+    /** 사용자 템플릿에서 문제별 스텁이 들어갈 자리 표시자 (이슈 #35) */
+    const val SOLUTION_PLACEHOLDER = "{{SOLUTION}}"
+
+    /**
+     * 초기 코드 조합 (이슈 #35). 사용자 템플릿과 문제별 스텁(리트코드 Solution 클래스 등)을
+     * 합치는 규칙:
+     * - 템플릿 없음 → 스텁(문제별 initialCode, 없으면 플랫폼×언어 기본 코드)
+     * - 템플릿에 {{SOLUTION}} 있음 → 그 자리에 스텁 삽입
+     * - 문제별 스텁이 있는 플랫폼(리트코드/프로그래머스) → 템플릿 아래에 스텁을 덧붙임.
+     *   리트코드는 문제마다 메서드 시그니처가 달라 템플릿이 미리 알 수 없으므로,
+     *   Solution 구조를 항상 보존해야 제출 호환이 유지된다.
+     * - 스텁이 없는 플랫폼(코드포스 등) → 템플릿만. 기본 코드를 덧붙이면
+     *   main 함수가 중복돼 컴파일이 깨진다.
+     */
+    fun composeInitialCode(userTemplate: String?, problem: Problem, language: Language): String {
+        val stub = problem.initialCode.ifBlank { language.defaultCode(problem.source) }
+        return when {
+            userTemplate == null -> stub
+            userTemplate.contains(SOLUTION_PLACEHOLDER) ->
+                userTemplate.replace(SOLUTION_PLACEHOLDER, problem.initialCode.ifBlank { stub })
+            problem.initialCode.isNotBlank() -> userTemplate.trimEnd() + "\n\n" + problem.initialCode
+            else -> userTemplate
+        }
     }
 
     private const val CTK_MODULE_NAME = "CodingTestKit-Problem"

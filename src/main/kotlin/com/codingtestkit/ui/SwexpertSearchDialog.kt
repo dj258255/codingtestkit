@@ -20,7 +20,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class SwexpertSearchDialog(private val project: Project) : DialogWrapper(project) {
+class SwexpertSearchDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private val searchField = JTextField().apply {
         putClientProperty("JTextField.placeholderText", I18n.t("문제 번호 또는 키워드", "Problem number or keyword"))

@@ -21,7 +21,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class ProgrammersRandomDialog(private val project: Project) : DialogWrapper(project) {
+class ProgrammersRandomDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     // 다이얼로그 열릴 때 백그라운드에서 기출문제 목록을 동적으로 가져옴
     @Volatile private var examCollections: List<Pair<String, String>> = emptyList()

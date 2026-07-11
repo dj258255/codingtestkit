@@ -584,7 +584,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             return
         }
 
-        val dialog = LoginDialog(project, source)
+        val dialog = LoginDialog(project, source, this@ProblemPanel)
         if (dialog.showAndGet()) {
             val cookies = dialog.getCookies()
             if (cookies.isNotBlank()) {
@@ -613,7 +613,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     private fun handleGitHubLogin() {
-        val dialog = GitHubConfigDialog(project)
+        val dialog = GitHubConfigDialog(project, this@ProblemPanel)
         dialog.show()
         updateGitHubButton()
     }
@@ -636,7 +636,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val source = getSelectedSource()
         when (source) {
             ProblemSource.LEETCODE -> {
-                val dialog = LeetCodeSearchDialog(project)
+                val dialog = LeetCodeSearchDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val slug = dialog.selectedProblemSlug ?: return
                     problemIdField.text = slug
@@ -644,7 +644,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.CODEFORCES -> {
-                val dialog = CodeforcesSearchDialog(project)
+                val dialog = CodeforcesSearchDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val id = dialog.selectedProblemId ?: return
                     problemIdField.text = id
@@ -652,7 +652,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.PROGRAMMERS -> {
-                val dialog = ProgrammersSearchDialog(project)
+                val dialog = ProgrammersSearchDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val id = dialog.selectedProblemId ?: return
                     problemIdField.text = id
@@ -660,7 +660,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.SWEA -> {
-                val dialog = SwexpertSearchDialog(project)
+                val dialog = SwexpertSearchDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val id = dialog.selectedProblemId ?: return
                     problemIdField.text = id
@@ -674,7 +674,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         val source = getSelectedSource()
         when (source) {
             ProblemSource.LEETCODE -> {
-                val dialog = LeetCodeRandomDialog(project)
+                val dialog = LeetCodeRandomDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val slugs = dialog.selectedProblemSlugs
                     if (slugs.isEmpty()) return
@@ -682,7 +682,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.CODEFORCES -> {
-                val dialog = CodeforcesRandomDialog(project)
+                val dialog = CodeforcesRandomDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val ids = dialog.selectedProblemIds
                     if (ids.isEmpty()) return
@@ -690,7 +690,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.PROGRAMMERS -> {
-                val dialog = ProgrammersRandomDialog(project)
+                val dialog = ProgrammersRandomDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val ids = dialog.selectedProblemIds
                     if (ids.isEmpty()) return
@@ -698,7 +698,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 }
             }
             ProblemSource.SWEA -> {
-                val dialog = SwexpertRandomDialog(project)
+                val dialog = SwexpertRandomDialog(project, this@ProblemPanel)
                 if (dialog.showAndGet()) {
                     val ids = dialog.selectedProblemIds
                     if (ids.isEmpty()) return
@@ -720,7 +720,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
             )
             return
         }
-        val dialog = MySolvedDialog(project, source)
+        val dialog = MySolvedDialog(project, source, this@ProblemPanel)
         if (dialog.showAndGet()) {
             val id = dialog.selectedProblemId ?: return
             problemIdField.text = id
@@ -926,7 +926,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         if (!JBCefApp.isSupported()) return null
         var result: Problem? = null
         SwingUtilities.invokeAndWait {
-            val dialog = CodeforcesFetchDialog(project, id)
+            val dialog = CodeforcesFetchDialog(project, id, this@ProblemPanel)
             if (dialog.showAndGet()) {
                 result = dialog.getProblem()
             }
@@ -971,7 +971,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 // 4) JCEF 오프스크린도 실패 시 다이얼로그 fallback
                 if (problem == null) {
                     SwingUtilities.invokeAndWait {
-                        val dialog = SweaFetchDialog(project, problemId)
+                        val dialog = SweaFetchDialog(project, problemId, this@ProblemPanel)
                         if (dialog.showAndGet()) {
                             problem = dialog.getProblem()
                         }
@@ -1137,7 +1137,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 .replace(Regex("[^a-z0-9]+"), "-").trim('-')
             else -> problem.id
         }
-        val dialog = CodeSubmitDialog(project, source, submitId, code, language)
+        val dialog = CodeSubmitDialog(project, source, submitId, code, language, this@ProblemPanel)
 
         // 채점 통과(Accepted) 시 자동 GitHub 푸시
         val github = GitHubService.getInstance()

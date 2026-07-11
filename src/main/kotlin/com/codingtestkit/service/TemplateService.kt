@@ -37,6 +37,14 @@ class TemplateService : PersistentStateComponent<TemplateService.TemplateState> 
 
     fun saveTemplate(template: CodeTemplate) {
         val templates = getTemplates()
+        // 플랫폼 기본은 (플랫폼, 언어)당 하나 — 새로 지정하면 기존 지정을 해제 (이슈 #35)
+        if (template.defaultForPlatform != null) {
+            templates.filter {
+                it.name != template.name &&
+                    it.defaultForPlatform == template.defaultForPlatform &&
+                    it.language == template.language
+            }.forEach { it.defaultForPlatform = null }
+        }
         val existingIndex = templates.indexOfFirst { it.name == template.name }
         if (existingIndex >= 0) {
             templates[existingIndex] = template
@@ -45,6 +53,13 @@ class TemplateService : PersistentStateComponent<TemplateService.TemplateState> 
         }
         state.templatesJson = gson.toJson(templates)
     }
+
+    /**
+     * (플랫폼, 언어)로 지정된 기본 템플릿 (이슈 #35).
+     * 새 문제 파일 생성 시 하드코딩 스텁 대신 이 템플릿이 초기 코드가 된다.
+     */
+    fun findPlatformDefault(source: com.codingtestkit.model.ProblemSource, language: com.codingtestkit.model.Language): CodeTemplate? =
+        getTemplates().find { it.defaultForPlatform == source.name && it.language == language.displayName }
 
     fun deleteTemplate(name: String) {
         val templates = getTemplates()

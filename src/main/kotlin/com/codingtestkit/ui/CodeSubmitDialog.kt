@@ -23,7 +23,7 @@ class CodeSubmitDialog(
     private val problemId: String,
     private val code: String,
     private val language: Language
-) : DialogWrapper(project) {
+, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     var onAccepted: (() -> Unit)? = null
     private var submitted = false
