@@ -21,7 +21,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish Plugin
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
+      # Gradle 클라이언트(2.9.0) 우회 진단: 공식 업로드 API를 curl로 직접 호출해
+      # 서버의 원본 응답을 확인한다. 성공하면 이 스텝이 곧 배포다.
+      - name: Upload to Marketplace (direct API)
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: ./gradlew publishPlugin --info --stacktrace
+        run: |
+          ZIP=$(ls build/distributions/CodingTestKit-*.zip | head -1)
+          echo "Uploading: $ZIP"
+          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" \
+            -X POST "https://plugins.jetbrains.com/plugin/uploadPlugin" \
+            -H "Authorization: Bearer $PUBLISH_TOKEN" \
+            -F "xmlId=com.codingtestkit" \
+            -F "channel=default" \
+            -F "file=@$ZIP")
+          echo "HTTP status: $HTTP_CODE"
+          echo "--- server response ---"
+          cat response.json || true
+          echo
+          [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]
