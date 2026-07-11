@@ -1,4 +1,4 @@
-<!-- com.jetbrains.rust 플러그인이 있는 IDE(RustRover 등)에서만 로드되는 확장.
+<!-- RustRover(com.intellij.modules.rustrover 모듈 선언 제품)에서만 로드되는 확장.
      Cargo 실행 구성을 debug로 돌리는 Rust 디버그 어댑터를 여기서 등록한다. -->
 <idea-plugin>
     <extensions defaultExtensionNs="com.codingtestkit">

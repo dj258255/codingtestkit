@@ -207,8 +207,12 @@
     <depends optional="true" config-file="codingtestkit-go.xml">org.jetbrains.plugins.go</depends>
     <!-- Python 테스트 디버깅 (이슈 #36 Tier 2). PythonCore(Community 포함)가 있는 IDE에서만 로드. -->
     <depends optional="true" config-file="codingtestkit-python.xml">PythonCore</depends>
-    <!-- Rust 테스트 디버깅 (이슈 #36 Tier 3). Rust 플러그인이 있는 IDE(RustRover 등)에서만 로드. -->
-    <depends optional="true" config-file="codingtestkit-rust.xml">com.jetbrains.rust</depends>
+    <!-- Rust 테스트 디버깅 (이슈 #36 Tier 3). RustRover 제품 모듈로 게이트 —
+         플러그인 ID(com.jetbrains.rust)로 게이트하면 IDEA Ultimate+Rust 플러그인 조합에서도
+         로드되는데, 그쪽 Rust 플러그인은 API 시그니처가 달라(attachCargoProject 등)
+         NoSuchMethodError가 난다. 어댑터는 RustRover SDK 기준으로 컴파일됐고
+         IU의 Rust 플러그인엔 네이티브 디버거도 없으므로 RustRover 전용이 맞다. -->
+    <depends optional="true" config-file="codingtestkit-rust.xml">com.intellij.modules.rustrover</depends>
     <!-- C++ 테스트 디버깅 (이슈 #36 Tier 3). CLion에서만 로드. -->
     <depends optional="true" config-file="codingtestkit-cpp.xml">com.intellij.clion</depends>
     <!-- JavaScript(Node) 테스트 디버깅 (이슈 #36). NodeJS 플러그인이 있는 IDE(WebStorm 등)에서만 로드. -->
