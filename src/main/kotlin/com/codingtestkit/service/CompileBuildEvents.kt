@@ -12,7 +12,6 @@ import com.intellij.build.events.FileMessageEventResult
 import com.intellij.build.events.FinishBuildEvent
 import com.intellij.build.events.MessageEvent
 import com.intellij.build.events.MessageEventResult
-import com.intellij.build.events.OutputBuildEvent
 import com.intellij.build.events.StartBuildEvent
 import com.intellij.openapi.project.Project
 import com.intellij.pom.Navigatable
@@ -24,6 +23,8 @@ import com.intellij.pom.Navigatable
  * @ApiStatus.Internal + 생성자 deprecated 로 표시돼 마켓플레이스 검증 경고를
  * 유발한다. 이벤트 타입 자체(BuildEvent, MessageEvent 등)는 전부 공개
  * 인터페이스이므로 여기서 직접 구현해 내부 API 의존을 없앤다.
+ * 단 OutputBuildEvent는 @NonExtendable(구현 금지)이고 2026.x에서 추상 메서드가
+ * 추가돼 직접 구현이 깨진다 — 폴백 원문 출력도 MessageEvent로 전달한다.
  */
 internal open class CompileBuildEvent(
     private val id: Any,
@@ -55,15 +56,6 @@ internal class CompileFinishEvent(
     override fun getResult(): EventResult = object : FailureResult {
         override fun getFailures(): List<Failure> = emptyList()
     }
-}
-
-/** 파싱 실패 시 컴파일러 출력 원문을 콘솔 영역에 그대로 흘린다. */
-internal class CompileOutputEvent(
-    id: Any,
-    message: String,
-    private val stdOut: Boolean,
-) : CompileBuildEvent(id, message), OutputBuildEvent {
-    override fun isStdOut(): Boolean = stdOut
 }
 
 /** 위치 정보 없는 진단 메시지. */

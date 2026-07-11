@@ -53,8 +53,13 @@ object BuildOutputPublisher {
 
         val diags = parse(language, compilerOutput)
         if (diags.isEmpty()) {
-            // 파싱 실패 시 원문 그대로 (여전히 Build 창에서 보는 게 낫다)
-            viewManager.onEvent(buildId, CompileOutputEvent(buildId, compilerOutput + "\n", true))
+            // 파싱 실패 시 원문 전체를 detail로 전달 (여전히 Build 창에서 보는 게 낫다).
+            // OutputBuildEvent는 @NonExtendable이라 직접 구현할 수 없어 MessageEvent를 쓴다.
+            val headline = compilerOutput.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+                ?: I18n.t("컴파일 실패", "Compilation failed")
+            viewManager.onEvent(buildId, CompileMessageEvent(
+                buildId, MessageEvent.Kind.ERROR, "Compiler", headline, compilerOutput
+            ))
         } else {
             for (d in diags) {
                 // 임시 파일 진단을 실제 소스로 매핑 가능한 경우에만 클릭 이동 부여
@@ -68,7 +73,8 @@ object BuildOutputPublisher {
                 if (target != null && d.line > 0) {
                     viewManager.onEvent(buildId, CompileFileMessageEvent(
                         buildId, d.severity, "Compiler", d.message, d.detail,
-                        FilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0))
+                        // 3-인자 생성자는 제거 예정(scheduled for removal) — 시작=끝인 5-인자 사용
+                        FilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0), d.line - 1, (d.column - 1).coerceAtLeast(0))
                     ))
                 } else {
                     viewManager.onEvent(buildId, CompileMessageEvent(

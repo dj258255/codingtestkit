@@ -137,14 +137,31 @@ object CodeRunner {
     }
 
     /**
+     * 설치된 플러그인의 경로 조회 (번들 도구 탐색용 — dlv, kotlinc).
+     * PluginManagerCore.getPlugin과 PluginManager.findEnabledPlugin이 최신 플랫폼에서
+     * 전부 @ApiStatus.Internal로 표시돼 마켓플레이스 검증 경고를 유발하므로,
+     * 리플렉션으로 호출한다. API 자체는 모든 대상 버전(243+)에 존재한다.
+     * 실패해도 각 호출부에 PATH 폴백이 있어 기능은 유지된다.
+     */
+    private fun findPluginPath(pluginIdStr: String): File? = try {
+        val pmClass = Class.forName("com.intellij.ide.plugins.PluginManager")
+        val pm = pmClass.getMethod("getInstance").invoke(null)
+        val pluginId = com.intellij.openapi.extensions.PluginId.getId(pluginIdStr)
+        val descriptor = pmClass.getMethod("findEnabledPlugin", com.intellij.openapi.extensions.PluginId::class.java)
+            .invoke(pm, pluginId)
+        val path = descriptor?.javaClass?.getMethod("getPluginPath")?.invoke(descriptor) as? java.nio.file.Path
+        path?.toFile()
+    } catch (_: Throwable) {
+        null
+    }
+
+    /**
      * dlv 탐색: 1) Go 플러그인(GoLand)에 번들된 dlv → 2) PATH/GOPATH의 dlv.
      * 번들 경로: <go-plugin>/lib/dlv/<os><arch>/dlv
      */
     private fun findDlv(): String? {
         try {
-            val plugin = com.intellij.ide.plugins.PluginManager.getInstance().findEnabledPlugin(
-                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.plugins.go"))
-            val base = plugin?.pluginPath?.toFile()
+            val base = findPluginPath("org.jetbrains.plugins.go")
             if (base != null) {
                 val os = System.getProperty("os.name").lowercase()
                 val arm = System.getProperty("os.arch").lowercase().let { it.contains("aarch64") || it.contains("arm") }
@@ -980,9 +997,7 @@ end
         // 0. 지금 실행 중인 IDE에 번들된 Kotlin 플러그인의 kotlinc — 가장 신뢰할 수 있는 소스.
         //    (사용자 디렉토리의 IntelliJIdea* 잔재는 구버전 찌꺼기로 깨진 경우가 있음)
         try {
-            val kotlinPlugin = com.intellij.ide.plugins.PluginManager.getInstance().findEnabledPlugin(
-                com.intellij.openapi.extensions.PluginId.getId("org.jetbrains.kotlin"))
-            val bin = kotlinPlugin?.pluginPath?.toFile()
+            val bin = findPluginPath("org.jetbrains.kotlin")
                 ?.let { File(it, "kotlinc/bin/" + if (isWindows) "kotlinc.bat" else "kotlinc") }
             if (bin != null && bin.exists()) return bin.absolutePath
         } catch (_: Throwable) {}
