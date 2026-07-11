@@ -12,7 +12,7 @@ import com.intellij.util.ui.JBUI
 import java.awt.*
 import javax.swing.*
 
-class GitHubConfigDialog(private val project: Project?) : DialogWrapper(project) {
+class GitHubConfigDialog(private val project: Project?, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private val github = GitHubService.getInstance()
 

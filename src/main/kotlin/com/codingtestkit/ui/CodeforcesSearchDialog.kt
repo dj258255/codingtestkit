@@ -15,7 +15,7 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
 
-class CodeforcesSearchDialog(private val project: Project) : DialogWrapper(project) {
+class CodeforcesSearchDialog(private val project: Project, parent: java.awt.Component? = null) : DialogWrapper(project, parent, true, com.intellij.openapi.ui.DialogWrapper.IdeModalityType.IDE) {
 
     private val searchField = JTextField().apply {
         putClientProperty("JTextField.placeholderText", I18n.t("문제 이름 또는 번호 입력", "Enter problem name or number"))
