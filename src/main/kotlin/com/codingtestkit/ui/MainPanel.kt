@@ -192,7 +192,11 @@ class MainPanel(
             add(problemPanel, BorderLayout.CENTER)
         } else {
             remove(problemPanel)
-            tabbedPane.setComponentAt(0, problemPanel)
+            // 최대화 때 problemPanel을 재부모화하면서 "문제" 탭이 통째로 제거됐다
+            // (JTabbedPane은 내용 컴포넌트가 빠지면 removeTabAt으로 탭 자체를 없앤다).
+            // 따라서 setComponentAt으로 index 0을 덮으면 "테스트" 탭 내용을 망가뜨린다 —
+            // insertTab으로 제목·아이콘까지 index 0에 새로 꽂아 "문제" 탭을 복원한다.
+            tabbedPane.insertTab(I18n.t("문제", "Problems"), AllIcons.Actions.Download, problemPanel, null, 0)
             add(tabbedPane, BorderLayout.CENTER)
             tabbedPane.selectedIndex = 0
         }

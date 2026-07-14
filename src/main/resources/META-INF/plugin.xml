@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.codingtestkit</id>
     <name>CodingTestKit</name>
-    <version>1.7.0</version>
+    <version>1.7.1</version>
     <vendor email="dj258255@naver.com" url="https://github.com/dj258255/codingtestkit">Su Beom</vendor>
 
     <description><![CDATA[
@@ -157,6 +157,19 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.7.1</h3>
+        <p><b>Fix:</b> maximizing the problem statement no longer deletes tabs.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[Fix] Maximize/restore deleting tabs</b> – After maximizing the problem statement (⤢), restoring removed the "Problems" tab and left the statement stuck under the "Tests" tab; repeating the toggle dropped one more tab each cycle. Restore now re-inserts the "Problems" tab correctly. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[수정] 최대화/복원 시 탭이 사라지던 문제</b> – 지문 최대화(⤢) 후 복원하면 "문제" 탭이 사라지고 지문이 "테스트" 탭에 눌어붙었으며, 토글을 반복할 때마다 탭이 하나씩 더 사라졌습니다. 이제 복원 시 "문제" 탭이 올바르게 되살아납니다. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
+        </ul>
+
         <h3>v1.7.0</h3>
         <p><b>Per-test-case debugging (8 languages)</b>, <b>adversarial test generation</b>, <b>problem view maximize</b>, <b>embedded-page dark mode</b>, and <b>platform default templates</b>.</p>
 
@@ -180,21 +193,6 @@
             <li><b>[신규] 플랫폼 기본 템플릿</b> – 템플릿을 플랫폼 기본(★)으로 지정하면 그 플랫폼의 새 문제가 해당 템플릿으로 시작합니다. (플랫폼+언어당 1개, 중복 지정 시 확인 후 교체) <code>{{SOLUTION}}</code> 자리표시자로 플랫폼 제공 코드(예: LeetCode <code>Solution</code> 클래스)의 삽입 위치를 지정할 수 있습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
             <li><b>[신규] 컴파일 진단을 Build Output 창에 표시</b> – 컴파일 경고·오류가 테스트 출력 패널 대신 IDE Build Output 창에 파일 위치 클릭 가능하게 표시됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
             <li><b>[수정] 분리된 도구 창 뒤에 숨는 다이얼로그</b> – 도구 창을 분리(floating)했을 때 검색·랜덤·로그인·제출 다이얼로그가 창 뒤가 아니라 앞에 뜹니다.</li>
-        </ul>
-
-        <h3>v1.6.1</h3>
-        <p><b>Codeforces fetching on Linux</b> + <b>instant UI language switching.</b></p>
-
-        <b>English</b>
-        <ul>
-            <li><b>[Fix] Codeforces fetch on Linux</b> – The invisible (offscreen) browser cannot complete Cloudflare's canvas-rendering challenge on Linux due to a CEF-level offscreen paint/requestAnimationFrame issue (reproduced in CI). On Linux, fetching now goes straight to the visible fallback dialog (a real window renders correctly and passes the check); the passed <code>cf_clearance</code> cookie is cached so only the first problem shows the dialog and later fetches are silent. macOS/Windows keep the invisible automatic path.</li>
-            <li><b>[New] Instant UI language switching</b> – Changing the UI language (Korean/English) in Settings now updates all panels immediately without reopening the tool window; the current tab is preserved.</li>
-        </ul>
-
-        <b>한국어</b>
-        <ul>
-            <li><b>[수정] 리눅스 Codeforces 가져오기</b> – 안 보이는(오프스크린) 브라우저가 리눅스에서 CEF 오프스크린 페인트/requestAnimationFrame 문제로 Cloudflare의 canvas 렌더 챌린지를 통과하지 못하는 것을 CI로 확인. 리눅스는 이제 곧바로 보이는 폴백 다이얼로그(실제 창은 정상 렌더 → 통과)로 가며, 통과한 <code>cf_clearance</code> 쿠키를 캐싱해 첫 문제만 다이얼로그가 뜨고 이후는 조용히 가져온다. macOS/Windows는 안 보이는 자동 경로 유지.</li>
-            <li><b>[신규] UI 언어 즉시 전환</b> – 설정에서 UI 언어(한국어/English)를 바꾸면 도구 창을 다시 열지 않아도 모든 패널이 즉시 갱신된다. 보던 탭은 유지.</li>
         </ul>
 
     ]]></change-notes>
