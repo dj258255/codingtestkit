@@ -1,0 +1,18 @@
+// 플러그인 검증기가 무시할 알려진 문제 (이슈 #36 작업 중 정리)
+//
+// 형식: <플러그인 ID>:<버전(비우면 모든 버전)>:<문제 메시지 앞부분>
+//
+// org.rust는 RustRover에 들어있는 Rust 플러그인의 패키지다. 우리 Rust 디버그
+// 어댑터는 plugin.xml의 optional depends(com.intellij.modules.rustrover)가
+// 만족될 때 — 즉 RustRover에서만 — 로드되므로, IntelliJ IDEA Community로
+// 검증하면 이 패키지를 해석할 수 없는 게 정상이다. IC에서는 어댑터 자체가
+// 로드되지 않아 런타임에 NoClassDefFoundError가 날 경로가 없다.
+//
+// 같은 이유로 com.goide(GoLand)·com.jetbrains.python(PyCharm) 참조도 해석되지
+// 않지만 검증기는 그쪽은 보고하지 않는다 — 검증기가 아는 패키지 목록의 차이일
+// 뿐이라 코드 구조는 세 어댑터가 동일하다.
+//
+// 이 줄은 'org.rust 패키지 없음'만 무시한다. 다른 호환성 문제는 그대로 빌드를
+// 실패시킨다. Rust 어댑터의 실제 호환성을 확인하려면 RustRover를 검증 대상
+// IDE로 추가하면 된다 (build.gradle.kts의 pluginVerification.ides).
+com.codingtestkit::Package 'org.rust' is not found

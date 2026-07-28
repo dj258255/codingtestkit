@@ -63,6 +63,8 @@ intellijPlatform {
             ide(ic, "2025.1.7")
             ide(ic, "2025.2.6.1")
         }
+        // IC에서는 해석될 수 없는 IDE 전용 패키지(org.rust)만 무시한다 — 사유는 파일 주석 참고
+        ignoredProblemsFile = file(".verifier-ignored-problems.txt")
         failureLevel = listOf(
             org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES
