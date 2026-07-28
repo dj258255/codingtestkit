@@ -49,10 +49,11 @@ object TestFormatInterpreter {
      * @param seed null이면 매번 다른 결과, 값을 주면 재현 가능
      */
     fun generate(source: String, seed: Long? = null): String {
-        val nodes = Parser(source).parseTemplate(topLevel = true)
+        val parser = Parser(source)
+        val nodes = parser.parseTemplate(topLevel = true)
         val out = StringBuilder()
         val rng = if (seed != null) Random(seed) else Random.Default
-        Evaluator(rng, out).run(nodes, HashMap())
+        Evaluator(rng, out, parser.macros).run(nodes, HashMap())
         return out.toString()
     }
 
@@ -83,12 +84,29 @@ object TestFormatInterpreter {
         data class Ref(val name: String, val line: Int, val col: Int) : Expr()
         data class Bin(val op: Char, val l: Expr, val r: Expr, val line: Int, val col: Int) : Expr()
         data class Neg(val e: Expr) : Expr()
+        /** 집계: sum/min/max/len — 배열·구조 라벨을 수식 안에서 쓰게 한다 */
+        data class Agg(val fn: String, val target: String, val line: Int, val col: Int) : Expr()
     }
+
+    /** 내장 함수 이름 — 매크로가 덮어쓸 수 없다 */
+    private val RESERVED = setOf(
+        "const", "rand", "rand_float", "array", "string", "perm0", "perm1",
+        "array2d", "tree", "graph", "bipartite_graph", "anti_hash_int", "anti_hash_str",
+        "repeat", "def", "sum", "min", "max", "len"
+    )
+
+    private val AGGREGATES = setOf("sum", "min", "max", "len")
 
     // ───────────────────────── 파서 ─────────────────────────
 
+    /** 매크로 정의 — 본문은 평범한 템플릿, 파라미터는 수식 자리에 쓰인다 */
+    private class Macro(val name: String, val params: List<String>, val body: List<Node>)
+
     private class Parser(private val src: String) {
         private var pos = 0
+
+        /** def로 정의된 매크로들 (파싱 중 수집) */
+        val macros = HashMap<String, Macro>()
 
         private fun lineColOf(at: Int): Pair<Int, Int> {
             var line = 1; var col = 1
@@ -125,6 +143,12 @@ object TestFormatInterpreter {
                     val start = pos
                     val name = readIdent()
                     val afterName = pos
+                    // def name(params) { ... } — 매크로 정의는 출력 없이 등록만
+                    if (name == "def") {
+                        flushLiteral()
+                        parseMacroDef(start)
+                        continue
+                    }
                     skipSpacesOnly()
                     if (pos < src.length && src[pos] == '(') {
                         flushLiteral()
@@ -142,6 +166,73 @@ object TestFormatInterpreter {
             if (!topLevel) fail("unterminated block — missing '}'")
             flushLiteral()
             return nodes
+        }
+
+        /**
+         * def name(a, b) { ... } — 매크로 정의.
+         * 본문은 평범한 템플릿이고 파라미터는 수식 자리에서 값으로 쓰인다.
+         * 재귀는 없다: 정의 시점에 이미 등록된 매크로만 본문에서 호출할 수 있어
+         * 자기 자신·상호 재귀가 문법 단계에서 차단된다 (정지 보장).
+         */
+        private fun parseMacroDef(startPos: Int) {
+            skipWs()
+            if (pos >= src.length || !isIdentStart(src[pos])) fail("expected macro name after 'def'", startPos)
+            val name = readIdent()
+            if (name in RESERVED) fail("'$name' is a built-in function name", startPos)
+            if (macros.containsKey(name)) fail("macro '$name' is already defined", startPos)
+            skipWs()
+            expect('(')
+            val params = mutableListOf<String>()
+            skipWs()
+            if (src.getOrNull(pos) == ')') pos++ else while (true) {
+                skipWs()
+                if (pos >= src.length || !isIdentStart(src[pos])) fail("expected parameter name")
+                params.add(readIdent())
+                skipWs()
+                when (src.getOrNull(pos)) {
+                    ',' -> pos++
+                    ')' -> { pos++; break }
+                    else -> fail("expected ',' or ')' in parameter list")
+                }
+            }
+            skipWs()
+            expect('{')
+            skipLayoutWhitespace()
+            val body = parseTemplate(topLevel = false)
+            expect('}')
+            skipLayoutWhitespace()
+            // 본문이 아직 정의되지 않은 매크로를 부르면 거부 — 자기 재귀·상호 재귀가
+            // 여기서 막혀 매크로 전개가 반드시 끝난다
+            validateNoForwardCalls(body, name)
+            macros[name] = Macro(name, params, dropTrailingNewline(body))
+        }
+
+        /**
+         * 매크로 본문 끝의 개행 하나를 떼어낸다.
+         *
+         * 줄바꿈은 호출 지점이 정하는 게 자연스럽다 — `repeat { row(3) }`처럼
+         * 한 줄에 호출하면 그 줄의 개행이 이미 있으므로, 본문 끝 개행까지 남으면
+         * 반복마다 빈 줄이 생긴다. 여러 줄을 찍는 매크로의 중간 개행은 그대로 둔다.
+         * (repeat 본문은 반대로 끝 개행이 반복 구분자라 유지한다)
+         */
+        private fun dropTrailingNewline(nodes: List<Node>): List<Node> {
+            val last = nodes.lastOrNull() as? Node.Literal ?: return nodes
+            val trimmed = last.text.trimEnd(' ', '\t', '\r').removeSuffix("\n")
+            if (trimmed == last.text) return nodes
+            return nodes.dropLast(1) + if (trimmed.isEmpty()) emptyList() else listOf(Node.Literal(trimmed))
+        }
+
+        private fun validateNoForwardCalls(nodes: List<Node>, definingName: String) {
+            for (node in nodes) when (node) {
+                is Node.Literal -> {}
+                is Node.Repeat -> validateNoForwardCalls(node.body, definingName)
+                is Node.Call -> {
+                    if (node.name in RESERVED || node.name in macros) continue
+                    val why = if (node.name == definingName) "macros cannot call themselves"
+                              else "unknown function '${node.name}' (macros must be defined before use)"
+                    throw FormatException("in def $definingName(): $why", node.line, node.col)
+                }
+            }
         }
 
         private fun parseCall(name: String, line: Int, col: Int): Node.Call {
@@ -250,7 +341,19 @@ object TestFormatInterpreter {
             }
             if (isIdentStart(c)) {
                 val (l, cc) = lineColOf(pos)
-                return Expr.Ref(readIdent(), l, cc)
+                val id = readIdent()
+                // 집계 함수 호출: sum(a) / len(g) 등 — 인자는 라벨 하나
+                if (id in AGGREGATES) {
+                    skipWs()
+                    expect('(')
+                    skipWs()
+                    if (pos >= src.length || !isIdentStart(src[pos])) fail("$id() takes a label name")
+                    val target = readIdent()
+                    skipWs()
+                    expect(')')
+                    return Expr.Agg(id, target, l, cc)
+                }
+                return Expr.Ref(id, l, cc)
             }
             fail("unexpected character '$c' in expression")
         }
@@ -299,7 +402,11 @@ object TestFormatInterpreter {
 
     // ───────────────────────── 평가기 ─────────────────────────
 
-    private class Evaluator(private val rng: Random, private val out: StringBuilder) {
+    private class Evaluator(
+        private val rng: Random,
+        private val out: StringBuilder,
+        private val macros: Map<String, Macro>
+    ) {
         private var iterations = 0
 
         fun run(nodes: List<Node>, scope: MutableMap<String, Bound>) {
@@ -342,6 +449,7 @@ object TestFormatInterpreter {
                 is Bound.Str -> throw FormatException("'${e.name}' is a string, not a number", e.line, e.col)
                 null -> throw FormatException("unknown label '${e.name}'", e.line, e.col)
             }
+            is Expr.Agg -> evalAggregate(e, scope)
             is Expr.Bin -> {
                 val l = evalExpr(e.l, scope); val r = evalExpr(e.r, scope)
                 when (e.op) {
@@ -351,6 +459,28 @@ object TestFormatInterpreter {
                     '/' -> if (r.isZero()) throw FormatException("division by zero", e.line, e.col) else l.floorDiv(r)
                     else -> throw FormatException("unknown operator '${e.op}'", e.line, e.col)
                 }
+            }
+        }
+
+        /** sum/min/max/len — len은 문자열·구조에도 통하고, 나머지는 숫자 배열 전용 */
+        private fun evalAggregate(e: Expr.Agg, scope: Map<String, Bound>): GenNum {
+            val bound = scope[e.target]
+                ?: throw FormatException("unknown label '${e.target}'", e.line, e.col)
+            if (e.fn == "len") return when (bound) {
+                is Bound.Arr -> GenNum.of(bound.values.size.toLong())
+                is Bound.Rows -> GenNum.of(bound.lines.size.toLong())
+                is Bound.Str -> GenNum.of(bound.value.length.toLong())
+                is Bound.Scalar -> throw FormatException(
+                    "len() needs an array, string, or structure; '${e.target}' is a single number", e.line, e.col)
+            }
+            val values = (bound as? Bound.Arr)?.values ?: throw FormatException(
+                "${e.fn}() needs an array of numbers; '${e.target}' is not one (len() may work)", e.line, e.col)
+            if (values.isEmpty()) throw FormatException("${e.fn}() of an empty array", e.line, e.col)
+            return when (e.fn) {
+                "sum" -> values.fold(GenNum.ZERO) { acc, v -> acc + v }
+                "min" -> values.min()
+                "max" -> values.max()
+                else -> throw FormatException("unknown aggregate '${e.fn}'", e.line, e.col)
             }
         }
 
@@ -456,8 +586,35 @@ object TestFormatInterpreter {
                     a.emitRaw("\n")
                     a.bindAndEmit(2, Bound.Str(s2), s2)
                 }
-                else -> throw FormatException("unknown function '${call.name}'", call.line, call.col)
+                else -> {
+                    val macro = macros[call.name]
+                        ?: throw FormatException("unknown function '${call.name}'", call.line, call.col)
+                    expandMacro(macro, call, scope)
+                }
             }
+        }
+
+        /**
+         * 매크로 전개 — 인자를 값으로 평가해 파라미터에 묶고 본문을 실행한다.
+         * 본문에서 만든 라벨은 호출 지역이라 바깥 라벨과 충돌하지 않는다
+         * (같은 헬퍼를 여러 번 불러도 서로 덮어쓰지 않음).
+         */
+        private fun expandMacro(macro: Macro, call: Node.Call, scope: MutableMap<String, Bound>) {
+            if (call.args.size != macro.params.size) throw FormatException(
+                "${macro.name}() expects ${macro.params.size} argument(s), got ${call.args.size}",
+                call.line, call.col)
+            val local = HashMap<String, Bound>(scope)   // 바깥 라벨은 읽을 수 있게 상속
+            for ((i, param) in macro.params.withIndex()) {
+                val a = call.args[i]
+                val value = when {
+                    a.expr != null -> evalExpr(a.expr, scope)
+                    a.ident != null -> evalExpr(Expr.Ref(a.ident, a.line, a.col), scope)
+                    else -> throw FormatException(
+                        "${macro.name}(): argument #${i + 1} must be a number", call.line, call.col)
+                }
+                local[param] = Bound.Scalar(value)
+            }
+            run(macro.body, local)   // 지역 스코프 — 바깥으로 새지 않는다
         }
 
         private fun buildArray(type: String, n: Int, lo: GenNum, hi: GenNum, a: CallArgs): List<GenNum> =

@@ -268,6 +268,121 @@ class TestFormatInterpreterTest {
         assertEquals(listOf("2", "4", "1 2", "1 3", "1 4", "4", "1 2", "1 3", "1 4"), lines)
     }
 
+    // ─── 3단계: 매크로 def + 집계 함수 ───
+
+    @Test
+    fun `macro expands with its arguments`() {
+        val src = """
+            def pair(lo, hi) {
+            rand(lo, lo, a) rand(hi, hi, b)
+            }
+            pair(1, 2)
+            pair(3, 4)
+        """.trimIndent()
+        // 줄바꿈은 호출 지점이 정한다 — 매크로 본문은 끝 개행을 더하지 않는다
+        assertEquals("1 2\n3 4", gen(src))
+    }
+
+    @Test
+    fun `macro labels are local to each call`() {
+        // 매크로 안에서 n을 만들어도 바깥 n을 덮지 않는다
+        val src = """
+            def helper() {
+            rand(99, 99, n)
+            }
+            rand(1, 1, n)helper()const(n, out)
+        """.trimIndent()
+        // 한 줄에 이어 붙인 호출이므로 개행 없이 이어진다.
+        // 핵심은 마지막 값: 매크로 안에서 n=99를 만들어도 바깥 n은 1로 남는다.
+        assertEquals("1991", gen(src))
+    }
+
+    @Test
+    fun `macro can read outer labels and be used in repeat`() {
+        val src = """
+            def row(k) {
+            array(k, r, SPACE, CONSTANT, 7, 7)
+            }
+            const(2, t)
+            repeat(t) {
+            row(3)
+            }
+        """.trimIndent()
+        assertEquals("2\n7 7 7\n7 7 7\n", gen(src))
+    }
+
+    @Test
+    fun `macro recursion is rejected at parse time`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("def f(n) {\nf(n)\n}\nf(1)")
+        }
+        assertTrue(e.message!!.contains("cannot call themselves"), e.message)
+
+        // 상호 재귀도 '아직 정의되지 않은 매크로' 규칙에 걸린다
+        val e2 = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("def a(n) {\nb(n)\n}\ndef b(n) {\na(n)\n}\na(1)")
+        }
+        assertTrue(e2.message!!.contains("must be defined before use"), e2.message)
+    }
+
+    @Test
+    fun `macro cannot shadow a builtin or be redefined`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) { gen("def rand(a) {\nx\n}") }
+        assertTrue(e.message!!.contains("built-in"), e.message)
+
+        val e2 = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("def f() {\nx\n}\ndef f() {\ny\n}")
+        }
+        assertTrue(e2.message!!.contains("already defined"), e2.message)
+    }
+
+    @Test
+    fun `macro arity mismatch is reported`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("def f(a, b) {\nconst(a, x)\n}\nf(1)")
+        }
+        assertTrue(e.message!!.contains("expects 2 argument"), e.message)
+    }
+
+    @Test
+    fun `aggregates over arrays`() {
+        // 배열을 _숨김 라벨로 만들고 집계만 출력
+        assertEquals("15", gen("array(5, _a, SPACE, INCREASING, 1, 100)const(sum(_a), s)"))
+        assertEquals("5", gen("array(5, _a, SPACE, INCREASING, 1, 100)const(len(_a), s)"))
+        assertEquals("1", gen("array(5, _a, SPACE, INCREASING, 1, 100)const(min(_a), s)"))
+        assertEquals("5", gen("array(5, _a, SPACE, INCREASING, 1, 100)const(max(_a), s)"))
+        // 집계를 수식 안에서 사용
+        assertEquals("16", gen("array(5, _a, SPACE, INCREASING, 1, 100)const(sum(_a) + 1, s)"))
+    }
+
+    @Test
+    fun `len works on strings and structures`() {
+        assertEquals("12", gen("string(12, _s)const(len(_s), n)"))
+        assertEquals("4", gen("tree(5, _g)const(len(_g), n)"))       // 간선 n-1개
+        assertEquals("3", gen("array2d(3, 4, 1, 1, _m)const(len(_m), n)")) // 행 수
+    }
+
+    @Test
+    fun `aggregate on wrong kind gives a clear error`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("const(5, x)const(sum(x), y)")
+        }
+        assertTrue(e.message!!.contains("needs an array"), e.message)
+
+        val e2 = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("const(1, x)const(len(unknown), y)")
+        }
+        assertTrue(e2.message!!.contains("unknown label"), e2.message)
+    }
+
+    @Test
+    fun `array label used as a number reports a helpful hint`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("array(3, a, SPACE, CONSTANT, 1, 1)const(a, x)")
+        }
+        assertTrue(e.message!!.contains("len(a)"), "집계 사용법을 안내해야 한다: ${e.message}")
+    }
+
     @Test
     fun `rand_float honors decimals`() {
         val v = gen("rand_float(0, 1, f, 3)").trim()
