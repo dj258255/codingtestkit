@@ -249,6 +249,16 @@
                 implementation="com.codingtestkit.service.DuplicateClassHighlightFilter"/>
         <statusBarWidgetFactory id="CodingTestKit.StatusBar"
                                implementation="com.codingtestkit.ui.CodingTestKitStatusBarFactory"/>
+        <!-- 테스트 입력 생성 형식 (.ctk-format, 이슈 #36).
+             PSI/파서 없이 편집·강조만 필요하므로 language 속성 없이 FileType으로 등록하고,
+             강조는 editorHighlighterProvider(렉서 기반)로 붙인다. 확장자를 플러그인 고유로
+             둔 이유는 범용적인 .format을 전역으로 차지하면 다른 도구의 파일까지 물기 때문. -->
+        <fileType name="CtkFormat"
+                  implementationClass="com.codingtestkit.lang.CtkFormatFileType"
+                  fieldName="INSTANCE"
+                  extensions="ctk-format"/>
+        <editorHighlighterProvider filetype="CtkFormat"
+                                   implementationClass="com.codingtestkit.lang.CtkFormatEditorHighlighterProvider"/>
     </extensions>
 
     <actions>
@@ -277,6 +287,18 @@
                     description="Translate problem description">
                 <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt T"/>
             </action>
+            <!-- 생성 형식 파일 (이슈 #36) — 편집기/프로젝트 뷰의 컨텍스트 메뉴에도 노출 -->
+            <action id="CodingTestKit.GenerateFromFormatFile"
+                    class="com.codingtestkit.lang.GenerateFromFormatFileAction"
+                    text="CodingTestKit: Generate Test Input From This File"
+                    description="Run the .ctk-format generator script and preview the generated input">
+                <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+                <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            </action>
+            <action id="CodingTestKit.ShowFormatDocs"
+                    class="com.codingtestkit.lang.ShowFormatDocsAction"
+                    text="CodingTestKit: Generator Format Syntax"
+                    description="Show the generator format syntax reference"/>
         </group>
     </actions>
 </idea-plugin>

@@ -92,7 +92,46 @@ class TestCaseGeneratorDialog(
         init()
     }
 
+    // ─── 고급 탭: 생성 형식 DSL (이슈 #36) ───
+    private val formatArea = javax.swing.JTextArea(com.codingtestkit.lang.CtkFormatDocs.STARTER_TEMPLATE, 12, 60).apply {
+        font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, JBUI.scaleFontSize(12f))
+    }
+    private val tabs = com.intellij.ui.components.JBTabbedPane()
+
+    /** 고급 탭이 선택돼 있으면 DSL로 생성한다 */
+    private fun isAdvanced(): Boolean = tabs.selectedIndex == 1
+
     override fun createCenterPanel(): JComponent {
+        tabs.addTab(I18n.t("간단", "Simple"), createSimplePanel())
+        tabs.addTab(I18n.t("고급 (형식)", "Advanced (format)"), createAdvancedPanel())
+        return tabs
+    }
+
+    private fun createAdvancedPanel(): JComponent {
+        val panel = JPanel(java.awt.BorderLayout(JBUI.scale(4), JBUI.scale(4)))
+        panel.add(JLabel("<html>" + I18n.t(
+            "글자·줄바꿈은 그대로, <code>이름(...)</code> 호출만 생성값으로 바뀝니다. " +
+                "복잡한 입력 형식(케이스 수·n m·배열들)을 그대로 기술할 수 있습니다.",
+            "Literals pass through; only <code>name(...)</code> calls are replaced. " +
+                "Lets you describe multi-part input formats (case count, n m, arrays) directly."
+        ) + "</html>"), java.awt.BorderLayout.NORTH)
+        panel.add(com.intellij.ui.components.JBScrollPane(formatArea), java.awt.BorderLayout.CENTER)
+
+        val south = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT))
+        south.add(JLabel(I18n.t("시드 (비우면 랜덤):", "Seed (blank = random):")))
+        south.add(seedField)
+        val docsButton = javax.swing.JButton(I18n.t("문법 도움말", "Syntax help"))
+        docsButton.addActionListener { com.codingtestkit.lang.ShowFormatDocsAction.showDocs(null) }
+        south.add(docsButton)
+        south.add(JLabel("<html><i>" + I18n.t(
+            ".ctk-format 파일로 저장하면 구문 강조와 함께 편집할 수 있습니다.",
+            "Save as a .ctk-format file to edit it with syntax highlighting."
+        ) + "</i></html>").apply { foreground = com.intellij.ui.JBColor.GRAY })
+        panel.add(south, java.awt.BorderLayout.SOUTH)
+        return panel
+    }
+
+    private fun createSimplePanel(): JComponent {
         val panel = JPanel(GridBagLayout())
         val gbc = GridBagConstraints().apply {
             anchor = GridBagConstraints.WEST
@@ -178,6 +217,11 @@ class TestCaseGeneratorDialog(
     }
 
     override fun doValidate(): com.intellij.openapi.ui.ValidationInfo? {
+        // 고급 탭은 DSL 문법만 검사한다 (간단 탭의 숫자 필드는 무관)
+        if (isAdvanced()) {
+            val error = com.codingtestkit.service.TestFormatInterpreter.validate(formatArea.text)
+            return error?.let { com.intellij.openapi.ui.ValidationInfo(it.message ?: "invalid format", formatArea) }
+        }
         val cases = caseCountField.text.trim().toIntOrNull()
         if (cases == null || cases !in 1..50) {
             return com.intellij.openapi.ui.ValidationInfo(I18n.t("케이스 수는 1~50", "Cases must be 1–50"), caseCountField)
@@ -201,6 +245,12 @@ class TestCaseGeneratorDialog(
 
     /** OK 이후 호출: 설정대로 입력 문자열들을 생성 */
     fun generateInputs(): List<String> {
+        // 고급 탭 — DSL이 만든 결과 전체가 케이스 하나의 입력이다
+        // (여러 케이스가 필요하면 형식 안에서 repeat로 표현한다)
+        if (isAdvanced()) {
+            val seed = seedField.text.trim().toLongOrNull()
+            return listOf(com.codingtestkit.service.TestFormatInterpreter.generate(formatArea.text, seed))
+        }
         val cases = caseCountField.text.trim().toInt()
         val n = sizeField.text.trim().toInt()
         val min = minField.text.trim().toLong()

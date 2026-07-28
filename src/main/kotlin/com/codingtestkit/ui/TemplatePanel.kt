@@ -233,7 +233,9 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         val code = when (options[choice]) {
             selectionLabel -> editor?.selectionModel?.selectedText ?: ""
             fileLabel -> {
-                val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
+                // createSingleFileDescriptor()는 deprecated — jar 내부를 열지 않는 쪽이
+                // 소스 파일 선택 용도에도 맞는다
+                val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
                     .withTitle(I18n.t("템플릿으로 저장할 파일 선택", "Choose File to Save as Template"))
                 val vf = FileChooser.chooseFile(descriptor, project, null) ?: return
                 String(vf.contentsToByteArray(), vf.charset)
