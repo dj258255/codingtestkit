@@ -98,8 +98,18 @@ class TestCaseGeneratorDialog(
     }
     private val tabs = com.intellij.ui.components.JBTabbedPane()
 
+    /**
+     * 고급 탭 전용 시드 입력칸.
+     * Swing 컴포넌트는 부모가 하나뿐이라 같은 필드를 두 탭에 넣으면 나중 탭으로
+     * 옮겨가며 앞 탭에서 사라진다 — 탭마다 별도 필드를 둔다.
+     */
+    private val advancedSeedField = JTextField("", 10)
+
     /** 고급 탭이 선택돼 있으면 DSL로 생성한다 */
     private fun isAdvanced(): Boolean = tabs.selectedIndex == 1
+
+    /** 현재 탭의 시드 입력칸 */
+    private fun activeSeedField(): JTextField = if (isAdvanced()) advancedSeedField else seedField
 
     override fun createCenterPanel(): JComponent {
         tabs.addTab(I18n.t("간단", "Simple"), createSimplePanel())
@@ -119,7 +129,7 @@ class TestCaseGeneratorDialog(
 
         val south = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT))
         south.add(JLabel(I18n.t("시드 (비우면 랜덤):", "Seed (blank = random):")))
-        south.add(seedField)
+        south.add(advancedSeedField)
         val docsButton = javax.swing.JButton(I18n.t("문법 도움말", "Syntax help"))
         docsButton.addActionListener { com.codingtestkit.lang.ShowFormatDocsAction.showDocs(null) }
         south.add(docsButton)
@@ -219,6 +229,10 @@ class TestCaseGeneratorDialog(
     override fun doValidate(): com.intellij.openapi.ui.ValidationInfo? {
         // 고급 탭은 DSL 문법만 검사한다 (간단 탭의 숫자 필드는 무관)
         if (isAdvanced()) {
+            if (advancedSeedField.text.isNotBlank() && advancedSeedField.text.trim().toLongOrNull() == null) {
+                return com.intellij.openapi.ui.ValidationInfo(
+                    I18n.t("시드가 숫자가 아닙니다", "Seed is not a number"), advancedSeedField)
+            }
             val error = com.codingtestkit.service.TestFormatInterpreter.validate(formatArea.text)
             return error?.let { com.intellij.openapi.ui.ValidationInfo(it.message ?: "invalid format", formatArea) }
         }
@@ -248,7 +262,7 @@ class TestCaseGeneratorDialog(
         // 고급 탭 — DSL이 만든 결과 전체가 케이스 하나의 입력이다
         // (여러 케이스가 필요하면 형식 안에서 repeat로 표현한다)
         if (isAdvanced()) {
-            val seed = seedField.text.trim().toLongOrNull()
+            val seed = activeSeedField().text.trim().toLongOrNull()
             return listOf(com.codingtestkit.service.TestFormatInterpreter.generate(formatArea.text, seed))
         }
         val cases = caseCountField.text.trim().toInt()
