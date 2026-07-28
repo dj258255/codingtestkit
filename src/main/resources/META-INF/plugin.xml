@@ -157,6 +157,27 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.8.0</h3>
+        <p><b>Generator format</b> for describing complex test inputs, plus fixes to Build Output diagnostics, embedded dark mode, and the template panel.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] Test input generator format</b> – Describe a whole input format instead of a single array. Literals pass through and only <code>name(...)</code> calls are replaced; labels bind values for reuse (<code>rand(1, 100, n)</code> then <code>array(n, a)</code>), and <code>_label</code> binds without printing. Generators: <code>const</code>, <code>rand</code>, <code>rand_float</code>, <code>array</code>, <code>array2d</code>, <code>string</code>, <code>perm0</code>/<code>perm1</code>, <code>tree</code> (RANDOM/STAR/PATH/BAMBOO/CATERPILLAR/BINARY), <code>graph</code> (SIMPLE/CONNECTED/DAG/MULTI/TREE, optionally directed and weighted), <code>bipartite_graph</code>. Also <code>repeat(t as i) { … }</code> blocks (nestable), macros via <code>def</code>, aggregates <code>sum</code>/<code>min</code>/<code>max</code>/<code>len</code>, arithmetic, and integers beyond 2^64. Strings, 2-D arrays, trees and graphs now generate on stdin platforms (Codeforces/SWEA) too, not only LeetCode. Save as a <code>.ctk-format</code> file for syntax highlighting, or use the new "Advanced (format)" tab in the generator dialog. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[New] Adversarial number generator</b> – <code>anti_hash_int</code> emits multiples of the bucket prime that libstdc++ will use, collapsing <code>std::unordered_map</code>/<code>set</code> into a single bucket (O(N) per operation) on GCC. <code>anti_hash_str</code> keeps the Thue–Morse colliding pair. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[Fix] Compiler diagnostics missing from Build Output</b> – Since v1.7.0 the Build window showed only an empty "Compilation failed" node. Every diagnostic reused the build's event id and was silently dropped as an id collision. Diagnostics, with clickable file locations, appear again. (<a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
+            <li><b>[Fix] Embedded page dark mode</b> – A bright band no longer appears below pages shorter than the window, the Codeforces header logo is legible on dark, and already-dark pages (the Programmers problem view) are no longer inverted back to light. Pages that render late (SPA) are re-checked after load. (<a href="https://github.com/dj258255/codingtestkit/issues/34">#34</a>)</li>
+            <li><b>[Improved] Template panel</b> – Right-click a template to load it, set it as a platform default (★), or delete it. Saving now asks what to save — the whole editor, the current selection, or a file — and asks for the name last. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] 테스트 입력 생성 형식</b> – 배열 하나가 아니라 입력 형식 전체를 기술합니다. 글자·줄바꿈은 그대로 나오고 <code>이름(...)</code> 호출만 생성값으로 바뀌며, 라벨로 값을 묶어 뒤에서 재사용합니다(<code>rand(1, 100, n)</code> 뒤에 <code>array(n, a)</code>). <code>_라벨</code>은 묶기만 하고 출력하지 않습니다. 생성 함수: <code>const</code>, <code>rand</code>, <code>rand_float</code>, <code>array</code>, <code>array2d</code>, <code>string</code>, <code>perm0</code>/<code>perm1</code>, <code>tree</code>(RANDOM/STAR/PATH/BAMBOO/CATERPILLAR/BINARY), <code>graph</code>(SIMPLE/CONNECTED/DAG/MULTI/TREE, 방향·가중치 선택), <code>bipartite_graph</code>. 여기에 <code>repeat(t as i) { … }</code> 반복(중첩 가능), <code>def</code> 매크로, 집계 <code>sum</code>/<code>min</code>/<code>max</code>/<code>len</code>, 사칙연산, 2^64를 넘는 정수까지 지원합니다. 문자열·2차원 배열·트리·그래프 생성이 이제 리트코드뿐 아니라 stdin 플랫폼(코드포스·SWEA)에서도 됩니다. <code>.ctk-format</code> 파일로 저장하면 구문 강조와 함께 편집할 수 있고, 생성 다이얼로그의 "고급(형식)" 탭에서도 쓸 수 있습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[신규] 저격용 수열 생성</b> – <code>anti_hash_int</code>는 libstdc++가 쓰게 될 버킷 소수의 배수를 만들어 GCC의 <code>std::unordered_map</code>/<code>set</code>을 한 버킷에 몰아 연산당 O(N)으로 떨어뜨립니다. <code>anti_hash_str</code>은 기존 Thue–Morse 충돌 쌍입니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[수정] 컴파일 진단이 Build Output에 표시되지 않던 문제</b> – v1.7.0부터 Build 창에 "컴파일 실패" 빈 노드만 떴습니다. 모든 진단이 빌드와 같은 이벤트 id를 써서 id 충돌로 조용히 버려지고 있었습니다. 이제 파일 위치를 클릭할 수 있는 진단이 다시 표시됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
+            <li><b>[수정] 임베드 페이지 다크 모드</b> – 창보다 짧은 페이지 아래에 밝은 띠가 생기지 않고, 코드포스 헤더 로고가 어두운 배경에서도 보이며, 이미 어두운 페이지(프로그래머스 문제 화면)가 밝게 반전되지 않습니다. 로드 후 늦게 그려지는 SPA는 다시 판정합니다. (<a href="https://github.com/dj258255/codingtestkit/issues/34">#34</a>)</li>
+            <li><b>[개선] 템플릿 패널</b> – 템플릿을 우클릭해 불러오기·플랫폼 기본 지정(★)·삭제를 할 수 있습니다. 저장은 무엇을 저장할지(에디터 전체·선택 영역·파일)를 먼저 묻고 이름은 마지막에 입력받습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
+        </ul>
+
         <h3>v1.7.1</h3>
         <p><b>Fix:</b> maximizing the problem statement no longer deletes tabs.</p>
 
@@ -168,31 +189,6 @@
         <b>한국어</b>
         <ul>
             <li><b>[수정] 최대화/복원 시 탭이 사라지던 문제</b> – 지문 최대화(⤢) 후 복원하면 "문제" 탭이 사라지고 지문이 "테스트" 탭에 눌어붙었으며, 토글을 반복할 때마다 탭이 하나씩 더 사라졌습니다. 이제 복원 시 "문제" 탭이 올바르게 되살아납니다. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
-        </ul>
-
-        <h3>v1.7.0</h3>
-        <p><b>Per-test-case debugging (8 languages)</b>, <b>adversarial test generation</b>, <b>problem view maximize</b>, <b>embedded-page dark mode</b>, and <b>platform default templates</b>.</p>
-
-        <b>English</b>
-        <ul>
-            <li><b>[New] Per-test-case debugging</b> – A debug button on each test case launches the debugger with that case's input, stopping at your breakpoints. Supported: Java/Kotlin (IntelliJ), Go (GoLand), Python (PyCharm), C++ (CLion), Rust (RustRover), JavaScript (WebStorm), Ruby (RubyMine). (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
-            <li><b>[New] Advanced test generation</b> – Generate test inputs by pattern (numbers, arrays, strings, graphs…), including adversarial cases: quicksort-killer sequences, anti-hash strings (Thue–Morse, collides for any odd base mod 2^64), 2D arrays and binary trees. Run a single case, mark unknown-answer cases with a neutral verdict, or plug in a custom checker. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
-            <li><b>[New] Problem statement maximize</b> – Hover the statement and click the ⤢ button to expand it over the whole tool window; the timer progress bar stays visible. Click again to restore. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
-            <li><b>[New] Dark mode for embedded pages</b> – A new embed-theme setting (Auto/Light/Dark) applies to Codeforces login/submission pages and the rendered problem statement; already-dark pages (LeetCode) are left untouched. (<a href="https://github.com/dj258255/codingtestkit/issues/34">#34</a>)</li>
-            <li><b>[New] Platform default templates</b> – Mark a template as the default for a platform (★, one per platform+language; setting a new one replaces the old after confirmation). New problems start from the default template, and the <code>{{SOLUTION}}</code> placeholder controls where the platform-provided code (e.g. LeetCode's <code>Solution</code> class) is inserted. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
-            <li><b>[New] Compiler diagnostics in Build Output</b> – Compile warnings and errors now appear in the IDE Build Output window with clickable file locations, instead of being mixed into the test output panel. (<a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
-            <li><b>[Fix] Dialogs hidden behind a floating tool window</b> – When the tool window is detached, search/random/login/submit dialogs now open in front of it instead of behind.</li>
-        </ul>
-
-        <b>한국어</b>
-        <ul>
-            <li><b>[신규] 테스트 케이스별 디버깅</b> – 각 테스트 케이스의 디버그 버튼으로 해당 입력을 물린 디버거가 실행되어 브레이크포인트에서 멈춥니다. 지원: Java/Kotlin(IntelliJ), Go(GoLand), Python(PyCharm), C++(CLion), Rust(RustRover), JavaScript(WebStorm), Ruby(RubyMine). (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
-            <li><b>[신규] 고급 테스트 생성</b> – 패턴(숫자·배열·문자열·그래프 등)으로 테스트 입력을 생성하며, 저격 케이스도 지원: 퀵소트 킬러 수열, 안티 해시 문자열(Thue–Morse, 홀수 base mod 2^64 전부 충돌), 2차원 배열·이진 트리. 개별 케이스 실행, 정답 미상 케이스의 중립 판정, 커스텀 체커도 사용할 수 있습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
-            <li><b>[신규] 지문 최대화</b> – 지문에 마우스를 올리면 나타나는 ⤢ 버튼으로 지문이 도구 창 전체를 차지합니다. 타이머 프로그레스 바는 계속 표시되며, 다시 누르면 원래 화면으로 복원됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
-            <li><b>[신규] 임베드 페이지 다크 모드</b> – 새 임베드 테마 설정(자동/라이트/다크)이 코드포스 로그인·제출 페이지와 렌더링된 지문에 적용됩니다. 이미 어두운 페이지(LeetCode)는 그대로 둡니다. (<a href="https://github.com/dj258255/codingtestkit/issues/34">#34</a>)</li>
-            <li><b>[신규] 플랫폼 기본 템플릿</b> – 템플릿을 플랫폼 기본(★)으로 지정하면 그 플랫폼의 새 문제가 해당 템플릿으로 시작합니다. (플랫폼+언어당 1개, 중복 지정 시 확인 후 교체) <code>{{SOLUTION}}</code> 자리표시자로 플랫폼 제공 코드(예: LeetCode <code>Solution</code> 클래스)의 삽입 위치를 지정할 수 있습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
-            <li><b>[신규] 컴파일 진단을 Build Output 창에 표시</b> – 컴파일 경고·오류가 테스트 출력 패널 대신 IDE Build Output 창에 파일 위치 클릭 가능하게 표시됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
-            <li><b>[수정] 분리된 도구 창 뒤에 숨는 다이얼로그</b> – 도구 창을 분리(floating)했을 때 검색·랜덤·로그인·제출 다이얼로그가 창 뒤가 아니라 앞에 뜹니다.</li>
         </ul>
 
     ]]></change-notes>
