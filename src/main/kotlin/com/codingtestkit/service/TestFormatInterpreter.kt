@@ -1,0 +1,487 @@
+package com.codingtestkit.service
+
+import com.codingtestkit.ui.TestCaseGenerators
+import kotlin.random.Random
+
+/**
+ * 테스트 입력 생성 DSL 인터프리터 (이슈 #36).
+ *
+ * 리터럴 문자·공백·줄바꿈은 그대로 통과하고 `name(...)` 호출만 생성값으로
+ * 치환한다. 라벨은 생성값을 이름에 묶어 뒤에서 재사용하게 하고, `_라벨`은
+ * 묶기만 하고 출력하지 않는다.
+ *
+ *   const(100, t)
+ *   repeat(t) {
+ *   rand(1, 100, n) rand(n, 1000, m)
+ *   array(n, a, SPACE, RANDOM, 0, 1000)
+ *   }
+ *
+ * 재귀·조건문은 의도적으로 없다 — 예측 가능한 치환기로 남겨 무한 루프와
+ * 정지 문제를 원천 차단한다. 그 이상이 필요하면 별도의 생성기 프로그램
+ * (커스텀 체커와 같은 방식)이 탈출구다.
+ */
+object TestFormatInterpreter {
+
+    /** 한 번 생성에서 만들 수 있는 최대 출력 크기 — 실수로 IDE를 죽이지 않도록 */
+    private const val MAX_OUTPUT = 64 * 1024 * 1024
+    /** 배열 하나의 최대 길이 */
+    private const val MAX_ELEMENTS = 5_000_000
+    /** repeat 총 반복 횟수 상한 (중첩 포함 누적) */
+    private const val MAX_ITERATIONS = 1_000_000
+
+    class FormatException(
+        message: String,
+        val line: Int,
+        val column: Int
+    ) : Exception(if (line > 0) "$message (line $line, col $column)" else message)
+
+    /** 라벨에 묶이는 값 — 스칼라·배열·문자열 */
+    sealed class Bound {
+        data class Scalar(val value: GenNum) : Bound()
+        data class Arr(val values: List<GenNum>) : Bound()
+        data class Str(val value: String) : Bound()
+    }
+
+    /**
+     * 소스를 실행해 테스트 입력 문자열을 만든다.
+     * @param seed null이면 매번 다른 결과, 값을 주면 재현 가능
+     */
+    fun generate(source: String, seed: Long? = null): String {
+        val nodes = Parser(source).parseTemplate(topLevel = true)
+        val out = StringBuilder()
+        val rng = if (seed != null) Random(seed) else Random.Default
+        Evaluator(rng, out).run(nodes, HashMap())
+        return out.toString()
+    }
+
+    /** 문법 검사만 — 편집기 오류 표시용 (실행 없이 파싱만) */
+    fun validate(source: String): FormatException? = try {
+        Parser(source).parseTemplate(topLevel = true); null
+    } catch (e: FormatException) { e }
+
+    // ─────────────────────────── AST ───────────────────────────
+
+    private sealed class Node {
+        data class Literal(val text: String) : Node()
+        data class Call(val name: String, val args: List<Arg>, val line: Int, val col: Int) : Node()
+        data class Repeat(
+            val count: Expr, val counterName: String?, val body: List<Node>,
+            val line: Int, val col: Int
+        ) : Node()
+    }
+
+    /**
+     * 인자 하나. 위치에 따라 수식·라벨·키워드·문자열 중 무엇으로 읽을지가 달라서
+     * (예: array(length, label, SEP, TYPE, min, max)) 원문 형태를 모두 보존한다.
+     */
+    private class Arg(val expr: Expr?, val ident: String?, val str: String?, val line: Int, val col: Int)
+
+    private sealed class Expr {
+        data class Lit(val value: GenNum) : Expr()
+        data class Ref(val name: String, val line: Int, val col: Int) : Expr()
+        data class Bin(val op: Char, val l: Expr, val r: Expr, val line: Int, val col: Int) : Expr()
+        data class Neg(val e: Expr) : Expr()
+    }
+
+    // ───────────────────────── 파서 ─────────────────────────
+
+    private class Parser(private val src: String) {
+        private var pos = 0
+
+        private fun lineColOf(at: Int): Pair<Int, Int> {
+            var line = 1; var col = 1
+            for (i in 0 until at.coerceAtMost(src.length)) {
+                if (src[i] == '\n') { line++; col = 1 } else col++
+            }
+            return line to col
+        }
+
+        private fun fail(message: String, at: Int = pos): Nothing {
+            val (l, c) = lineColOf(at)
+            throw FormatException(message, l, c)
+        }
+
+        /**
+         * 템플릿 본문을 읽는다. 식별자 뒤에 '('가 오면 호출, `repeat`은 블록,
+         * 그 밖의 모든 문자는 리터럴로 통과.
+         */
+        fun parseTemplate(topLevel: Boolean): List<Node> {
+            val nodes = mutableListOf<Node>()
+            val literal = StringBuilder()
+
+            fun flushLiteral() {
+                if (literal.isNotEmpty()) { nodes.add(Node.Literal(literal.toString())); literal.clear() }
+            }
+
+            while (pos < src.length) {
+                val c = src[pos]
+                if (c == '}' && !topLevel) {          // 블록 끝 — 호출자가 소비
+                    flushLiteral(); return nodes
+                }
+                if (c == '}' && topLevel) fail("unmatched '}'")
+                if (isIdentStart(c)) {
+                    val start = pos
+                    val name = readIdent()
+                    val afterName = pos
+                    skipSpacesOnly()
+                    if (pos < src.length && src[pos] == '(') {
+                        flushLiteral()
+                        val (l, cc) = lineColOf(start)
+                        nodes.add(if (name == "repeat") parseRepeat(l, cc) else parseCall(name, l, cc))
+                        continue
+                    }
+                    // 호출이 아니면 식별자 자체가 리터럴 텍스트
+                    literal.append(src, start, afterName)
+                    pos = afterName
+                    continue
+                }
+                literal.append(c); pos++
+            }
+            if (!topLevel) fail("unterminated block — missing '}'")
+            flushLiteral()
+            return nodes
+        }
+
+        private fun parseCall(name: String, line: Int, col: Int): Node.Call {
+            expect('(')
+            val args = parseArgs()
+            return Node.Call(name, args, line, col)
+        }
+
+        /** repeat(expr) { ... } / repeat(expr as i) { ... } */
+        private fun parseRepeat(line: Int, col: Int): Node.Repeat {
+            expect('(')
+            skipWs()
+            val count = parseExpr()
+            skipWs()
+            var counter: String? = null
+            if (pos < src.length && isIdentStart(src[pos])) {
+                val kw = readIdent()
+                if (kw != "as") fail("expected 'as' or ')' in repeat(...)")
+                skipWs()
+                if (pos >= src.length || !isIdentStart(src[pos])) fail("expected counter name after 'as'")
+                counter = readIdent()
+                skipWs()
+            }
+            expect(')')
+            skipWs()
+            expect('{')
+            skipLayoutWhitespace()  // 여는 중괄호 뒤 공백은 서식 — 본문에 넣지 않는다
+            val body = parseTemplate(topLevel = false)
+            expect('}')
+            skipLayoutWhitespace()  // 닫는 중괄호 뒤 공백도 흘린다
+            return Node.Repeat(count, counter, body, line, col)
+        }
+
+        private fun parseArgs(): List<Arg> {
+            val args = mutableListOf<Arg>()
+            skipWs()
+            if (pos < src.length && src[pos] == ')') { pos++; return args }
+            while (true) {
+                skipWs()
+                val (l, c) = lineColOf(pos)
+                val arg = when {
+                    pos < src.length && src[pos] == '"' -> Arg(null, null, readString(), l, c)
+                    // 식별자 하나로 끝나면 라벨/키워드, 뒤에 연산자가 붙으면 수식
+                    pos < src.length && isIdentStart(src[pos]) -> {
+                        val save = pos
+                        val id = readIdent()
+                        skipWs()
+                        val next = src.getOrNull(pos)
+                        if (next == ',' || next == ')') Arg(null, id, null, l, c)
+                        else { pos = save; Arg(parseExpr(), null, null, l, c) }
+                    }
+                    else -> Arg(parseExpr(), null, null, l, c)
+                }
+                args.add(arg)
+                skipWs()
+                when (src.getOrNull(pos)) {
+                    ',' -> { pos++ }
+                    ')' -> { pos++; return args }
+                    null -> fail("unterminated argument list — missing ')'")
+                    else -> fail("expected ',' or ')' in argument list")
+                }
+            }
+        }
+
+        // 수식: 항 (('+'|'-') 항)*, 항: 인자 (('*'|'/') 인자)*
+        fun parseExpr(): Expr {
+            var left = parseTerm()
+            while (true) {
+                skipWs()
+                val op = src.getOrNull(pos) ?: return left
+                if (op != '+' && op != '-') return left
+                val (l, c) = lineColOf(pos)
+                pos++
+                left = Expr.Bin(op, left, parseTerm(), l, c)
+            }
+        }
+
+        private fun parseTerm(): Expr {
+            var left = parseFactor()
+            while (true) {
+                skipWs()
+                val op = src.getOrNull(pos) ?: return left
+                if (op != '*' && op != '/') return left
+                val (l, c) = lineColOf(pos)
+                pos++
+                left = Expr.Bin(op, left, parseFactor(), l, c)
+            }
+        }
+
+        private fun parseFactor(): Expr {
+            skipWs()
+            val c = src.getOrNull(pos) ?: fail("unexpected end of expression")
+            if (c == '-') { pos++; return Expr.Neg(parseFactor()) }
+            if (c == '(') {
+                pos++
+                val e = parseExpr()
+                skipWs()
+                expect(')')
+                return e
+            }
+            if (c.isDigit()) {
+                val start = pos
+                while (pos < src.length && src[pos].isDigit()) pos++
+                val text = src.substring(start, pos)
+                return Expr.Lit(GenNum.parse(text) ?: fail("invalid number '$text'", start))
+            }
+            if (isIdentStart(c)) {
+                val (l, cc) = lineColOf(pos)
+                return Expr.Ref(readIdent(), l, cc)
+            }
+            fail("unexpected character '$c' in expression")
+        }
+
+        // ── 어휘 보조 ──
+
+        private fun isIdentStart(c: Char) = c.isLetter() || c == '_'
+        private fun isIdentPart(c: Char) = c.isLetterOrDigit() || c == '_'
+
+        private fun readIdent(): String {
+            val start = pos
+            while (pos < src.length && isIdentPart(src[pos])) pos++
+            return src.substring(start, pos)
+        }
+
+        private fun readString(): String {
+            pos++ // 여는 따옴표
+            val sb = StringBuilder()
+            while (pos < src.length && src[pos] != '"') {
+                if (src[pos] == '\\' && pos + 1 < src.length) { pos++; }
+                sb.append(src[pos]); pos++
+            }
+            if (pos >= src.length) fail("unterminated string literal")
+            pos++ // 닫는 따옴표
+            return sb.toString()
+        }
+
+        private fun expect(ch: Char) {
+            skipWs()
+            if (pos >= src.length || src[pos] != ch) fail("expected '$ch'")
+            pos++
+        }
+
+        private fun skipWs() { while (pos < src.length && src[pos].isWhitespace()) pos++ }
+        private fun skipSpacesOnly() { while (pos < src.length && (src[pos] == ' ' || src[pos] == '\t')) pos++ }
+
+        /**
+         * 중괄호 바로 뒤의 공백을 흘린다 — 명세대로 '{' / '}' 뒤 공백은 내용이 아니라 서식.
+         * 반복 본문의 구분자(닫는 중괄호 '앞'의 공백·개행)는 본문에 남으므로,
+         * 반복마다 줄바꿈되는 형태는 그대로 유지된다.
+         */
+        private fun skipLayoutWhitespace() {
+            while (pos < src.length && src[pos].isWhitespace()) pos++
+        }
+    }
+
+    // ───────────────────────── 평가기 ─────────────────────────
+
+    private class Evaluator(private val rng: Random, private val out: StringBuilder) {
+        private var iterations = 0
+
+        fun run(nodes: List<Node>, scope: MutableMap<String, Bound>) {
+            for (node in nodes) when (node) {
+                is Node.Literal -> emit(node.text)
+                is Node.Call -> evalCall(node, scope)
+                is Node.Repeat -> {
+                    val count = evalExpr(node.count, scope).toIntOrNull()
+                        ?: throw FormatException("repeat count too large", node.line, node.col)
+                    if (count < 0) throw FormatException("repeat count must be >= 0", node.line, node.col)
+                    iterations += count
+                    if (iterations > MAX_ITERATIONS)
+                        throw FormatException("too many repeat iterations (max $MAX_ITERATIONS)", node.line, node.col)
+                    repeat(count) { i ->
+                        // 반복 카운터는 안쪽 스코프에만 — 바깥 라벨을 덮지 않는다
+                        val inner = if (node.counterName != null) HashMap(scope).also {
+                            it[node.counterName] = Bound.Scalar(GenNum.of(i.toLong()))
+                        } else scope
+                        run(node.body, inner)
+                        // 안쪽에서 만든 라벨은 다음 반복에도 보이게 유지 (같은 이름 재생성이 자연스럽다)
+                        if (inner !== scope) inner.forEach { (k, v) -> if (k != node.counterName) scope[k] = v }
+                    }
+                }
+            }
+        }
+
+        private fun emit(text: String) {
+            if (out.length + text.length > MAX_OUTPUT)
+                throw FormatException("generated output exceeds ${MAX_OUTPUT / (1024 * 1024)} MB", 0, 0)
+            out.append(text)
+        }
+
+        private fun evalExpr(e: Expr, scope: Map<String, Bound>): GenNum = when (e) {
+            is Expr.Lit -> e.value
+            is Expr.Neg -> GenNum.ZERO - evalExpr(e.e, scope)
+            is Expr.Ref -> when (val b = scope[e.name]) {
+                is Bound.Scalar -> b.value
+                is Bound.Arr -> throw FormatException("'${e.name}' is an array; use an aggregate like len(${e.name})", e.line, e.col)
+                is Bound.Str -> throw FormatException("'${e.name}' is a string, not a number", e.line, e.col)
+                null -> throw FormatException("unknown label '${e.name}'", e.line, e.col)
+            }
+            is Expr.Bin -> {
+                val l = evalExpr(e.l, scope); val r = evalExpr(e.r, scope)
+                when (e.op) {
+                    '+' -> l + r
+                    '-' -> l - r
+                    '*' -> l * r
+                    '/' -> if (r.isZero()) throw FormatException("division by zero", e.line, e.col) else l.floorDiv(r)
+                    else -> throw FormatException("unknown operator '${e.op}'", e.line, e.col)
+                }
+            }
+        }
+
+        private fun evalCall(call: Node.Call, scope: MutableMap<String, Bound>) {
+            val a = CallArgs(call, scope, this)
+            when (call.name) {
+                "const" -> {
+                    val v = a.num(0)
+                    a.bindAndEmit(1, Bound.Scalar(v), v.toString())
+                }
+                "rand" -> {
+                    val lo = a.num(0); val hi = a.num(1)
+                    if (lo > hi) a.fail("min > max")
+                    val v = lo.rangeTo(hi, rng)
+                    a.bindAndEmit(2, Bound.Scalar(v), v.toString())
+                }
+                "rand_float" -> {
+                    val lo = a.num(0); val hi = a.num(1)
+                    if (lo > hi) a.fail("min > max")
+                    val decimals = if (a.size > 3) a.num(3).toIntOrNull() ?: a.fail("invalid decimals") else 6
+                    if (decimals !in 0..18) a.fail("decimals must be 0..18")
+                    val lod = lo.toBigInteger().toDouble(); val hid = hi.toBigInteger().toDouble()
+                    val v = lod + (hid - lod) * rng.nextDouble()
+                    val text = String.format("%.${decimals}f", v)
+                    a.bindAndEmit(2, Bound.Str(text), text)
+                }
+                "perm0", "perm1" -> {
+                    val n = a.count(0)
+                    val base = if (call.name == "perm1") 1 else 0
+                    val values = MutableList(n) { GenNum.of((it + base).toLong()) }
+                    values.shuffle(rng)
+                    a.bindAndEmit(1, Bound.Arr(values), values.joinToString(" "))
+                }
+                "string" -> {
+                    val n = a.count(0)
+                    val alphabet = if (a.size > 2) expandAlphabet(a.str(2)) else ('a'..'z').toList()
+                    if (alphabet.isEmpty()) a.fail("alphabet is empty")
+                    val s = buildString(n) { repeat(n) { append(alphabet[rng.nextInt(alphabet.size)]) } }
+                    a.bindAndEmit(1, Bound.Str(s), s)
+                }
+                "array" -> {
+                    val n = a.count(0)
+                    val sep = separatorOf(if (a.size > 2) a.keyword(2) else "SPACE", a)
+                    val type = if (a.size > 3) a.keyword(3) else "RANDOM"
+                    val lo = if (a.size > 4) a.num(4) else GenNum.ZERO
+                    val hi = if (a.size > 5) a.num(5) else GenNum.of(1_000_000_000L)
+                    if (lo > hi) a.fail("min > max")
+                    val values = buildArray(type, n, lo, hi, a)
+                    a.bindAndEmit(1, Bound.Arr(values), values.joinToString(sep))
+                }
+                else -> throw FormatException("unknown function '${call.name}'", call.line, call.col)
+            }
+        }
+
+        private fun buildArray(type: String, n: Int, lo: GenNum, hi: GenNum, a: CallArgs): List<GenNum> =
+            when (type) {
+                "RANDOM" -> List(n) { lo.rangeTo(hi, rng) }
+                "INCREASING" -> List(n) { lo + GenNum.of(it.toLong()) }
+                "DECREASING" -> List(n) { hi - GenNum.of(it.toLong()) }
+                "CONSTANT" -> List(n) { lo }
+                "PERM0" -> MutableList(n) { GenNum.of(it.toLong()) }.also { it.shuffle(rng) }
+                "PERM1" -> MutableList(n) { GenNum.of((it + 1).toLong()) }.also { it.shuffle(rng) }
+                "QUICKSORT_KILLER" -> TestCaseGenerators.quicksortKiller(n).map { GenNum.of(it.toLong()) }
+                else -> a.fail("unknown array type '$type' " +
+                    "(RANDOM, INCREASING, DECREASING, CONSTANT, PERM0, PERM1, QUICKSORT_KILLER)")
+            }
+
+        private fun separatorOf(keyword: String, a: CallArgs): String = when (keyword) {
+            "SPACE" -> " "
+            "NEWLINE" -> "\n"
+            "COMMA" -> ","
+            "NONE" -> ""
+            else -> a.fail("unknown separator '$keyword' (SPACE, NEWLINE, COMMA, NONE)")
+        }
+
+        /** "a-z0-9" 같은 범위 표기를 문자 목록으로 */
+        private fun expandAlphabet(spec: String): List<Char> {
+            val chars = mutableListOf<Char>()
+            var i = 0
+            while (i < spec.length) {
+                if (i + 2 < spec.length && spec[i + 1] == '-') {
+                    val from = spec[i]; val to = spec[i + 2]
+                    if (from <= to) for (c in from..to) chars.add(c) else chars.add(spec[i])
+                    i += 3
+                } else { chars.add(spec[i]); i++ }
+            }
+            return chars
+        }
+
+        fun emitValue(text: String) = emit(text)
+        fun evaluate(e: Expr, scope: Map<String, Bound>) = evalExpr(e, scope)
+
+        /** 호출 인자 접근 도우미 — 위치별로 수식·라벨·키워드·문자열 중 맞는 형태로 읽는다 */
+        private class CallArgs(
+            val call: Node.Call,
+            val scope: MutableMap<String, Bound>,
+            val ev: Evaluator
+        ) {
+            val size: Int get() = call.args.size
+
+            fun fail(message: String): Nothing =
+                throw FormatException("${call.name}(): $message", call.line, call.col)
+
+            private fun arg(i: Int): Arg =
+                call.args.getOrNull(i) ?: fail("missing argument #${i + 1}")
+
+            fun num(i: Int): GenNum {
+                val a = arg(i)
+                a.expr?.let { return ev.evaluate(it, scope) }
+                // 라벨 하나만 쓴 형태도 수식으로 취급 (rand(n, 1000, m)의 n)
+                a.ident?.let { return ev.evaluate(Expr.Ref(it, a.line, a.col), scope) }
+                fail("argument #${i + 1} must be a number")
+            }
+
+            /** 배열 길이·반복 횟수처럼 Int여야 하는 자리 */
+            fun count(i: Int): Int {
+                val n = num(i).toIntOrNull() ?: fail("length must fit in 32 bits")
+                if (n < 0) fail("length must be >= 0")
+                if (n > MAX_ELEMENTS) fail("length exceeds $MAX_ELEMENTS")
+                return n
+            }
+
+            fun keyword(i: Int): String = arg(i).ident?.uppercase()
+                ?: fail("argument #${i + 1} must be a keyword")
+
+            fun str(i: Int): String = arg(i).str
+                ?: fail("argument #${i + 1} must be a quoted string")
+
+            /** 라벨 위치에 값을 묶고, `_` 로 시작하지 않으면 출력도 한다 */
+            fun bindAndEmit(labelIndex: Int, value: Bound, text: String) {
+                val label = arg(labelIndex).ident ?: fail("argument #${labelIndex + 1} must be a label name")
+                scope[label] = value
+                if (!label.startsWith("_")) ev.emitValue(text)
+            }
+        }
+    }
+}
