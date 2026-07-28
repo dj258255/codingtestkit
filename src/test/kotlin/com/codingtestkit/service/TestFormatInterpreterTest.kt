@@ -1,5 +1,6 @@
 package com.codingtestkit.service
 
+import com.codingtestkit.ui.TestCaseGenerators
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.math.BigInteger
@@ -182,6 +183,89 @@ class TestFormatInterpreterTest {
             gen("array(999999999, a, SPACE, CONSTANT, 1, 1)")
         }
         assertTrue(e.message!!.contains("exceeds"), e.message)
+    }
+
+    @Test
+    fun `tree prints n minus 1 edge lines`() {
+        val lines = gen("tree(6, g, PATH)").split("\n")
+        assertEquals(5, lines.size)
+        assertEquals(listOf("1 2", "2 3", "3 4", "4 5", "5 6"), lines)
+        assertEquals(9, gen("tree(10, g)").split("\n").size, "기본 타입 RANDOM도 n-1줄")
+    }
+
+    @Test
+    fun `graph honors type directed and weighted flags`() {
+        val simple = gen("graph(10, 15, g)").split("\n")
+        assertEquals(15, simple.size)
+        assertTrue(simple.all { it.split(" ").size == 2 }, "가중치 없으면 2필드")
+
+        val weighted = gen("graph(10, 12, g, SIMPLE, false, true, 3, 4)").split("\n")
+        assertTrue(weighted.all { it.split(" ").size == 3 }, "가중치 있으면 3필드")
+        assertTrue(weighted.all { it.split(" ")[2].toInt() in 3..4 })
+
+        val dag = gen("graph(12, 20, g, DAG, true)").split("\n")
+        assertTrue(dag.all { val p = it.split(" "); p[0].toInt() < p[1].toInt() }, "DAG는 낮은→높은")
+    }
+
+    @Test
+    fun `bipartite graph and array2d shapes`() {
+        val bip = gen("bipartite_graph(3, 4, 6, g)").split("\n")
+        assertEquals(6, bip.size)
+
+        val grid = gen("array2d(3, 4, 5, 5, g, SPACE, CONSTANT)").split("\n")
+        assertEquals(3, grid.size, "행 수")
+        assertTrue(grid.all { it == "5 5 5 5" }, "각 행은 cols개 값: $grid")
+    }
+
+    @Test
+    fun `anti_hash_int values collide in one bucket`() {
+        val values = gen("anti_hash_int(500, a)").trim().split(" ").map { it.toLong() }
+        assertEquals(500, values.size)
+        val prime = GenStructures.bucketPrimeFor(500)
+        assertTrue(values.all { it % prime == 0L }, "모두 같은 버킷에 몰려야 한다")
+        // 소수를 직접 지정하는 형태
+        val custom = gen("anti_hash_int(10, a, 107897)").trim().split(" ").map { it.toLong() }
+        assertEquals((1..10).map { 107897L * it }, custom)
+    }
+
+    @Test
+    fun `anti_hash_str prints the colliding pair on two lines`() {
+        val lines = gen("anti_hash_str(8, x, y)").split("\n")
+        assertEquals(2, lines.size)
+        assertEquals(lines[0].length, lines[1].length)
+        assertNotEquals(lines[0], lines[1])
+        // 두 문자열은 mod 2^64 다항 해시가 어떤 base에서도 충돌한다
+        assertEquals(
+            TestCaseGenerators.polyHashMod2p64(lines[0], 131),
+            TestCaseGenerators.polyHashMod2p64(lines[1], 131)
+        )
+    }
+
+    @Test
+    fun `structure errors surface with dsl position`() {
+        val e = assertThrows(TestFormatInterpreter.FormatException::class.java) {
+            gen("graph(5, 99, g)")   // n=5 단순 그래프에 간선 99개는 불가능
+        }
+        assertTrue(e.message!!.contains("exceeds"), e.message)
+        assertTrue(e.message!!.contains("graph()"), "함수명이 실려야 한다: ${e.message}")
+
+        val e2 = assertThrows(TestFormatInterpreter.FormatException::class.java) { gen("tree(5, g, NOPE)") }
+        assertTrue(e2.message!!.contains("unknown tree type"), e2.message)
+    }
+
+    @Test
+    fun `structures compose inside repeat`() {
+        // 케이스마다 정점 수를 뽑고 그 크기의 트리를 출력하는 실전 형태
+        val src = """
+            const(2, t)
+            repeat(t) {
+            rand(4, 4, n)
+            tree(n, g, STAR)
+            }
+        """.trimIndent()
+        val lines = gen(src).trimEnd('\n').split("\n")
+        // 첫 줄은 케이스 수, 이후 케이스마다: n 한 줄 + 간선 3줄
+        assertEquals(listOf("2", "4", "1 2", "1 3", "1 4", "4", "1 2", "1 3", "1 4"), lines)
     }
 
     @Test

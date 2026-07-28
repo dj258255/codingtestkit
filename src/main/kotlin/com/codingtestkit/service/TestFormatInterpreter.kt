@@ -35,11 +35,13 @@ object TestFormatInterpreter {
         val column: Int
     ) : Exception(if (line > 0) "$message (line $line, col $column)" else message)
 
-    /** 라벨에 묶이는 값 — 스칼라·배열·문자열 */
+    /** 라벨에 묶이는 값 — 스칼라·배열·문자열·여러 줄 구조(트리/그래프 등) */
     sealed class Bound {
         data class Scalar(val value: GenNum) : Bound()
         data class Arr(val values: List<GenNum>) : Bound()
         data class Str(val value: String) : Bound()
+        /** 줄 단위로 출력되는 구조 — 줄 수가 곧 간선 수/행 수 */
+        data class Rows(val lines: List<String>) : Bound()
     }
 
     /**
@@ -336,6 +338,7 @@ object TestFormatInterpreter {
             is Expr.Ref -> when (val b = scope[e.name]) {
                 is Bound.Scalar -> b.value
                 is Bound.Arr -> throw FormatException("'${e.name}' is an array; use an aggregate like len(${e.name})", e.line, e.col)
+                is Bound.Rows -> throw FormatException("'${e.name}' is a structure; use an aggregate like len(${e.name})", e.line, e.col)
                 is Bound.Str -> throw FormatException("'${e.name}' is a string, not a number", e.line, e.col)
                 null -> throw FormatException("unknown label '${e.name}'", e.line, e.col)
             }
@@ -397,6 +400,61 @@ object TestFormatInterpreter {
                     if (lo > hi) a.fail("min > max")
                     val values = buildArray(type, n, lo, hi, a)
                     a.bindAndEmit(1, Bound.Arr(values), values.joinToString(sep))
+                }
+                "array2d" -> {
+                    val rows = a.count(0); val cols = a.count(1)
+                    if (rows.toLong() * cols > MAX_ELEMENTS)
+                        a.fail("rows * cols exceeds $MAX_ELEMENTS")
+                    val lo = a.num(2); val hi = a.num(3)
+                    if (lo > hi) a.fail("min > max")
+                    val sep = separatorOf(if (a.size > 5) a.keyword(5) else "SPACE", a)
+                    val type = if (a.size > 6) a.keyword(6) else "RANDOM"
+                    val lines = (0 until rows).map { buildArray(type, cols, lo, hi, a).joinToString(sep) }
+                    a.bindAndEmit(4, Bound.Rows(lines), lines.joinToString("\n"))
+                }
+                "tree" -> {
+                    val n = a.count(0)
+                    val type = if (a.size > 2) a.keyword(2) else "RANDOM"
+                    val edges = a.guarded { GenStructures.tree(n, type, rng) }
+                    val lines = edges.map { it.render() }
+                    a.bindAndEmit(1, Bound.Rows(lines), lines.joinToString("\n"))
+                }
+                "graph" -> {
+                    val n = a.count(0); val m = a.count(1)
+                    val type = if (a.size > 3) a.keyword(3) else "SIMPLE"
+                    val directed = if (a.size > 4) a.bool(4) else false
+                    val weighted = if (a.size > 5) a.bool(5) else false
+                    val wmin = if (a.size > 6) a.num(6).toLongOrNull() ?: a.fail("wmin too large") else 1L
+                    val wmax = if (a.size > 7) a.num(7).toLongOrNull() ?: a.fail("wmax too large") else 1_000_000_000L
+                    if (weighted && wmin > wmax) a.fail("wmin > wmax")
+                    val edges = a.guarded {
+                        GenStructures.graph(n, m, type, directed, rng, weighted, wmin, wmax)
+                    }
+                    val lines = edges.map { it.render() }
+                    a.bindAndEmit(2, Bound.Rows(lines), lines.joinToString("\n"))
+                }
+                "bipartite_graph" -> {
+                    val n1 = a.count(0); val n2 = a.count(1); val m = a.count(2)
+                    val directed = if (a.size > 4) a.bool(4) else false
+                    val edges = a.guarded { GenStructures.bipartiteGraph(n1, n2, m, directed, rng) }
+                    val lines = edges.map { it.render() }
+                    a.bindAndEmit(3, Bound.Rows(lines), lines.joinToString("\n"))
+                }
+                "anti_hash_int" -> {
+                    val n = a.count(0)
+                    val prime = if (a.size > 2) a.num(2).toLongOrNull() ?: a.fail("prime too large")
+                                else GenStructures.bucketPrimeFor(n)
+                    if (prime <= 0) a.fail("prime must be positive")
+                    val values = a.guarded { GenStructures.antiHashInts(n, prime) }.map { GenNum.of(it) }
+                    a.bindAndEmit(1, Bound.Arr(values), values.joinToString(" "))
+                }
+                "anti_hash_str" -> {
+                    val len = a.count(0)
+                    val (s1, s2) = TestCaseGenerators.thueMorseAntiHash(len)
+                    // 라벨 둘 — 각각 한 줄로 출력 (충돌하는 문자열 쌍)
+                    a.bindAndEmit(1, Bound.Str(s1), s1)
+                    a.emitRaw("\n")
+                    a.bindAndEmit(2, Bound.Str(s2), s2)
                 }
                 else -> throw FormatException("unknown function '${call.name}'", call.line, call.col)
             }
@@ -475,6 +533,18 @@ object TestFormatInterpreter {
 
             fun str(i: Int): String = arg(i).str
                 ?: fail("argument #${i + 1} must be a quoted string")
+
+            fun bool(i: Int): Boolean = when (keyword(i)) {
+                "TRUE", "YES" -> true
+                "FALSE", "NO" -> false
+                else -> fail("argument #${i + 1} must be true or false")
+            }
+
+            /** 구조 생성기의 인자 검증 실패를 DSL 위치가 실린 오류로 바꾼다 */
+            fun <T> guarded(block: () -> T): T = try { block() }
+                catch (e: IllegalArgumentException) { fail(e.message ?: "invalid arguments") }
+
+            fun emitRaw(text: String) = ev.emitValue(text)
 
             /** 라벨 위치에 값을 묶고, `_` 로 시작하지 않으면 출력도 한다 */
             fun bindAndEmit(labelIndex: Int, value: Bound, text: String) {
