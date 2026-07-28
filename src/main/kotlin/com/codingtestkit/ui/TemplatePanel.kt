@@ -9,6 +9,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -28,23 +30,12 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
 
     private val templateList = JBList<String>()
     private val templateListModel = DefaultListModel<String>()
-    private val nameField = JTextField().apply {
-        toolTipText = I18n.t("템플릿 이름을 입력하세요", "Enter template name")
-    }
     private val languageCombo = ComboBox(Language.entries.map { it.displayName }.toTypedArray())
-    /** 이 템플릿을 어느 플랫폼의 기본으로 쓸지 (이슈 #35) — 0 = 지정 안 함 */
-    private val platformDefaultCombo = ComboBox(
-        (listOf(I18n.t("기본 지정 안 함", "Not a default")) + ProblemSource.entries.map {
-            I18n.t("${it.displayName} 기본", "${it.englishName} default")
-        }).toTypedArray()
-    ).apply {
-        toolTipText = I18n.t(
-            "지정하면 해당 플랫폼에서 새 문제를 열 때 이 템플릿이 초기 코드가 됩니다",
-            "When set, new problems on that platform start with this template"
-        )
-    }
     private val saveButton = JButton(I18n.t("저장", "Save"), AllIcons.Actions.MenuSaveall).apply {
-        toolTipText = I18n.t("현재 에디터의 코드를 템플릿으로 저장", "Save current editor code as template")
+        toolTipText = I18n.t(
+            "에디터 전체·선택 영역·파일을 템플릿으로 저장",
+            "Save the editor, a selection, or a file as a template"
+        )
     }
     private val loadButton = JButton(I18n.t("불러오기", "Load"), AllIcons.Actions.Upload).apply {
         toolTipText = I18n.t("선택한 템플릿을 에디터에 불러오기", "Load selected template into editor")
@@ -66,22 +57,15 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             border = JBUI.Borders.empty(6, 8, 4, 8)
         }
 
-        // Row 1: 이름 + 언어 (WrapLayout으로 반응형)
+        // Row 1: 언어 (이름은 저장 시 마지막에 묻고, 플랫폼 기본은 우클릭 메뉴 — 이슈 #35)
         val row1 = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(4), JBUI.scale(2))).apply {
             alignmentX = LEFT_ALIGNMENT
         }
-        row1.add(JLabel(I18n.t("이름:", "Name:")).apply {
-            font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
-            foreground = JBColor.GRAY
-        })
-        nameField.preferredSize = Dimension(JBUI.scale(120), nameField.preferredSize.height)
-        row1.add(nameField)
         row1.add(JLabel(I18n.t("언어:", "Lang:")).apply {
             font = font.deriveFont(Font.BOLD, JBUI.scaleFontSize(11f).toFloat())
             foreground = JBColor.GRAY
         })
         row1.add(languageCombo)
-        row1.add(platformDefaultCombo)
         topPanel.add(row1)
 
         // {{SOLUTION}} 자리 표시자 안내 (이슈 #35)
@@ -145,13 +129,73 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         deleteButton.addActionListener { deleteTemplate() }
         templateList.addListSelectionListener { previewSelectedTemplate() }
 
-        // 더블클릭으로 불러오기
+        // 더블클릭으로 불러오기 + 우클릭 컨텍스트 메뉴 (이슈 #35)
         templateList.addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mouseClicked(e: java.awt.event.MouseEvent) {
-                if (e.clickCount == 2) loadTemplate()
+                if (e.clickCount == 2 && SwingUtilities.isLeftMouseButton(e)) loadTemplate()
             }
+            override fun mousePressed(e: java.awt.event.MouseEvent) = maybeShowContextMenu(e)
+            override fun mouseReleased(e: java.awt.event.MouseEvent) = maybeShowContextMenu(e)
         })
 
+        refreshTemplateList()
+    }
+
+    /** 우클릭한 항목을 선택하고 컨텍스트 메뉴 표시 (이슈 #35 — 기본 지정을 발견 가능하게) */
+    private fun maybeShowContextMenu(e: java.awt.event.MouseEvent) {
+        if (!e.isPopupTrigger) return
+        val index = templateList.locationToIndex(e.point)
+        if (index < 0) return
+        templateList.selectedIndex = index
+        val template = getSelectedTemplate() ?: return
+
+        val menu = JPopupMenu()
+        menu.add(JMenuItem(I18n.t("에디터에 불러오기", "Load into Editor"), AllIcons.Actions.Upload).apply {
+            addActionListener { loadTemplate() }
+        })
+        val defaultMenu = JMenu(I18n.t("플랫폼 기본으로 지정", "Set as Platform Default")).apply {
+            icon = AllIcons.Nodes.Favorite
+            toolTipText = I18n.t(
+                "지정하면 해당 플랫폼에서 새 문제를 열 때 이 템플릿이 초기 코드가 됩니다",
+                "When set, new problems on that platform start with this template"
+            )
+        }
+        for (src in ProblemSource.entries) {
+            val isCurrent = template.defaultForPlatform == src.name
+            defaultMenu.add(JCheckBoxMenuItem(src.localizedName(), isCurrent).apply {
+                // 이미 기본인 플랫폼을 다시 클릭하면 지정 해제
+                addActionListener { setPlatformDefault(template, if (isCurrent) null else src) }
+            })
+        }
+        menu.add(defaultMenu)
+        menu.addSeparator()
+        menu.add(JMenuItem(I18n.t("삭제", "Delete"), AllIcons.General.Remove).apply {
+            addActionListener { deleteTemplate() }
+        })
+        menu.show(templateList, e.x, e.y)
+    }
+
+    /** 템플릿을 플랫폼 기본으로 지정/해제 (null = 해제, 이슈 #35) */
+    private fun setPlatformDefault(template: CodeTemplate, platform: ProblemSource?) {
+        val service = TemplateService.getInstance(project)
+        if (platform != null) {
+            val displaced = service.getTemplates().find {
+                it.name != template.name && it.defaultForPlatform == platform.name && it.language == template.language
+            }
+            if (displaced != null) {
+                val ok = Messages.showYesNoDialog(
+                    project,
+                    I18n.t(
+                        "'${displaced.name}'이(가) 현재 ${platform.localizedName()}(${template.language}) 기본입니다.\n'${template.name}'으로 교체할까요?",
+                        "'${displaced.name}' is currently the ${platform.englishName} (${template.language}) default.\nReplace it with '${template.name}'?"
+                    ),
+                    I18n.t("기본 템플릿 교체", "Replace Default Template"),
+                    Messages.getQuestionIcon()
+                )
+                if (ok != Messages.YES) return
+            }
+        }
+        service.saveTemplate(template.copy(defaultForPlatform = platform?.name))
         refreshTemplateList()
     }
 
@@ -168,50 +212,66 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun saveTemplate() {
-        val name = nameField.text.trim()
-        if (name.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t("템플릿 이름을 입력하세요.", "Please enter a template name."), "CodingTestKit")
+        // 1) 무엇을 저장할지 먼저 정한다 — 이름은 내용이 정해진 다음 (이슈 #35)
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+        val wholeLabel = I18n.t("현재 에디터 전체", "Whole editor")
+        val selectionLabel = I18n.t("선택 영역", "Selection")
+        val fileLabel = I18n.t("파일에서...", "From file...")
+        val options = mutableListOf(wholeLabel)
+        if (editor?.selectionModel?.hasSelection() == true) options.add(selectionLabel)
+        options.add(fileLabel)
+        options.add(I18n.t("취소", "Cancel"))
+
+        val choice = Messages.showDialog(
+            project,
+            I18n.t("무엇을 템플릿으로 저장할까요?", "What should be saved as the template?"),
+            I18n.t("템플릿 저장", "Save Template"),
+            options.toTypedArray(), 0, Messages.getQuestionIcon()
+        )
+        if (choice < 0 || choice == options.lastIndex) return
+
+        val code = when (options[choice]) {
+            selectionLabel -> editor?.selectionModel?.selectedText ?: ""
+            fileLabel -> {
+                val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
+                    .withTitle(I18n.t("템플릿으로 저장할 파일 선택", "Choose File to Save as Template"))
+                val vf = FileChooser.chooseFile(descriptor, project, null) ?: return
+                String(vf.contentsToByteArray(), vf.charset)
+            }
+            else -> editor?.document?.text ?: ""
+        }
+        if (code.isBlank()) {
+            Messages.showWarningDialog(project, I18n.t("저장할 코드가 없습니다.", "No code to save."), "CodingTestKit")
             return
         }
+
+        // 2) 이름 입력 (이슈 #35 — 마지막 단계)
+        val name = Messages.showInputDialog(
+            project,
+            I18n.t("템플릿 이름:", "Template name:"),
+            I18n.t("템플릿 저장", "Save Template"),
+            Messages.getQuestionIcon()
+        )?.trim()
+        if (name.isNullOrBlank()) return
 
         val service = TemplateService.getInstance(project)
         val existing = service.getTemplate(name)
-        // 에디터가 비어도 기존 템플릿의 메타데이터(언어·플랫폼 기본)만 바꾸는 건 허용 — 기존 코드 유지 (이슈 #35)
-        val code = getCurrentEditorCode().ifBlank { existing?.code ?: "" }
-        if (code.isBlank()) {
-            Messages.showWarningDialog(project, I18n.t(
-                "에디터에 코드가 없습니다. (기존 템플릿 수정은 리스트에서 선택 후 저장)",
-                "No code in editor. (To edit an existing template, select it in the list first, then Save.)"
-            ), "CodingTestKit")
-            return
+        if (existing != null) {
+            val ok = Messages.showYesNoDialog(
+                project,
+                I18n.t("'$name' 템플릿이 이미 있습니다. 덮어쓸까요?", "Template '$name' already exists. Overwrite?"),
+                I18n.t("템플릿 저장", "Save Template"),
+                Messages.getQuestionIcon()
+            )
+            if (ok != Messages.YES) return
         }
 
         val language = Language.entries[languageCombo.selectedIndex]
-        // 플랫폼 기본 지정 (0 = 지정 안 함, 이슈 #35)
-        val platformIdx = platformDefaultCombo.selectedIndex
-        val newPlatform = if (platformIdx > 0) ProblemSource.entries[platformIdx - 1].name else null
-
-        // 같은 (플랫폼, 언어)에 이미 다른 기본 템플릿이 있으면 교체 여부 확인
-        if (newPlatform != null) {
-            val displaced = service.getTemplates().find {
-                it.name != name && it.defaultForPlatform == newPlatform && it.language == language.displayName
-            }
-            if (displaced != null) {
-                val platformLabel = ProblemSource.entries.first { it.name == newPlatform }.localizedName()
-                val ok = Messages.showYesNoDialog(
-                    project,
-                    I18n.t(
-                        "'${displaced.name}'이(가) 현재 $platformLabel($language) 기본입니다.\n'$name'으로 교체할까요?",
-                        "'${displaced.name}' is currently the $platformLabel ($language) default.\nReplace it with '$name'?"
-                    ),
-                    I18n.t("기본 템플릿 교체", "Replace Default Template"),
-                    Messages.getQuestionIcon()
-                )
-                if (ok != Messages.YES) return
-            }
-        }
-
-        service.saveTemplate(CodeTemplate(name = name, language = language.displayName, code = code, defaultForPlatform = newPlatform))
+        // 같은 이름 덮어쓰기 시 기존의 플랫폼 기본 지정은 유지 — 지정/해제는 우클릭 메뉴 담당
+        service.saveTemplate(CodeTemplate(
+            name = name, language = language.displayName, code = code,
+            defaultForPlatform = existing?.defaultForPlatform
+        ))
         refreshTemplateList()
         Messages.showInfoMessage(project, I18n.t("'$name' 템플릿이 저장되었습니다.", "Template '$name' saved."), "CodingTestKit")
     }
@@ -284,15 +344,10 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     private fun previewSelectedTemplate() {
         val template = getSelectedTemplate()
         updatePreviewEditor(template?.code ?: "", template?.language ?: "Java")
-        // 선택한 템플릿의 속성을 입력 폼에 동기화 — 같은 이름으로 재저장(수정)이 자연스럽도록 (이슈 #35)
+        // 선택한 템플릿의 언어를 콤보에 동기화 — 같은 언어로 재저장이 자연스럽도록 (이슈 #35)
         if (template != null) {
-            nameField.text = template.name
             Language.entries.indexOfFirst { it.displayName == template.language }
                 .takeIf { it >= 0 }?.let { languageCombo.selectedIndex = it }
-            val platformIdx = template.defaultForPlatform?.let { p ->
-                ProblemSource.entries.indexOfFirst { it.name == p }
-            } ?: -1
-            platformDefaultCombo.selectedIndex = if (platformIdx >= 0) platformIdx + 1 else 0
         }
     }
 
@@ -347,11 +402,6 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         val selected = templateList.selectedValue ?: return null
         val name = selected.substringBefore("||")
         return TemplateService.getInstance(project).getTemplate(name)
-    }
-
-    private fun getCurrentEditorCode(): String {
-        val editor = FileEditorManager.getInstance(project).selectedTextEditor
-        return editor?.document?.text ?: ""
     }
 
     private class TemplateListRenderer : DefaultListCellRenderer() {
