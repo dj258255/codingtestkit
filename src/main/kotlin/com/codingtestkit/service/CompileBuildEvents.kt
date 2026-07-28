@@ -30,10 +30,11 @@ internal open class CompileBuildEvent(
     private val id: Any,
     private val message: String,
     private val description: String? = null,
+    private val parentId: Any? = null,
 ) : BuildEvent {
     private val eventTime = System.currentTimeMillis()
     override fun getId(): Any = id
-    override fun getParentId(): Any? = null
+    override fun getParentId(): Any? = parentId
     override fun getEventTime(): Long = eventTime
     override fun getMessage(): String = message
     override fun getHint(): String? = null
@@ -58,14 +59,21 @@ internal class CompileFinishEvent(
     }
 }
 
-/** 위치 정보 없는 진단 메시지. */
+/**
+ * 위치 정보 없는 진단 메시지.
+ *
+ * id/parentId 규약: 시작·종료 이벤트만 buildId를 자기 id로 쓰고, 메시지 이벤트는
+ * 반드시 고유 id + parentId=buildId여야 한다. BuildTreeConsoleView가 id로 기존
+ * 노드를 조회하는데, buildId를 id로 재사용하면 루트 노드와 충돌해 debug 로그만
+ * 남기고 이벤트가 조용히 버려진다 (v1.7.0 회귀 — 이슈 #32 재보고 원인).
+ */
 internal open class CompileMessageEvent(
-    id: Any,
+    parentId: Any,
     protected val msgKind: MessageEvent.Kind,
     private val group: String,
     message: String,
     protected val msgDetail: String?,
-) : CompileBuildEvent(id, message, msgDetail), MessageEvent {
+) : CompileBuildEvent(Any(), message, msgDetail, parentId), MessageEvent {
     override fun getKind(): MessageEvent.Kind = msgKind
     override fun getGroup(): String = group
     override fun getNavigatable(project: Project): Navigatable? = null
@@ -77,13 +85,13 @@ internal open class CompileMessageEvent(
 
 /** 파일 위치가 붙은 진단 — 클릭하면 해당 소스 위치로 이동한다. */
 internal class CompileFileMessageEvent(
-    id: Any,
+    parentId: Any,
     kind: MessageEvent.Kind,
     group: String,
     message: String,
     detail: String?,
     private val position: FilePosition,
-) : CompileMessageEvent(id, kind, group, message, detail), FileMessageEvent {
+) : CompileMessageEvent(parentId, kind, group, message, detail), FileMessageEvent {
     override fun getFilePosition(): FilePosition = position
     override fun getNavigatable(project: Project): Navigatable = FileNavigatable(project, position)
     override fun getResult(): FileMessageEventResult = object : FileMessageEventResult {
