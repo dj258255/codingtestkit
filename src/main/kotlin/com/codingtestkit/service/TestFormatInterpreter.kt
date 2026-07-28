@@ -462,6 +462,18 @@ object TestFormatInterpreter {
             }
         }
 
+        /**
+         * 없는 함수 오류 — 협의 과정에서 이름이 갈라진 것들은 대체 함수를 안내한다.
+         * 초기 스펙의 perm/anti_hash는 0-based·1-based 모호성, 숫자·문자열 구분
+         * 때문에 각각 둘로 나뉘었다. 그대로 따라 친 사용자가 헤매지 않도록 한다.
+         */
+        private fun unknownFunctionMessage(name: String): String = when (name) {
+            "perm" -> "unknown function 'perm' — use perm0(n, label) for 0..n-1 or perm1(n, label) for 1..n"
+            "anti_hash" -> "unknown function 'anti_hash' — use anti_hash_int(n, label, [prime]) for " +
+                "unordered_map/set killers or anti_hash_str(length, labelA, labelB) for colliding strings"
+            else -> "unknown function '$name'"
+        }
+
         /** sum/min/max/len — len은 문자열·구조에도 통하고, 나머지는 숫자 배열 전용 */
         private fun evalAggregate(e: Expr.Agg, scope: Map<String, Bound>): GenNum {
             val bound = scope[e.target]
@@ -588,7 +600,7 @@ object TestFormatInterpreter {
                 }
                 else -> {
                     val macro = macros[call.name]
-                        ?: throw FormatException("unknown function '${call.name}'", call.line, call.col)
+                        ?: throw FormatException(unknownFunctionMessage(call.name), call.line, call.col)
                     expandMacro(macro, call, scope)
                 }
             }
