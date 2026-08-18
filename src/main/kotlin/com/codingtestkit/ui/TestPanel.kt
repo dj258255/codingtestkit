@@ -20,6 +20,24 @@ import javax.swing.*
 class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
     companion object {
+        /**
+         * 체커 stdout 첫 줄 → 판정 (이슈 #36).
+         *
+         * OK/AC = 통과, CHECK/UNKNOWN/SKIP = 판정 보류(중립), 그 밖 = 불통과.
+         * 아무것도 출력하지 않은 체커도 보류로 본다 — 판정을 못 낸 것을 FAIL로
+         * 접으면 사용자가 자기 풀이를 의심하게 된다.
+         */
+        internal fun parseCheckerVerdict(output: String): Boolean? {
+            val first = output.lineSequence().firstOrNull()?.trim()?.uppercase() ?: ""
+            return when {
+                first == "OK" || first == "AC" || first.startsWith("OK ") -> true
+                first == "CHECK" || first == "UNKNOWN" || first == "SKIP" ||
+                    first.startsWith("CHECK ") -> null
+                first.isBlank() -> null
+                else -> false
+            }
+        }
+
         /** 이 길이를 넘는 입력은 카드에 미리보기만 표시 (렌더링·sync 보호, 이슈 #36) */
         private const val LARGE_INPUT_CHARS = 100_000
 
@@ -370,9 +388,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         val checker = checkerCode
         if (!checker.isNullOrBlank()) {
-            // 커스텀 체커 판정 (복수 정답 문제, 이슈 #36)
-            val (ok, message) = runChecker(checker, tc, stdout)
-            tc.passed = ok
+            // 커스텀 체커 판정 (복수 정답 문제, 이슈 #36).
+            // 3상태: 통과 / 불통과 / 판정 보류(null → 중립).
+            val (verdict, message) = runChecker(checker, tc, stdout)
+            tc.passed = verdict
             return ExecOutcome(result, message)
         }
 
@@ -399,10 +418,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
-     * 체커 실행: stdin으로 입력/사용자출력/예상출력을 ===CTK=== 구분으로 전달하고,
-     * 체커 stdout 첫 줄이 OK/AC면 통과. 체커 자체가 실패하면 불통과 + 에러 메시지.
+     * 체커 실행: stdin으로 입력/사용자출력/예상출력을 ===CTK=== 구분으로 전달한다.
+     *
+     * 판정은 체커 stdout 첫 줄로 정한다 — OK/AC면 통과, CHECK/UNKNOWN/SKIP이면
+     * 판정 보류(중립), 그 밖은 불통과.
+     *
+     * 보류 상태가 필요한 이유: 체커의 주 용도가 기대 출력 없는 생성 케이스 판정인데,
+     * 판정 못 하는 경우를 전부 FAIL로 접으면 사용자가 자기 풀이를 의심하게 된다.
+     * 같은 이유로 체커 자체가 실행에 실패한 경우도 불통과가 아니라 보류로 둔다 —
+     * 잘못된 건 체커지 풀이가 아니다.
      */
-    private fun runChecker(checkerSrc: String, tc: TestCase, userOut: String): Pair<Boolean, String> {
+    private fun runChecker(checkerSrc: String, tc: TestCase, userOut: String): Pair<Boolean?, String> {
         val payload = buildString {
             append(tc.input.trimEnd()).append('\n')
             append("===CTK===\n")
@@ -415,12 +441,10 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             TestCase(input = payload, expectedOutput = ""), timeoutSeconds = 10
         )
         if (res.exitCode != 0 && res.error.isNotBlank()) {
-            return false to I18n.t("체커 실행 실패: ", "Checker failed: ") + res.error.trim()
+            return null to I18n.t("체커 실행 실패: ", "Checker failed: ") + res.error.trim()
         }
         val out = res.output.trim()
-        val firstLine = out.lineSequence().firstOrNull()?.trim()?.uppercase() ?: ""
-        val ok = firstLine == "OK" || firstLine == "AC" || firstLine.startsWith("OK ")
-        return ok to out
+        return parseCheckerVerdict(out) to out
     }
 
     /** 실행됐지만 판정이 없는 중립 케이스인가 (예상 출력 없음 또는 복수 정답 불일치, 이슈 #36) */

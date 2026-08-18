@@ -27,7 +27,12 @@ import javax.swing.JTextArea
  *   ===CTK===
  *   <예상 출력 (없으면 빈 값)>
  *
- * 체커가 stdout 첫 줄에 "OK"(또는 "AC")를 출력하면 통과, 그 외는 실패.
+ * 판정은 체커 stdout 첫 줄로 정한다:
+ *   OK / AC          → 통과
+ *   CHECK / UNKNOWN / SKIP → 판정 보류(중립) — 기대 출력이 없어 비교할 수 없을 때
+ *   그 밖             → 불통과
+ * 체커가 아무것도 출력하지 못했거나 실행 자체에 실패한 경우도 보류로 둔다.
+ * 판정 못 한 것을 FAIL로 접으면 사용자가 자기 풀이를 의심하게 된다.
  * 체커는 main이 있는 완전한 stdin 프로그램이어야 한다.
  */
 class CheckerDialog(
@@ -79,9 +84,9 @@ class CheckerDialog(
 
         panel.add(JLabel("<html>${I18n.t(
             "stdin: 입력 → <b>===CTK===</b> → 사용자 출력 → <b>===CTK===</b> → 예상 출력. " +
-                "첫 줄에 <b>OK</b> 출력 시 통과.",
+                "첫 줄에 <b>OK</b>=통과, <b>CHECK</b>=판정 보류(중립), 그 외=불통과.",
             "stdin: input → <b>===CTK===</b> → user output → <b>===CTK===</b> → expected output. " +
-                "Print <b>OK</b> on the first line to pass."
+                "First line: <b>OK</b> passes, <b>CHECK</b> holds the verdict (neutral), anything else fails."
         )}</html>").apply {
             foreground = com.intellij.ui.JBColor.GRAY
             font = font.deriveFont(JBUI.scaleFontSize(11f).toFloat())
@@ -105,6 +110,11 @@ class CheckerDialog(
             |user_out = sections[1].strip() if len(sections) > 1 else ""
             |expected = sections[2].strip() if len(sections) > 2 else ""
             |
+            |# 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |if not expected:
+            |    print("CHECK")
+            |    sys.exit(0)
+            |
             |# 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |ok = sorted(user_out.split()) == sorted(expected.split())
             |
@@ -123,6 +133,9 @@ class CheckerDialog(
             |        String input = sec.length > 0 ? sec[0].trim() : "";
             |        String userOut = sec.length > 1 ? sec[1].trim() : "";
             |        String expected = sec.length > 2 ? sec[2].trim() : "";
+            |
+            |        // 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |        if (expected.isEmpty()) { System.out.println("CHECK"); return; }
             |
             |        // 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |        String[] a = userOut.split("\\s+"); Arrays.sort(a);
@@ -151,6 +164,9 @@ class CheckerDialog(
             |    string userOut = sec.size() > 1 ? sec[1] : "";
             |    string expected = sec.size() > 2 ? sec[2] : "";
             |
+            |    // 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |    if (expected.find_first_not_of(" \\t\\r\\n") == string::npos) { cout << "CHECK" << endl; return 0; }
+            |
             |    // 여기에 판정 로직 작성 — 예: 순서 무관 토큰 비교
             |    auto tokens = [](const string& s) {
             |        vector<string> v; string t; stringstream ss(s);
@@ -172,6 +188,9 @@ class CheckerDialog(
             |    val userOut = sec.getOrElse(1) { "" }.trim()
             |    val expected = sec.getOrElse(2) { "" }.trim()
             |
+            |    // 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |    if (expected.isEmpty()) { println("CHECK"); return }
+            |
             |    // 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |    val ok = userOut.split(Regex("\\s+")).sorted() == expected.split(Regex("\\s+")).sorted()
             |
@@ -184,6 +203,9 @@ class CheckerDialog(
             |const input = (sec[0] || '').trim();
             |const userOut = (sec[1] || '').trim();
             |const expected = (sec[2] || '').trim();
+            |
+            |// 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |if (!expected) { console.log('CHECK'); process.exit(0); }
             |
             |// 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |const norm = s => s.split(/\s+/).filter(Boolean).sort().join(' ');
@@ -202,6 +224,9 @@ class CheckerDialog(
             |    let _input = sec.get(0).unwrap_or(&"").trim();
             |    let user_out = sec.get(1).unwrap_or(&"").trim();
             |    let expected = sec.get(2).unwrap_or(&"").trim();
+            |
+            |    // 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |    if expected.is_empty() { println!("CHECK"); return; }
             |
             |    // 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |    let mut a: Vec<&str> = user_out.split_whitespace().collect();
@@ -236,6 +261,12 @@ class CheckerDialog(
             |    }
             |    userOut, expected := get(1), get(2)
             |
+            |    // 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |    if expected == "" {
+            |        fmt.Println("CHECK")
+            |        return
+            |    }
+            |
             |    // 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |    a, b := strings.Fields(userOut), strings.Fields(expected)
             |    sort.Strings(a)
@@ -255,6 +286,12 @@ class CheckerDialog(
             |input = (sec[0] || "").strip
             |user_out = (sec[1] || "").strip
             |expected = (sec[2] || "").strip
+            |
+            |# 기대 출력이 없는 생성 케이스는 비교 대상이 없다 — 판정 보류(중립)
+            |if expected.empty?
+            |  puts "CHECK"
+            |  exit
+            |end
             |
             |# 여기에 판정 로직 작성 — 예: 순서 무관 비교
             |ok = user_out.split.sort == expected.split.sort
