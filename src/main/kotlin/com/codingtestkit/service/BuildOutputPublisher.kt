@@ -4,6 +4,7 @@ import com.codingtestkit.model.Language
 import com.intellij.build.BuildViewManager
 import com.intellij.build.DefaultBuildDescriptor
 import com.intellij.build.FilePosition
+import com.intellij.build.events.BuildEvent
 import com.intellij.build.events.MessageEvent
 import com.intellij.openapi.project.Project
 import java.io.File
@@ -17,10 +18,13 @@ import java.io.File
  * 줄 번호 매핑 주의: 플러그인은 임시 디렉토리에 소스를 써서 컴파일하므로
  * 진단의 파일·줄은 임시 파일 기준이다.
  * - stdin형 실행(코드포스/SWEA 등)은 사용자 코드를 원형 그대로 쓰므로 1:1 → 클릭 이동 가능
- * - 래퍼형(리트코드/프로그래머스)은 진단 파일명이 사용자 파일명과 일치하는 경우만
- *   이동시킨다 (Java는 Solution.java가 별도 파일로 원형 유지, Kotlin은 하네스가
- *   아래에만 붙어 사용자 코드 줄이 보존됨 — 둘 다 이름이 일치. 반면 python은
- *   solution.py처럼 소문자 임시명이라 불일치 → 이동 없이 메시지만)
+ * - 래퍼형(리트코드/프로그래머스)은 두 경우에 이동시킨다:
+ *   (a) 진단 파일명이 사용자 파일명과 일치 (Java는 Solution.java가 별도 파일로 원형 유지)
+ *   (b) 하네스를 사용자 코드 '아래'에만 붙이는 줄 보존 언어
+ *       (python/kotlin/js/rust/ruby — 임시 파일명이 달라도 줄 번호는 1:1)
+ *   그 밖(Go의 package 프리펜드 등)은 이동 없이 메시지만 남긴다.
+ * - 어느 경우든 진단의 줄 번호가 사용자 파일 줄 수를 넘으면 하네스가 낸 것이므로
+ *   이동을 붙이지 않는다.
  */
 object BuildOutputPublisher {
 
@@ -29,15 +33,41 @@ object BuildOutputPublisher {
         language: Language,
         rawError: String,
         userFile: File?,
-        wrapperStyle: Boolean
+        wrapperStyle: Boolean,
+        /** false면 컴파일은 성공했고 경고만 전달하는 것 — 빌드 노드를 실패로 물들이지 않는다 */
+        failed: Boolean = true
     ) {
         val viewManager = project.getService(BuildViewManager::class.java) ?: return
         val buildId = Any()
-        val title = "CodingTestKit: ${language.displayName} " + I18n.t("컴파일", "compile")
-        val descriptor = DefaultBuildDescriptor(buildId, title, project.basePath ?: "", System.currentTimeMillis()).apply {
-            isActivateToolWindowWhenFailed = true // 컴파일 실패 시 Build 창 자동 표시
+        for (event in buildEvents(buildId, project.basePath ?: "", language, rawError, userFile, wrapperStyle, failed)) {
+            viewManager.onEvent(buildId, event)
         }
-        viewManager.onEvent(buildId, CompileStartEvent(descriptor, I18n.t("컴파일 중...", "Compiling...")))
+    }
+
+    /**
+     * 게시할 이벤트 열을 순서대로 만든다 — 순수 함수라 IDE 없이 검증할 수 있다.
+     *
+     * 발행을 이 함수로 분리한 이유는 v1.7.0 회귀(이슈 #32 재보고)가 이벤트 '객체'가
+     * 아니라 '호출부가 넘긴 인자'에서 났기 때문이다. 객체를 직접 만들어 보는 테스트로는
+     * 그 실수를 잡을 수 없어, 실제 발행 순서·id·parentId·이동 대상까지 여기서 검증한다.
+     */
+    internal fun buildEvents(
+        buildId: Any,
+        basePath: String,
+        language: Language,
+        rawError: String,
+        userFile: File?,
+        wrapperStyle: Boolean,
+        failed: Boolean
+    ): List<BuildEvent> {
+        val events = mutableListOf<BuildEvent>()
+        val title = "CodingTestKit: ${language.displayName} " + I18n.t("컴파일", "compile")
+        val descriptor = DefaultBuildDescriptor(buildId, title, basePath, System.currentTimeMillis()).apply {
+            // 실패했을 때만 Build 창을 자동으로 띄운다. 경고까지 창을 열면
+            // 정상 실행마다 포커스를 빼앗는다.
+            isActivateToolWindowWhenFailed = failed
+        }
+        events.add(CompileStartEvent(descriptor, I18n.t("컴파일 중...", "Compiling...")))
 
         // "컴파일 에러:\n" 프리픽스 제거 후 파싱
         val compilerOutput = rawError
@@ -56,37 +86,53 @@ object BuildOutputPublisher {
             // 파싱 실패 시 원문 전체를 detail로 전달 (여전히 Build 창에서 보는 게 낫다).
             // OutputBuildEvent는 @NonExtendable이라 직접 구현할 수 없어 MessageEvent를 쓴다.
             val headline = compilerOutput.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
-                ?: I18n.t("컴파일 실패", "Compilation failed")
-            viewManager.onEvent(buildId, CompileMessageEvent(
-                buildId, MessageEvent.Kind.ERROR, "Compiler", headline, compilerOutput
+                ?: if (failed) I18n.t("컴파일 실패", "Compilation failed")
+                   else I18n.t("컴파일 경고", "Compiler warnings")
+            events.add(CompileMessageEvent(
+                buildId,
+                if (failed) MessageEvent.Kind.ERROR else MessageEvent.Kind.WARNING,
+                "Compiler", headline, compilerOutput
             ))
         } else {
+            // 사용자 파일 줄 수 — 래퍼/하네스가 만든 진단은 이 범위를 넘어간다.
+            // 범위를 넘는 줄에 이동을 붙이면 엉뚱한 위치로 점프하므로 메시지만 남긴다 (이슈 #32).
+            val userFileLines = userFile?.takeIf { it.isFile }
+                ?.let { runCatching { it.readLines().size }.getOrNull() }
+
             for (d in diags) {
                 // 임시 파일 진단을 실제 소스로 매핑 가능한 경우에만 클릭 이동 부여
                 val target = when {
                     userFile == null -> null
                     !wrapperStyle -> userFile                       // stdin형: 원형 그대로 → 1:1
-                    d.fileName == userFile.name -> userFile          // 래퍼형: 파일명 일치(Java 분리 파일)
+                    // 래퍼형 + 파일명 일치: Java만. Java는 사용자 클래스를 별도 파일로
+                    // 원형 유지하지만, 다른 언어는 임시 파일명이 solution.go처럼 고정이라
+                    // 사용자 파일 이름과 우연히 같아도 줄 보존을 뜻하지 않는다.
+                    language == Language.JAVA && d.fileName == userFile.name -> userFile
                     linePreservedWrapper -> userFile                 // 래퍼형: 줄 보존 언어 (하네스가 아래)
                     else -> null
                 }
-                val position = if (target != null && d.line > 0)
+                val inRange = userFileLines == null || d.line <= userFileLines
+                val position = if (target != null && d.line > 0 && inRange)
                     createFilePosition(target, d.line - 1, (d.column - 1).coerceAtLeast(0)) else null
                 if (position != null) {
-                    viewManager.onEvent(buildId, CompileFileMessageEvent(
+                    events.add(CompileFileMessageEvent(
                         buildId, d.severity, "Compiler", d.message, d.detail, position
                     ))
                 } else {
-                    viewManager.onEvent(buildId, CompileMessageEvent(
+                    events.add(CompileMessageEvent(
                         buildId, d.severity, "Compiler", d.message, d.detail
                     ))
                 }
             }
         }
 
-        viewManager.onEvent(buildId, CompileFinishEvent(
-            buildId, I18n.t("컴파일 실패", "Compilation failed")
+        events.add(CompileFinishEvent(
+            buildId,
+            if (failed) I18n.t("컴파일 실패", "Compilation failed")
+            else I18n.t("컴파일 성공 (경고 있음)", "Compiled with warnings"),
+            failed
         ))
+        return events
     }
 
     /**
@@ -130,8 +176,12 @@ object BuildOutputPublisher {
         val detail: String? = null
     )
 
-    private fun kindOf(word: String): MessageEvent.Kind =
-        if (word.contains("warn", ignoreCase = true)) MessageEvent.Kind.WARNING else MessageEvent.Kind.ERROR
+    // g++의 note:는 직전 진단의 부연 설명이라 오류로 세면 오류 개수가 부풀려진다
+    private fun kindOf(word: String): MessageEvent.Kind = when {
+        word.equals("note", ignoreCase = true) -> MessageEvent.Kind.INFO
+        word.contains("warn", ignoreCase = true) -> MessageEvent.Kind.WARNING
+        else -> MessageEvent.Kind.ERROR
+    }
 
     internal fun parse(language: Language, output: String): List<Diagnostic> = when (language) {
         Language.JAVA -> parseByPattern(output, Regex("""^(.+\.java):(\d+):\s*(error|warning):\s*(.+)$"""), colGroup = null)
@@ -209,10 +259,35 @@ object BuildOutputPublisher {
     }
 
     /** "file:line[:col]: severity: message" 꼴 공통 파서 (javac/kotlinc/g++) */
+    /**
+     * 헤드라인 다음에 오는 설명 줄들을 detail로 함께 담는다 (이슈 #32).
+     *
+     * javac는 `symbol:` / `location:` / 캐럿 줄을, g++·rustc는 소스 스니펫을
+     * 헤드라인 아래에 붙인다. 헤드라인만 담으면 Build 창 상세 콘솔이 비어
+     * 이슈가 요구한 '가독성'의 절반이 사라진다.
+     */
     private fun parseByPattern(output: String, pattern: Regex, colGroup: Int?): List<Diagnostic> {
         val diags = mutableListOf<Diagnostic>()
-        for (line in output.lineSequence()) {
-            val m = pattern.find(line.trim()) ?: continue
+        val pending = mutableListOf<String>()   // 직전 진단에 붙일 설명 줄
+        val lines = output.lines()
+
+        fun flush() {
+            if (pending.isEmpty()) return
+            val detail = pending.joinToString("\n").trimEnd()
+            if (detail.isNotBlank() && diags.isNotEmpty()) {
+                val last = diags.removeAt(diags.size - 1)
+                diags.add(last.copy(detail = last.message + "\n" + detail))
+            }
+            pending.clear()
+        }
+
+        for (line in lines) {
+            val m = pattern.find(line.trim())
+            if (m == null) {
+                if (diags.isNotEmpty() && line.isNotBlank()) pending.add(line)
+                continue
+            }
+            flush()
             val g = m.groupValues
             val sevIdx = if (colGroup != null) 4 else 3
             diags.add(Diagnostic(
@@ -223,6 +298,7 @@ object BuildOutputPublisher {
                 message = g[sevIdx + 1].trim()
             ))
         }
+        flush()
         return diags
     }
 

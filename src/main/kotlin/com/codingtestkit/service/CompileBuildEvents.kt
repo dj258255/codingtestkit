@@ -13,6 +13,8 @@ import com.intellij.build.events.FinishBuildEvent
 import com.intellij.build.events.MessageEvent
 import com.intellij.build.events.MessageEventResult
 import com.intellij.build.events.StartBuildEvent
+import com.intellij.build.events.SuccessResult
+import com.intellij.build.events.Warning
 import com.intellij.openapi.project.Project
 import com.intellij.pom.Navigatable
 
@@ -49,14 +51,25 @@ internal class CompileStartEvent(
     override fun getBuildDescriptor(): BuildDescriptor = descriptor
 }
 
-/** 빌드 종료 — 실패 결과로 마감해 빌드 노드가 빨간 실패 상태로 표시된다. */
+/**
+ * 빌드 종료. failed=true면 실패 결과로 마감해 빌드 노드가 빨간 실패 상태가 된다.
+ *
+ * 경고만 있는 빌드(컴파일 성공)를 실패로 마감하면 Build 창이 빨갛게 뜨고 창이
+ * 강제로 열려, 정상 빌드를 실패로 오인하게 된다 — 그래서 성공 마감이 따로 필요하다
+ * (이슈 #32).
+ */
 internal class CompileFinishEvent(
     id: Any,
     message: String,
+    private val failed: Boolean = true,
 ) : CompileBuildEvent(id, message), FinishBuildEvent {
-    override fun getResult(): EventResult = object : FailureResult {
-        override fun getFailures(): List<Failure> = emptyList()
-    }
+    override fun getResult(): EventResult =
+        if (failed) object : FailureResult {
+            override fun getFailures(): List<Failure> = emptyList()
+        } else object : SuccessResult {
+            override fun isUpToDate(): Boolean = false
+            override fun getWarnings(): List<Warning> = emptyList()
+        }
 }
 
 /**

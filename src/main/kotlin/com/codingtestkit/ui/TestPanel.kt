@@ -427,9 +427,13 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
     private fun isNeutralRan(tc: TestCase): Boolean =
         tc.passed == null && tc.actualOutput.isNotBlank()
 
-    /** Build 창에 게시할 진단인가: 컴파일 에러 또는 인터프리터 문법 에러(시작 실패) */
+    /**
+     * Build 창에 게시할 진단인가 (이슈 #32).
+     * 컴파일 에러 / 컴파일 경고 / 인터프리터 문법 에러(시작 실패) 셋 다 해당한다.
+     * 경고는 컴파일이 성공해도 나오므로 exitCode와 무관하게 판단해야 한다.
+     */
     private fun shouldPublishDiagnostics(result: CodeRunner.RunResult, language: Language): Boolean =
-        result.compileError ||
+        result.compileError || result.compileWarning.isNotBlank() ||
             (result.exitCode != 0 && com.codingtestkit.service.BuildOutputPublisher.isStartupError(language, result.error))
 
     /**
@@ -440,9 +444,15 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         val vf = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
             .selectedFiles.firstOrNull()
         val wrapperStyle = problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
+        // 컴파일 실패면 실패 진단을, 성공했는데 경고가 남았으면 경고를 게시한다.
+        // 후자는 빌드 노드를 실패로 물들이지 않고 창도 강제로 열지 않는다.
+        val compileFailed = result.compileError ||
+            (result.compileWarning.isBlank() && result.exitCode != 0)
+        val text = if (compileFailed) result.error else result.compileWarning
+        if (text.isBlank()) return
         com.codingtestkit.service.BuildOutputPublisher.publishCompileError(
-            project, language, result.error,
-            vf?.let { java.io.File(it.path) }, wrapperStyle
+            project, language, text,
+            vf?.let { java.io.File(it.path) }, wrapperStyle, compileFailed
         )
     }
 

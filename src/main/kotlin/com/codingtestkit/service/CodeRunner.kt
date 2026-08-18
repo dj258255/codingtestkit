@@ -26,8 +26,23 @@ object CodeRunner {
         val executionTimeMs: Long = 0,
         val peakMemoryKB: Long = 0,
         /** 컴파일 단계 실패 여부 (Build Output 창 게시용, 이슈 #32) */
-        val compileError: Boolean = false
+        val compileError: Boolean = false,
+        /**
+         * 컴파일에 성공했는데도 컴파일러가 남긴 출력 — 사실상 경고 (이슈 #32).
+         *
+         * 이슈가 요청한 것은 '경고'를 Build 창에서 보는 것인데, 진단을 실패 경로
+         * (compileError)에만 실으면 경고만 있는 빌드는 아무것도 전달되지 않는다.
+         * 성공 경로에서도 컴파일러 stderr를 그대로 들고 나온다.
+         */
+        val compileWarning: String = ""
     )
+
+    /**
+     * 컴파일이 성공했을 때 남은 컴파일러 출력(경고)을 실행 결과에 실어 보낸다 (이슈 #32).
+     * 컴파일 실패는 별도 경로로 이미 처리되므로 여기 오는 출력은 경고뿐이다.
+     */
+    private fun RunResult.withCompileWarning(compilerOutput: String): RunResult =
+        if (compilerOutput.isBlank()) this else copy(compileWarning = compilerOutput.trim())
 
     /**
      * 디버그 세션 시작 결과 (이슈 #36 Tier 1).
@@ -557,7 +572,9 @@ object CodeRunner {
         val solutionClass = if (code.contains("class Solution")) {
             code
         } else {
-            "class Solution {\n$code\n}"
+            // 여는 중괄호 뒤에 줄바꿈을 넣지 않는다 — 넣으면 사용자 코드가 한 줄씩
+            // 밀려 Build 창 진단이 한 줄 위로 이동한다 (이슈 #32).
+            "class Solution {$code\n}"
         }
 
         // import문 추출
@@ -1144,7 +1161,7 @@ end
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
             }
-            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout).withCompileWarning(compile.error)
         }
 
         val className = detectJavaClassName(code)
@@ -1166,7 +1183,7 @@ end
             if (compile.exitCode != 0) {
                 return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
             }
-            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout)
+            return executeProcess(javaCommand("-cp", dir.absolutePath, "Main"), dir, input, timeout).withCompileWarning(compile.error)
         }
 
         val sourceFile = File(dir, "$className.java")
@@ -1177,7 +1194,7 @@ end
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
-        return executeProcess(javaCommand("-cp", dir.absolutePath, className), dir, input, timeout)
+        return executeProcess(javaCommand("-cp", dir.absolutePath, className), dir, input, timeout).withCompileWarning(compile.error)
     }
 
     private fun javacCommand(vararg sourceFiles: File): List<String> {
@@ -1198,6 +1215,15 @@ end
         ) + args
     }
 
+    /**
+     * 코드에서 특정 클래스만 남긴 소스를 만든다 (Main + Solution 분리 컴파일용).
+     *
+     * 잘라 붙이지 않고 '대상 밖의 줄을 빈 줄로 치환'하는 이유는 줄 번호 보존이다
+     * (이슈 #32). 예전처럼 import + 클래스 본문을 이어 붙이면 임시 파일의 줄 번호가
+     * 원본과 어긋나, 컴파일 진단을 클릭했을 때 엉뚱한 줄로 이동한다 —
+     * BOJ·SWEA에서 가장 흔한 Main + Solution 레이아웃이 정확히 이 경우다.
+     * package·import는 컴파일에 필요하므로 제자리에 그대로 둔다.
+     */
     private fun extractJavaClass(code: String, className: String): String {
         val pattern = Regex("(class\\s+$className\\s*\\{)", RegexOption.DOT_MATCHES_ALL)
         val match = pattern.find(code) ?: return code
@@ -1215,16 +1241,18 @@ end
             }
         }
 
-        // import 문도 포함
-        val imports = code.lines()
-            .filter { it.trimStart().startsWith("import ") }
-            .joinToString("\n")
+        // 문자 오프셋 → 0-based 줄 번호
+        val startLine = code.substring(0, start).count { it == '\n' }
+        val endLine = code.substring(0, end).count { it == '\n' }
 
-        return if (imports.isNotBlank()) {
-            "$imports\n\n${code.substring(start, end)}"
-        } else {
-            code.substring(start, end)
-        }
+        return code.lines().mapIndexed { i, line ->
+            val kept = line.trimStart()
+            when {
+                i in startLine..endLine -> line                      // 대상 클래스 본문
+                kept.startsWith("import ") || kept.startsWith("package ") -> line
+                else -> ""                                            // 나머지는 빈 줄 — 줄 번호 보존
+            }
+        }.joinToString("\n")
     }
 
     private fun runPython(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -1266,7 +1294,7 @@ end
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
-        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
+        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout).withCompileWarning(compile.error)
     }
 
     private fun runKotlin(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -1290,7 +1318,7 @@ end
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
-        return executeProcess(javaCommand("-jar", jarFile.absolutePath), dir, input, timeout)
+        return executeProcess(javaCommand("-jar", jarFile.absolutePath), dir, input, timeout).withCompileWarning(compile.error)
     }
 
     private fun runJavaScript(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -1325,7 +1353,7 @@ end
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
-        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
+        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout).withCompileWarning(compile.error)
     }
 
     private fun runGo(code: String, input: String, dir: File, timeout: Long): RunResult {
@@ -1347,7 +1375,7 @@ end
             return RunResult(output = "", error = I18n.t("컴파일 에러", "Compile error") + ":\n${compile.error}", exitCode = compile.exitCode, compileError = true)
         }
 
-        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout)
+        return executeProcess(listOf(outputFile.absolutePath), dir, input, timeout).withCompileWarning(compile.error)
     }
 
     private fun runRuby(code: String, input: String, dir: File, timeout: Long): RunResult {
