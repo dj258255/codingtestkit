@@ -33,15 +33,66 @@ object CefDarkMode {
      * 로드 완료 시점에 설정을 읽어 적용 — 다이얼로그가 떠 있는 동안
      * 페이지를 오가도 계속 어둡게 유지된다.
      */
+    // 부착된 브라우저들 — 설정이나 IDE 테마가 바뀌면 이미 열려 있는 페이지도
+    // 다시 칠해야 한다. 다이얼로그가 닫혀도 참조가 남지 않도록 약한 참조로 들고,
+    // 죽은 참조는 순회할 때 정리한다 (이슈 #34).
+    private val attached = java.util.Collections.synchronizedList(
+        mutableListOf<java.lang.ref.WeakReference<JBCefBrowser>>()
+    )
+    private var themeHooksInstalled = false
+
     fun attach(browser: JBCefBrowser) {
+        installThemeHooks()
+        attached.add(java.lang.ref.WeakReference(browser))
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(cef: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
                 if (!frame.isMain) return
-                if (!isDarkEnabled()) return
-                cef.executeJavaScript(INJECT_JS, cef.url, 0)
+                cef.executeJavaScript(if (isDarkEnabled()) INJECT_JS else REMOVE_JS, cef.url, 0)
             }
         }, browser.cefBrowser)
     }
+
+    /**
+     * 설정 변경과 IDE 테마 변경을 한 번만 구독한다.
+     *
+     * 주입 시점이 onLoadEnd뿐이면 설정을 바꿔도 이미 열려 있는 페이지는 그대로다 —
+     * Dark→Light로 바꿔도 반전이 남고, Light→Dark로 바꿔도 밝은 채로 있다.
+     * FOLLOW_IDE는 JBColor.isBright()를 주입 시점에만 읽으므로 IDE 테마를 런타임에
+     * 바꾸면 따라오지 않는다. 둘 다 여기서 잡는다.
+     */
+    private fun installThemeHooks() {
+        if (themeHooksInstalled) return
+        themeHooksInstalled = true
+        PluginSettingsService.getInstance().addEmbedThemeListener { reapplyAll() }
+        com.intellij.openapi.application.ApplicationManager.getApplication().messageBus
+            .connect()
+            .subscribe(
+                com.intellij.ide.ui.LafManagerListener.TOPIC,
+                com.intellij.ide.ui.LafManagerListener { reapplyAll() }
+            )
+    }
+
+    /** 살아 있는 모든 임베드 브라우저에 현재 설정을 다시 적용 */
+    private fun reapplyAll() {
+        val script = if (isDarkEnabled()) INJECT_JS else REMOVE_JS
+        synchronized(attached) {
+            val it = attached.iterator()
+            while (it.hasNext()) {
+                val browser = it.next().get()
+                if (browser == null) { it.remove(); continue }
+                runCatching { browser.cefBrowser.executeJavaScript(script, browser.cefBrowser.url, 0) }
+            }
+        }
+    }
+
+    /** 주입한 다크 스타일을 걷어내고 재주입 가드를 푼다 */
+    private val REMOVE_JS = """
+        (function() {
+          var s = document.getElementById('ctk-dark-style');
+          if (s) s.remove();
+          window.__ctkDark = false;
+        })();
+    """.trimIndent()
 
     // 밝은 페이지(body 휘도 > 128)에만 필터를 씌운다. 이미지·비디오·캔버스는
     // 이중 반전으로 원색 유지. 중복 주입은 id로 방지.
@@ -51,10 +102,15 @@ object CefDarkMode {
     // 오히려 밝게 뒤집혀 문서가 뷰포트보다 짧을 때 하단에 밝은 띠가 생긴다
     // (이슈 #34 재보고). 흰색이 invert(0.92)를 거치면 ≈ #141414 다크가 된다.
     //
-    // 코드포스 헤더 로고는 투명 배경 + 어두운 글자라 원색 보존(이중 반전) 대상에서
-    // 제외 — 루트 반전만 받아 다크 배경 위 밝은 로고가 된다. 국기 아이콘 등 헤더의
-    // 다른 이미지는 원색 유지가 맞는데 이들도 codeforces.org 경로라, 로고 파일명
-    // 프리픽스인 "codeforces-"(하이픈 포함)로 좁혀야 도메인명에 오매칭되지 않는다.
+    // 코드포스 헤더 로고는 '불투명한 흰 판' 이미지다 (투명 픽셀 0%). 원색 보존
+    // 대상에 두면 이중 반전으로 다크 배경 위에 흰 사각형이 남는다 — 제외해서 루트
+    // 반전만 받게 해야 로고가 어두워진다.
+    //
+    // 셀렉터를 하나로 좁히지 않는 이유: 클래식 레이아웃은 div#header 안의
+    // codeforces-*.png 이지만, 새 프론트엔드는 <header>에 id가 없고 로고도
+    // /assets/img/logo.png 다. 한쪽만 겨누면 다른 쪽에서 조용히 아무것도 매칭되지
+    // 않아 제보자가 본 흰 판이 그대로 돌아온다. 국기 아이콘 등 다른 헤더 이미지는
+    // 원색 유지가 맞으므로 로고로 보이는 것만 고른다.
     private val INJECT_JS = """
         (function() {
           if (window.__ctkDark) return; // 같은 문서에 중복 부착 방지 (내비게이션 시 초기화됨)
@@ -103,8 +159,13 @@ object CefDarkMode {
               'html{filter:invert(0.92) hue-rotate(180deg)!important;background:#fff!important;}' +
               'img,video,canvas,iframe,embed,svg image,[style*="background-image"]' +
               '{filter:invert(1) hue-rotate(180deg)!important;}';
-            if (/(^|\.)codeforces\.com${'$'}/.test(location.hostname))
-              s.textContent += '#header img[src*="codeforces-"]{filter:none!important;}';
+            if (/(^|\.)codeforces\.(com|org)${'$'}/.test(location.hostname))
+              s.textContent +=
+                '#header img[src*="codeforces-"],' +
+                'header img[src*="logo"],' +
+                '#header img[src*="logo"],' +
+                'img[alt*="Codeforces" i]' +
+                '{filter:none!important;}';
             document.documentElement.appendChild(s);
           }
 

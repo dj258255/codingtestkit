@@ -216,5 +216,6 @@ class MainPanel(
 
     override fun dispose() {
         I18n.removeChangeListener(languageListener)
+        problemPanel.dispose()
     }
 }

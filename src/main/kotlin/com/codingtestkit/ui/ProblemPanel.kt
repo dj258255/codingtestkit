@@ -41,7 +41,7 @@ import java.awt.Color
 import java.awt.Font
 import javax.swing.*
 
-class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
+class ProblemPanel(private val project: Project) : JPanel(BorderLayout()), com.intellij.openapi.Disposable {
 
     private val sourceCombo = ComboBox(ProblemSource.entries.map { it.localizedName() }.toTypedArray()).apply {
         preferredSize = Dimension(JBUI.scale(88), preferredSize.height)
@@ -164,6 +164,11 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     private var isTranslated = false
     private var originalHtml: String? = null
     private var translatedHtml: String? = null
+    // 번역 결과를 HTML이 아니라 Problem 상태로도 들고 있는다. 테마가 바뀌면 CSS가
+    // 달라지므로 캐시된 HTML을 재사용할 수 없고 다시 그려야 한다 (이슈 #34).
+    private var translatedProblem: Problem? = null
+    private var translatedLang: String? = null
+    private val embedThemeListener: () -> Unit = { SwingUtilities.invokeLater { redrawForThemeChange() } }
 
     init {
         border = JBUI.Borders.empty()
@@ -359,11 +364,9 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         syncTimerBar()
 
         // 임베드 테마 설정 변경 시 이미 로드된 지문을 새 테마로 즉시 다시 그림 (이슈 #34)
-        com.codingtestkit.service.PluginSettingsService.getInstance().addEmbedThemeListener {
-            SwingUtilities.invokeLater {
-                currentProblem?.let { displayProblem(it) }
-            }
-        }
+        // 리스너는 애플리케이션 수명 서비스에 등록되므로, 패널이 사라질 때 직접
+        // 떼어내지 않으면 프로젝트를 닫아도 계속 쌓인다 (이슈 #34)
+        com.codingtestkit.service.PluginSettingsService.getInstance().addEmbedThemeListener(embedThemeListener)
 
         submitButton.isEnabled = false
         githubPushButton.isEnabled = false
@@ -1022,6 +1025,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         currentProblemFolder = files.folder
         isTranslated = false
         translatedHtml = null
+        translatedProblem = null
         translateButton.text = I18n.t("번역", "Translate")
         displayProblem(problem)
         translateButton.isEnabled = true
@@ -1049,6 +1053,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         currentProblemFolder = null
         isTranslated = false
         translatedHtml = null
+        translatedProblem = null
         translateButton.text = I18n.t("번역", "Translate")
         translateButton.isEnabled = false
         submitButton.isEnabled = false
@@ -1064,6 +1069,7 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
         currentProblemFolder = folder
         isTranslated = false
         translatedHtml = null
+        translatedProblem = null
         translateButton.text = I18n.t("번역", "Translate")
         displayProblem(problem)
         submitButton.isEnabled = true
@@ -1437,6 +1443,35 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
     /**
      * @param overrideLang 번역 시 예제 헤더 등을 타겟 언어로 강제 ("ko" or "en"), null이면 UI 언어 사용
      */
+    override fun dispose() {
+        com.codingtestkit.service.PluginSettingsService.getInstance()
+            .removeEmbedThemeListener(embedThemeListener)
+    }
+
+    /**
+     * 임베드 테마가 바뀌었을 때 현재 보고 있는 화면을 새 테마로 다시 그린다 (이슈 #34).
+     *
+     * 그냥 displayProblem(currentProblem)을 부르면 번역해서 보고 있던 사용자가
+     * 말없이 원문으로 돌아가고, 버튼 라벨은 '원문'인 채로 남아 상태가 어긋난다.
+     * 캐시된 translatedHtml은 이전 테마의 CSS를 물고 있어 재사용할 수도 없다.
+     */
+    private fun redrawForThemeChange() {
+        val problem = currentProblem ?: return
+        val translated = translatedProblem
+        if (isTranslated && translated != null) {
+            val prevOriginal = originalHtml
+            displayProblem(translated, overrideLang = translatedLang)
+            translatedHtml = originalHtml
+            originalHtml = prevOriginal
+            isTranslated = true
+            translateButton.text = I18n.t("원문", "Original")
+            return
+        }
+        // 번역본을 안 보고 있어도 캐시는 옛 테마 CSS라 무효화한다 — 다음 토글 때 다시 번역
+        translatedHtml = null
+        displayProblem(problem)
+    }
+
     private fun displayProblem(problem: Problem, overrideLang: String? = null) {
         // overrideLang이 지정되면 I18n 대신 직접 선택
         fun t(ko: String, en: String): String = when (overrideLang) {
@@ -1784,15 +1819,17 @@ class ProblemPanel(private val project: Project) : JPanel(BorderLayout()) {
                 val translatedDesc = TranslateService.translate(problem.description, descLang, targetLang)
                 val translatedTitle = TranslateService.translate(problem.title, descLang, targetLang)
                 // 번역된 설명으로 HTML 재생성
-                val translatedProblem = problem.copy(description = translatedDesc, title = translatedTitle)
+                val translatedProblem_ = problem.copy(description = translatedDesc, title = translatedTitle)
                 SwingUtilities.invokeLater {
                     // 번역된 HTML 빌드 (displayProblem과 동일한 로직이지만 originalHtml을 덮어쓰지 않음)
                     val prevOriginal = originalHtml
-                    displayProblem(translatedProblem, overrideLang = targetLang)
+                    displayProblem(translatedProblem_, overrideLang = targetLang)
                     translatedHtml = originalHtml
                     originalHtml = prevOriginal
 
                     isTranslated = true
+                    translatedProblem = translatedProblem_
+                    translatedLang = targetLang
                     translateButton.text = I18n.t("원문", "Original")
                     translateButton.isEnabled = true
                 }
