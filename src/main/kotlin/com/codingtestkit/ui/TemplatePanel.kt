@@ -3,7 +3,9 @@ package com.codingtestkit.ui
 import com.codingtestkit.service.I18n
 import com.codingtestkit.model.CodeTemplate
 import com.codingtestkit.model.Language
+import com.codingtestkit.model.Problem
 import com.codingtestkit.model.ProblemSource
+import com.codingtestkit.service.ProblemFileManager
 import com.codingtestkit.service.TemplateService
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
@@ -144,8 +146,13 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
     /** 우클릭한 항목을 선택하고 컨텍스트 메뉴 표시 (이슈 #35 — 기본 지정을 발견 가능하게) */
     private fun maybeShowContextMenu(e: java.awt.event.MouseEvent) {
         if (!e.isPopupTrigger) return
+        // locationToIndex는 '가장 가까운' 인덱스를 돌려주므로, 목록 아래 빈 영역을
+        // 우클릭하면 마지막 항목이 잡힌다 — 그 메뉴에 삭제가 있어서 위험하다.
+        // 셀 경계 안쪽인지 확인해야 한다.
         val index = templateList.locationToIndex(e.point)
         if (index < 0) return
+        val bounds = templateList.getCellBounds(index, index) ?: return
+        if (!bounds.contains(e.point)) return
         templateList.selectedIndex = index
         val template = getSelectedTemplate() ?: return
 
@@ -160,11 +167,13 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
                 "When set, new problems on that platform start with this template"
             )
         }
+        val currentDefaults = template.defaultPlatforms()
         for (src in ProblemSource.entries) {
-            val isCurrent = template.defaultForPlatform == src.name
+            val isCurrent = src.name in currentDefaults
             defaultMenu.add(JCheckBoxMenuItem(src.localizedName(), isCurrent).apply {
-                // 이미 기본인 플랫폼을 다시 클릭하면 지정 해제
-                addActionListener { setPlatformDefault(template, if (isCurrent) null else src) }
+                // 체크하면 추가, 이미 체크된 항목을 다시 누르면 그 플랫폼만 해제.
+                // 다른 플랫폼 지정은 그대로 둔다 — 한 템플릿이 여러 플랫폼의 기본일 수 있다.
+                addActionListener { togglePlatformDefault(template, src) }
             })
         }
         menu.add(defaultMenu)
@@ -175,12 +184,14 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         menu.show(templateList, e.x, e.y)
     }
 
-    /** 템플릿을 플랫폼 기본으로 지정/해제 (null = 해제, 이슈 #35) */
-    private fun setPlatformDefault(template: CodeTemplate, platform: ProblemSource?) {
+    /** 템플릿의 플랫폼 기본 지정을 토글 (이슈 #35) */
+    private fun togglePlatformDefault(template: CodeTemplate, platform: ProblemSource) {
         val service = TemplateService.getInstance(project)
-        if (platform != null) {
+        val current = template.defaultPlatforms()
+        val adding = platform.name !in current
+        if (adding) {
             val displaced = service.getTemplates().find {
-                it.name != template.name && it.defaultForPlatform == platform.name && it.language == template.language
+                it.name != template.name && platform.name in it.defaultPlatforms() && it.language == template.language
             }
             if (displaced != null) {
                 val ok = Messages.showYesNoDialog(
@@ -195,7 +206,8 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
                 if (ok != Messages.YES) return
             }
         }
-        service.saveTemplate(template.copy(defaultForPlatform = platform?.name))
+        val next = if (adding) current + platform.name else current - platform.name
+        service.saveTemplate(template.withDefaultPlatforms(next))
         refreshTemplateList()
     }
 
@@ -204,9 +216,9 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         val templates = TemplateService.getInstance(project).getTemplates()
         for (t in templates) {
             // 세 번째 조각 = 플랫폼 기본 배지 (없으면 빈 문자열, 이슈 #35)
-            val badge = t.defaultForPlatform?.let { p ->
+            val badge = t.defaultPlatforms().joinToString(", ") { p ->
                 ProblemSource.entries.find { it.name == p }?.localizedName() ?: p
-            } ?: ""
+            }
             templateListModel.addElement("${t.name}||${t.language}||$badge")
         }
     }
@@ -230,17 +242,44 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         )
         if (choice < 0 || choice == options.lastIndex) return
 
+        // 저장 대상에서 확장자로 언어를 유추한다 (상단 콤보보다 우선)
+        var savedLanguage: Language? = null
         val code = when (options[choice]) {
-            selectionLabel -> editor?.selectionModel?.selectedText ?: ""
+            selectionLabel -> {
+                savedLanguage = languageOf(editor?.virtualFile?.extension)
+                editor?.selectionModel?.selectedText ?: ""
+            }
             fileLabel -> {
                 // createSingleFileDescriptor()는 deprecated — jar 내부를 열지 않는 쪽이
                 // 소스 파일 선택 용도에도 맞는다
                 val descriptor = FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
                     .withTitle(I18n.t("템플릿으로 저장할 파일 선택", "Choose File to Save as Template"))
                 val vf = FileChooser.chooseFile(descriptor, project, null) ?: return
-                String(vf.contentsToByteArray(), vf.charset)
+                savedLanguage = languageOf(vf.extension)
+                // 바이너리·거대 파일·읽기 실패를 그냥 두면 예외가 EDT로 새어나가
+                // IDE 오류 리포트가 뜬다. 여기서 잡아 사용자에게 이유를 알린다.
+                val text = runCatching { String(vf.contentsToByteArray(), vf.charset) }.getOrElse { ex ->
+                    Messages.showWarningDialog(
+                        project,
+                        I18n.t("파일을 읽을 수 없습니다: ", "Cannot read the file: ") + (ex.message ?: ex.javaClass.simpleName),
+                        "CodingTestKit"
+                    )
+                    return
+                }
+                if (text.any { it == '\u0000' }) {
+                    Messages.showWarningDialog(
+                        project,
+                        I18n.t("텍스트 파일이 아닙니다.", "That is not a text file."),
+                        "CodingTestKit"
+                    )
+                    return
+                }
+                text
             }
-            else -> editor?.document?.text ?: ""
+            else -> {
+                savedLanguage = languageOf(editor?.virtualFile?.extension)
+                editor?.document?.text ?: ""
+            }
         }
         if (code.isBlank()) {
             Messages.showWarningDialog(project, I18n.t("저장할 코드가 없습니다.", "No code to save."), "CodingTestKit")
@@ -268,15 +307,50 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             if (ok != Messages.YES) return
         }
 
-        val language = Language.entries[languageCombo.selectedIndex]
+        // 언어는 저장 대상에서 유추한 값을 우선한다. 상단 콤보는 직전에 미리본
+        // 템플릿을 따라 바뀌므로, 그대로 믿으면 .py 파일을 Java로 저장하게 되고
+        // 그러면 findPlatformDefault가 영영 매칭되지 않는다 (이슈 #35).
+        val language = savedLanguage ?: Language.entries[languageCombo.selectedIndex]
         // 같은 이름 덮어쓰기 시 기존의 플랫폼 기본 지정은 유지 — 지정/해제는 우클릭 메뉴 담당
-        service.saveTemplate(CodeTemplate(
-            name = name, language = language.displayName, code = code,
-            defaultForPlatform = existing?.defaultForPlatform
-        ))
+        service.saveTemplate(
+            CodeTemplate(name = name, language = language.displayName, code = code)
+                .withDefaultPlatforms(existing?.defaultPlatforms() ?: emptySet())
+        )
         refreshTemplateList()
         Messages.showInfoMessage(project, I18n.t("'$name' 템플릿이 저장되었습니다.", "Template '$name' saved."), "CodingTestKit")
     }
+
+    /**
+     * 템플릿을 현재 문제에 맞춰 조합한다 (이슈 #35).
+     *
+     * 전체 교체는 파일을 처음 만들 때와 결과가 같아야 한다. 템플릿 코드를 그대로
+     * 쓰면 {{SOLUTION}}이 리터럴로 남고, 리트코드처럼 문제별 스텁이 필요한
+     * 플랫폼에서는 Solution 클래스가 사라져 제출이 깨진다 — 이슈가 경고한 바로
+     * 그 호환성 파괴다. 현재 문제를 못 찾으면(연습 파일 등) 템플릿 원본을 쓴다.
+     */
+    private fun composeForCurrentProblem(templateCode: String): String {
+        val problem = currentProblem() ?: return templateCode
+        val language = currentLanguage() ?: return templateCode
+        return ProblemFileManager.composeInitialCode(templateCode, problem, language)
+    }
+
+    /** 열려 있는 에디터 파일이 속한 문제 폴더에서 Problem 복원 */
+    private fun currentProblem(): Problem? {
+        val path = FileEditorManager.getInstance(project).selectedTextEditor
+            ?.virtualFile?.path ?: return null
+        val base = project.basePath ?: return null
+        val folder = ProblemFileManager.findProblemFolder(path, base) ?: return null
+        return ProblemFileManager.loadProblemFromFolder(folder)
+    }
+
+    /** 확장자로 언어 판별 */
+    private fun languageOf(extension: String?): Language? =
+        extension?.let { ext -> Language.entries.firstOrNull { it.extension.equals(ext, ignoreCase = true) } }
+
+    /** 에디터 파일 확장자로 언어 판별 (템플릿 언어가 아니라 실제 파일 기준) */
+    private fun currentLanguage(): Language? = languageOf(
+        FileEditorManager.getInstance(project).selectedTextEditor?.virtualFile?.extension
+    )
 
     private fun loadTemplate() {
         val template = getSelectedTemplate() ?: run {
@@ -310,7 +384,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             )
             when (choice) {
                 0 -> WriteCommandAction.runWriteCommandAction(project) {
-                    editor.document.setText(template.code)
+                    editor.document.setText(composeForCurrentProblem(template.code))
                 }
                 1 -> WriteCommandAction.runWriteCommandAction(project) {
                     editor.document.insertString(editor.caretModel.offset, template.code)
@@ -319,7 +393,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
             }
         } else {
             WriteCommandAction.runWriteCommandAction(project) {
-                editor.document.setText(template.code)
+                editor.document.setText(composeForCurrentProblem(template.code))
             }
         }
 

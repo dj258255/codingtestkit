@@ -51,8 +51,24 @@ data class CodeTemplate(
     var inputTemplate: String = "",
     // nullable: 기존 저장 JSON에 없는 필드라 Gson이 null을 넣음 (하위호환, 이슈 #35).
     // 값은 ProblemSource.name — 해당 플랫폼에서 새 문제를 열 때 이 템플릿이 초기 코드가 된다.
-    var defaultForPlatform: String? = null
-)
+    //
+    // defaultForPlatform(단수)은 v1.7.0 형식이다. 하나만 담을 수 있어 UI의 플랫폼
+    // 체크박스 여러 개와 어긋났고, 두 번째 플랫폼을 체크하면 첫 번째가 조용히
+    // 지워졌다. 복수형 필드를 정본으로 쓰되, 예전 버전이 읽어도 최소 하나는
+    // 살아 있도록 단수 필드도 함께 기록한다.
+    var defaultForPlatform: String? = null,
+    var defaultForPlatforms: MutableList<String>? = null
+) {
+    /** 이 템플릿이 기본으로 지정된 플랫폼들 (구·신 필드 통합 조회) */
+    fun defaultPlatforms(): Set<String> =
+        defaultForPlatforms?.toSet() ?: setOfNotNull(defaultForPlatform)
+
+    /** 지정 플랫폼 집합을 갱신한 사본 — 두 필드를 항상 함께 맞춘다 */
+    fun withDefaultPlatforms(platforms: Set<String>): CodeTemplate = copy(
+        defaultForPlatform = platforms.firstOrNull(),
+        defaultForPlatforms = if (platforms.isEmpty()) null else platforms.toMutableList()
+    )
+}
 
 enum class Language(
     val displayName: String,

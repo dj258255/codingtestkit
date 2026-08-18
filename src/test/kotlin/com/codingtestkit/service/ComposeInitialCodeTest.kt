@@ -51,6 +51,14 @@ class ComposeInitialCodeTest {
     }
 
     @Test
+    fun `자리표시자가 여러 번이어도 스텁은 한 번만`() {
+        val template = "{{SOLUTION}}\n// helpers\n{{SOLUTION}}"
+        val code = ProblemFileManager.composeInitialCode(template, problem(ProblemSource.LEETCODE, leetStub), Language.JAVA)
+        assertEquals(1, Regex("class Solution").findAll(code).count(), "Solution 클래스가 중복되면 컴파일이 깨진다")
+        assertFalse(code.contains("{{SOLUTION}}"), "남은 자리표시자는 제거돼야")
+    }
+
+    @Test
     fun `코드포스는 템플릿만 사용 - main 중복 방지`() {
         val template = "#include <bits/stdc++.h>\nint main() { return 0; }"
         val code = ProblemFileManager.composeInitialCode(template, problem(ProblemSource.CODEFORCES), Language.CPP)

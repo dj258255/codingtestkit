@@ -101,7 +101,11 @@ object ProblemFileManager {
         return when {
             userTemplate == null -> stub
             userTemplate.contains(SOLUTION_PLACEHOLDER) ->
-                userTemplate.replace(SOLUTION_PLACEHOLDER, problem.initialCode.ifBlank { stub })
+                // 첫 자리에만 스텁을 넣고 나머지 자리표시자는 지운다. 전부 치환하면
+                // Solution 클래스가 여러 개 생겨 컴파일이 깨진다 (이슈 #35).
+                userTemplate
+                    .replaceFirst(SOLUTION_PLACEHOLDER, problem.initialCode.ifBlank { stub })
+                    .replace(SOLUTION_PLACEHOLDER, "")
             problem.initialCode.isNotBlank() -> userTemplate.trimEnd() + "\n\n" + problem.initialCode
             else -> userTemplate
         }
@@ -243,6 +247,10 @@ object ProblemFileManager {
             "memoryLimit" to problem.memoryLimit,
             "contestProbId" to problem.contestProbId,
             "parameterNames" to problem.parameterNames,
+            // 플랫폼 스텁(리트코드 Solution 클래스 등). 저장해두지 않으면 사용자가
+            // 템플릿으로 파일을 덮어썼을 때 스텁을 되살릴 방법이 없다 (이슈 #35)
+            "initialCode" to problem.initialCode,
+            "parameterTypes" to problem.parameterTypes,
             "testCases" to problem.testCases.map { mapOf("input" to it.input, "expectedOutput" to it.expectedOutput) }
         ))
         File(folder, "problem.json").writeText(json)
@@ -284,6 +292,8 @@ object ProblemFileManager {
                 memoryLimit = json.get("memoryLimit")?.asString ?: "",
                 difficulty = json.get("difficulty")?.asString ?: "",
                 parameterNames = paramNames,
+                parameterTypes = json.getAsJsonArray("parameterTypes")?.map { it.asString },
+                initialCode = json.get("initialCode")?.asString ?: "",
                 contestProbId = json.get("contestProbId")?.asString ?: ""
             )
         } catch (_: Exception) { null }
