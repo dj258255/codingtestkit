@@ -78,7 +78,9 @@ class CppDebugAdapter : TestDebugAdapter {
                 settings.name = sessionName
 
                 if (input.isNotBlank()) {
-                    val inputFile = File(workingDir, "ctk_stdin.txt").apply { writeText(input, Charsets.UTF_8) }
+                    // 사용자 문제 폴더에 남기지 않는다 — 임시 파일 + 종료 시 삭제 (이슈 #36)
+                    val inputFile = File.createTempFile("ctk_stdin", ".txt")
+                        .apply { deleteOnExit(); writeText(input, Charsets.UTF_8) }
                     (settings.configuration as? InputRedirectAware.InputRedirectOptions)?.let {
                         it.isRedirectInput = true
                         it.redirectInputPath = inputFile.absolutePath

@@ -47,7 +47,9 @@ class PyDebugAdapter : TestDebugAdapter {
             cfg.scriptName = sourceFile.absolutePath
             cfg.workingDirectory = workingDir.absolutePath
             if (input.isNotBlank()) {
-                val inputFile = File(workingDir, "ctk_stdin.txt")
+                // 사용자 문제 폴더에 남기면 정리되지 않고 쌓인다 — 임시 디렉터리에 만들고
+                // JVM 종료 시 지운다 (이슈 #36)
+                val inputFile = File.createTempFile("ctk_stdin", ".txt").apply { deleteOnExit() }
                 inputFile.writeText(input, Charsets.UTF_8)
                 cfg.inputFile = inputFile.absolutePath
                 cfg.isRedirectInput = true

@@ -864,7 +864,9 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
             // 디버그 버튼 (이슈 #36 Tier 1) — ▶ 옆, tanmay 스케치 위치
             val debugBtn = JLabel(AllIcons.Actions.StartDebugger).apply {
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                toolTipText = I18n.t("이 케이스로 디버그 (Java/Kotlin)", "Debug this case (Java/Kotlin)")
+                toolTipText = I18n.t(
+                    "이 케이스 입력으로 디버거 실행 (언어에 맞는 IDE 필요)",
+                    "Debug this case with its input (requires the IDE for that language)")
                 border = JBUI.Borders.empty(0, 4)
             }
             debugBtn.addMouseListener(object : java.awt.event.MouseAdapter() {
