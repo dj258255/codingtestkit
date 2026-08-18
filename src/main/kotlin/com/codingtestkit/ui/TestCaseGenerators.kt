@@ -75,6 +75,13 @@ object TestCaseGenerators {
      * length는 2의 거듭제곱으로 올림(최소 4096 — 모든 홀수 base 충돌 보장).
      * @return (A, B) 두 문자열. 같은 base·mod 2^64 다항 해시에서 같은 값.
      */
+    /**
+     * Thue–Morse 충돌 문자열 쌍.
+     *
+     * 주의: [length]는 '최소 길이'다. 충돌 성질이 2의 거듭제곱 길이에서만 성립하므로
+     * 실제 길이는 length 이상의 2의 거듭제곱(최소 4096)으로 올림된다 — 요청한 길이가
+     * 그대로 나오지 않는다는 뜻이라 문법 문서에도 같은 설명을 적어 두었다 (이슈 #36).
+     */
     fun thueMorseAntiHash(length: Int): Pair<String, String> {
         // 2^10=1024면 최악 base도 충돌하지만, 여유를 두어 최소 4096
         var len = 1

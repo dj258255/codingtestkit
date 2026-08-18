@@ -291,10 +291,15 @@
                 <add-to-group group-id="EditorPopupMenu" anchor="last"/>
                 <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
             </action>
+            <!-- .ctk-format 편집 중에 바로 열 수 있어야 한다. 그룹에만 두면 Find Action
+                 으로만 도달해서, 요청받은 '에디터 옆 문서'가 되지 못한다 (이슈 #36) -->
             <action id="CodingTestKit.ShowFormatDocs"
                     class="com.codingtestkit.lang.ShowFormatDocsAction"
                     text="CodingTestKit: Generator Format Syntax"
-                    description="Show the generator format syntax reference"/>
+                    description="Show the generator format syntax reference">
+                <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+                <keyboard-shortcut keymap="$default" first-keystroke="control alt shift F1"/>
+            </action>
         </group>
     </actions>
 </idea-plugin>

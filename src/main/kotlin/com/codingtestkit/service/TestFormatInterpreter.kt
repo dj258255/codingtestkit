@@ -54,8 +54,19 @@ object TestFormatInterpreter {
         val out = StringBuilder()
         val rng = if (seed != null) Random(seed) else Random.Default
         Evaluator(rng, out, parser.macros).run(nodes, HashMap())
-        return out.toString()
+        return normalizeTrailingSpace(out.toString())
     }
+
+    /**
+     * 줄 끝 공백을 정리한다 (이슈 #36 명세: "'}' 앞 공백 무시").
+     *
+     * 파서 단계에서 '}' 앞 공백을 지우지 않는 이유: 그 공백은 서식이 아니라
+     * 반복 사이의 구분자다. repeat(3) { rand(1,10,x) }에서 지워버리면 값들이
+     * "5372"처럼 붙어 쓸 수 없는 입력이 된다. 대신 각 줄 끝에 남는 공백만
+     * 걷어내면 구분자는 살리면서 "1 1 1 " 같은 후행 공백 자국은 사라진다.
+     */
+    private fun normalizeTrailingSpace(text: String): String =
+        text.split("\n").joinToString("\n") { it.trimEnd(' ', '\t') }
 
     /** 문법 검사만 — 편집기 오류 표시용 (실행 없이 파싱만) */
     fun validate(source: String): FormatException? = try {
@@ -392,12 +403,11 @@ object TestFormatInterpreter {
 
         /**
          * 중괄호 바로 뒤의 공백을 흘린다 — 명세대로 '{' / '}' 뒤 공백은 내용이 아니라 서식.
-         * 반복 본문의 구분자(닫는 중괄호 '앞'의 공백·개행)는 본문에 남으므로,
-         * 반복마다 줄바꿈되는 형태는 그대로 유지된다.
          */
         private fun skipLayoutWhitespace() {
             while (pos < src.length && src[pos].isWhitespace()) pos++
         }
+
     }
 
     // ───────────────────────── 평가기 ─────────────────────────
@@ -446,7 +456,11 @@ object TestFormatInterpreter {
                 is Bound.Scalar -> b.value
                 is Bound.Arr -> throw FormatException("'${e.name}' is an array; use an aggregate like len(${e.name})", e.line, e.col)
                 is Bound.Rows -> throw FormatException("'${e.name}' is a structure; use an aggregate like len(${e.name})", e.line, e.col)
-                is Bound.Str -> throw FormatException("'${e.name}' is a string, not a number", e.line, e.col)
+                is Bound.Str -> throw FormatException(
+                    "'${e.name}' is text, not a number — rand_float and string values can be printed " +
+                        "and measured with len(${e.name}), but arithmetic works on integers only",
+                    e.line, e.col
+                )
                 null -> throw FormatException("unknown label '${e.name}'", e.line, e.col)
             }
             is Expr.Agg -> evalAggregate(e, scope)
@@ -593,9 +607,14 @@ object TestFormatInterpreter {
                 "anti_hash_str" -> {
                     val len = a.count(0)
                     val (s1, s2) = TestCaseGenerators.thueMorseAntiHash(len)
-                    // 라벨 둘 — 각각 한 줄로 출력 (충돌하는 문자열 쌍)
+                    // 라벨 둘 — 각각 한 줄로 출력 (충돌하는 문자열 쌍).
+                    // 구분 개행은 '둘 다 실제로 출력될 때'만 넣는다. _라벨로 숨긴
+                    // 쪽이 있는데도 개행을 넣으면 아무것도 출력하지 않기로 한 라벨이
+                    // 출력을 내는 셈이 된다 (이슈 #36 명세: _라벨은 묶기만 한다).
+                    val firstShown = !a.labelHidden(1)
+                    val secondShown = !a.labelHidden(2)
                     a.bindAndEmit(1, Bound.Str(s1), s1)
-                    a.emitRaw("\n")
+                    if (firstShown && secondShown) a.emitRaw("\n")
                     a.bindAndEmit(2, Bound.Str(s2), s2)
                 }
                 else -> {
@@ -632,8 +651,17 @@ object TestFormatInterpreter {
         private fun buildArray(type: String, n: Int, lo: GenNum, hi: GenNum, a: CallArgs): List<GenNum> =
             when (type) {
                 "RANDOM" -> List(n) { lo.rangeTo(hi, rng) }
-                "INCREASING" -> List(n) { lo + GenNum.of(it.toLong()) }
-                "DECREASING" -> List(n) { hi - GenNum.of(it.toLong()) }
+                // 연속 수열은 n개가 [lo,hi] 안에 들어가야 한다. 예전에는 클램프 없이
+                // lo+i / hi-i를 그대로 내보내 선언한 범위를 넘었다 (음수까지 내려감).
+                // 조용히 범위를 벗어나느니 왜 안 되는지 알려주는 편이 낫다 (이슈 #36).
+                "INCREASING", "DECREASING" -> {
+                    val span = hi - lo + GenNum.of(1L)
+                    if (span < GenNum.of(n.toLong())) a.fail(
+                        "$type needs a range wide enough for $n values, but [$lo, $hi] holds only $span"
+                    )
+                    if (type == "INCREASING") List(n) { lo + GenNum.of(it.toLong()) }
+                    else List(n) { hi - GenNum.of(it.toLong()) }
+                }
                 "CONSTANT" -> List(n) { lo }
                 "PERM0" -> MutableList(n) { GenNum.of(it.toLong()) }.also { it.shuffle(rng) }
                 "PERM1" -> MutableList(n) { GenNum.of((it + 1).toLong()) }.also { it.shuffle(rng) }
@@ -721,6 +749,10 @@ object TestFormatInterpreter {
                 scope[label] = value
                 if (!label.startsWith("_")) ev.emitValue(text)
             }
+
+            /** 해당 위치의 라벨이 _접두사(출력 안 함)인가 */
+            fun labelHidden(labelIndex: Int): Boolean =
+                arg(labelIndex).ident?.startsWith("_") == true
         }
     }
 }

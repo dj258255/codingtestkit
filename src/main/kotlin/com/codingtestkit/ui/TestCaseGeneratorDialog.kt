@@ -30,6 +30,10 @@ class TestCaseGeneratorDialog(
 ) : DialogWrapper(true) {
 
     companion object {
+        /** 미리보기 전용 고정 시드 — 타이핑 중 값이 요동치지 않게 */
+        private const val PREVIEW_SEED = 1L
+        private const val PREVIEW_LIMIT = 4000
+
         private val INT_ARRAY_TYPES = setOf("integer[]", "long[]", "list<integer>", "list<long>")
         private val STRING_ARRAY_TYPES = setOf("string[]", "list<string>")
         private val SCALAR_INT_TYPES = setOf("integer", "long")
@@ -105,6 +109,38 @@ class TestCaseGeneratorDialog(
      */
     private val advancedSeedField = JTextField("", 10)
 
+    /** 고급 탭 미리보기 — 형식이 실제로 어떤 입력을 만드는지 즉시 보여준다 (이슈 #36) */
+    private val previewArea = javax.swing.JTextArea().apply {
+        isEditable = false
+        font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, JBUI.scaleFontSize(12f))
+    }
+
+    /**
+     * 미리보기 갱신을 살짝 미뤄서 타이핑 도중 매 글자마다 생성하지 않게 한다.
+     * 미리보기는 고정 시드로 만든다 — 글자를 칠 때마다 값이 요동치면 형식이
+     * 맞는지 보려는 목적에 방해가 된다.
+     */
+    private val previewTimer = javax.swing.Timer(250) { refreshPreview() }.apply { isRepeats = false }
+
+    private fun schedulePreview() { previewTimer.restart() }
+
+    private fun refreshPreview() {
+        val src = formatArea.text
+        if (src.isBlank()) { previewArea.text = ""; return }
+        previewArea.text = try {
+            val out = com.codingtestkit.service.TestFormatInterpreter.generate(src, seed = PREVIEW_SEED)
+            // 미리보기는 형식 확인용이라 너무 길면 잘라 보여준다
+            if (out.length > PREVIEW_LIMIT)
+                out.take(PREVIEW_LIMIT) + "\n… " + I18n.t("(생략됨)", "(truncated)")
+            else out
+        } catch (e: com.codingtestkit.service.TestFormatInterpreter.FormatException) {
+            I18n.t("오류 (", "Error (") + I18n.t("${e.line}번째 줄", "line ${e.line}") + "): " + e.message
+        } catch (e: Exception) {
+            e.message ?: e.javaClass.simpleName
+        }
+        previewArea.caretPosition = 0
+    }
+
     /** 고급 탭이 선택돼 있으면 DSL로 생성한다 */
     private fun isAdvanced(): Boolean = tabs.selectedIndex == 1
 
@@ -125,7 +161,21 @@ class TestCaseGeneratorDialog(
             "Literals pass through; only <code>name(...)</code> calls are replaced. " +
                 "Lets you describe multi-part input formats (case count, n m, arrays) directly."
         ) + "</html>"), java.awt.BorderLayout.NORTH)
-        panel.add(com.intellij.ui.components.JBScrollPane(formatArea), java.awt.BorderLayout.CENTER)
+        // 형식 편집기 | 미리보기 — 형식은 눈으로 검산하기 어려워서, 작은 크기로
+        // 즉시 그려 보여줘야 "돌려보니 형식이 틀렸다"를 줄일 수 있다 (이슈 #36)
+        val split = com.intellij.ui.OnePixelSplitter(false, 0.62f).apply {
+            firstComponent = com.intellij.ui.components.JBScrollPane(formatArea)
+            secondComponent = com.intellij.ui.components.JBScrollPane(previewArea).apply {
+                border = JBUI.Borders.customLine(com.intellij.ui.JBColor.border(), 0, 1, 0, 0)
+            }
+        }
+        panel.add(split, java.awt.BorderLayout.CENTER)
+        formatArea.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent) = schedulePreview()
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent) = schedulePreview()
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent) = schedulePreview()
+        })
+        schedulePreview()
 
         val south = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT))
         south.add(JLabel(I18n.t("시드 (비우면 랜덤):", "Seed (blank = random):")))

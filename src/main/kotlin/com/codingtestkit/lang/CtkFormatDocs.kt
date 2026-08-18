@@ -71,9 +71,13 @@ object CtkFormatDocs {
             "anti_hash_int(n, label, [prime])" to I18n.t(
                 "std::unordered_map/set을 한 버킷에 몰아 O(N)로 만듦 (GCC libstdc++ 대상)",
                 "Collapses std::unordered_map/set into one bucket, O(N) per op (targets GCC libstdc++)"),
-            "anti_hash_str(length, labelA, labelB)" to I18n.t(
-                "mod 2^64 다항 해시가 어떤 base에서도 충돌하는 두 문자열",
-                "Two strings colliding under mod-2^64 polynomial hashing for any base"),
+            "anti_hash_str(minLength, labelA, labelB)" to I18n.t(
+                "mod 2^64 다항 해시가 어떤 base에서도 충돌하는 두 문자열. " +
+                    "충돌 성립에 2의 거듭제곱 길이가 필요해 실제 길이는 minLength 이상의 " +
+                    "2의 거듭제곱(최소 4096)으로 올림된다",
+                "Two strings colliding under mod-2^64 polynomial hashing for any base. " +
+                    "The collision needs a power-of-two length, so the actual length is rounded up " +
+                    "to a power of two of at least minLength (minimum 4096)"),
             "array(n, a, SPACE, QUICKSORT_KILLER)" to I18n.t(
                 "고전 단일피벗 퀵정렬을 O(n²)로 (introsort/TimSort는 무효)",
                 "Forces O(n²) on classic single-pivot quicksort (no effect on introsort/TimSort)")

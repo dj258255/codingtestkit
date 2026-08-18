@@ -135,13 +135,29 @@ class SpecConformanceTest {
     // (문법만 repeat(T as i) { ... } 로 합의)
     @Test
     fun `repeat counter runs from zero to t minus one inclusive`() {
-        assertEquals("0 1 2 3 ", gen("repeat(4 as i) {const(i, v) }"))
+        assertEquals("0 1 2 3", gen("repeat(4 as i) {const(i, v) }"))
     }
 
-    // "the white space after '{' or '}' should be ignored"
+    // 확정 문언: "whitespace right after `{` / before `}` ignored"
+    // (제보자의 첫 표현은 "after '{' or '}'"였지만 협의에서 위 문장으로 확정됐다.
+    //  대조표가 느슨한 쪽을 인용하면 지키지 못한 약속을 통과시키게 된다 — 실제로
+    //  '}' 앞 공백이 반복마다 후행 공백으로 남고 있었다.)
     @Test
-    fun `whitespace right after braces is ignored`() {
+    fun `whitespace right after the opening brace is ignored`() {
         assertEquals("1\n1\n", gen("repeat(2) {\n   const(1, a)\n}\n   "))
+    }
+
+    @Test
+    fun `no trailing space survives at the end of a line`() {
+        // '}' 앞 스페이스는 반복 사이의 구분자로 살리되, 줄 끝에 남는 자국은 없어야 한다
+        assertEquals("1 1 1", gen("repeat(3) {const(1, a) }"))
+        assertEquals("0 1 2 3", gen("repeat(4 as i) {const(i, v) }"))
+    }
+
+    @Test
+    fun `newline before the closing brace still separates iterations`() {
+        // 여러 줄 형태에서 마지막 개행은 서식이 아니라 반복 구분자다 — 지우면 안 된다
+        assertEquals("1\n1\n1\n", gen("repeat(3) {\nconst(1,a)\n}"))
     }
 
     // "you can allow simple arithmetic like (+,-,*,floor divide)"

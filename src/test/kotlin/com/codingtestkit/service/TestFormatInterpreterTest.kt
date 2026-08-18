@@ -89,9 +89,10 @@ class TestFormatInterpreterTest {
 
     @Test
     fun `repeat with counter and nesting`() {
-        assertEquals("0 1 2 ", gen("repeat(3 as i) {const(i, v) }"))
+        // 반복 사이 구분 공백은 살아 있되, 줄 끝 후행 공백은 남지 않는다 (이슈 #36)
+        assertEquals("0 1 2", gen("repeat(3 as i) {const(i, v) }"))
         // 중첩: 바깥 카운터를 안쪽에서 참조
-        assertEquals("0-0 0-1 1-0 1-1 ", gen("repeat(2 as i) {repeat(2 as j) {const(i, a)-const(j, b) } }"))
+        assertEquals("0-0 0-1 1-0 1-1", gen("repeat(2 as i) {repeat(2 as j) {const(i, a)-const(j, b) } }"))
     }
 
     @Test
