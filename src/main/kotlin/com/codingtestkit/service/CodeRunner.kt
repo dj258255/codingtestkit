@@ -517,10 +517,35 @@ object CodeRunner {
     /**
      * C++ 배열 변환: [1,2,3] → {1,2,3} (vector 초기화)
      */
+    /**
+     * C++ 인자 변환.
+     *
+     * 중괄호 리터럴 {1,2,3}을 그대로 넘기면 리트코드 표준 시그니처인
+     * `vector<int>& nums`(비-const 참조)에 바인딩되지 않아 컴파일이 깨진다.
+     * 그래서 _vec() 헬퍼로 진짜 vector 값을 만든다 — 호출부에서 이름 붙은
+     * 변수에 담으면 lvalue가 되어 참조 파라미터에도 바인딩된다.
+     */
     private fun toCppLiteral(value: String): String {
         val v = value.trim()
+        if (v.startsWith("\"")) return "string($v)"
         if (!v.startsWith("[")) return v
-        return v.replace('[', '{').replace(']', '}')
+        val inner = v.removePrefix("[").removeSuffix("]").trim()
+        if (inner.isEmpty()) return "_vec({})"
+        // 중첩 배열은 재귀적으로 _vec(...)로 감싼다
+        if (inner.startsWith("[")) {
+            val parts = mutableListOf<String>()
+            var depth = 0
+            val cur = StringBuilder()
+            for (c in inner) {
+                if (c == '[') depth++
+                if (c == ']') depth--
+                if (c == ',' && depth == 0) { parts.add(cur.toString()); cur.clear(); continue }
+                cur.append(c)
+            }
+            if (cur.isNotBlank()) parts.add(cur.toString())
+            return "_vec({" + parts.joinToString(", ") { toCppLiteral(it.trim()) } + "})"
+        }
+        return "_vec({$inner})"
     }
 
     /**
@@ -614,7 +639,98 @@ class Main {
 """.trimIndent()
     }
 
-    private fun wrapPython(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+    /**
+     * 래퍼형 플랫폼(리트코드/프로그래머스) 케이스를 IDE 디버거로 돌리기 위한 하네스 (이슈 #36).
+     *
+     * 문제: 이 플랫폼의 사용자 파일에는 main이 없고 함수·클래스 정의만 있다. 실행-소유
+     * 어댑터(Python/C++/Rust/JS/Ruby)는 파일을 '그대로' 실행하므로 아무 일도 일어나지
+     * 않고 끝났다.
+     *
+     * 해결: 실행할 파일을 따로 만들되, 그 파일이 사용자 파일을 '불러오게' 한다.
+     * 사용자 코드는 여전히 자기 경로·자기 줄 번호로 로드되므로 에디터에 찍은
+     * 브레이크포인트가 그대로 바인딩된다. 하네스 본문(인자 변환·결과 출력)은 실행
+     * 경로에서 쓰는 래퍼와 같은 코드를 재사용한다 — 디버그와 실행의 동작이 갈리지 않는다.
+     *
+     * @return 하네스 소스, 이 언어에서 지원하지 않으면 null
+     */
+    fun buildDebugHarness(
+        code: String,
+        language: Language,
+        testCase: TestCase,
+        parameterNames: List<String>,
+        userFile: File,
+    ): String? {
+        if (hasMainFunction(code, language)) return null   // stdin형은 하네스가 필요 없다
+        val inputValues = testCase.input.split("\n").map { it.trim() }
+        val path = userFile.absolutePath
+        return when (language) {
+            Language.PYTHON -> wrapPython(code, inputValues, parameterNames, pythonLoader(path))
+            Language.JAVASCRIPT -> wrapJavaScript(code, inputValues, parameterNames, jsLoader(path))
+            Language.RUBY -> wrapRuby(code, inputValues, parameterNames, rubyLoader(path))
+            Language.CPP -> wrapCpp(code, inputValues, parameterNames, cppLoader(path))
+            Language.RUST -> wrapRust(code, inputValues, parameterNames, rustLoader(path))
+            // JVM은 attach 방식이라 하네스 파일이 필요 없고, Go는 dlv가 사용자 파일로 빌드한다
+            Language.JAVA, Language.KOTLIN, Language.GO -> null
+        }
+    }
+
+    /** 하네스 소스에 파일 경로를 문자열 리터럴로 박을 때의 이스케이프 (윈도우 역슬래시) */
+    private fun literalPath(path: String): String = path.replace("\\", "\\\\").replace("\"", "\\\"")
+
+    /**
+     * importlib으로 실제 경로에서 로드해야 파이썬이 그 파일 이름으로 코드 객체를 만들고,
+     * 디버거가 브레이크포인트를 붙일 수 있다. exec(open(...).read())는 파일 이름이
+     * 사라져 브레이크포인트가 붙지 않는다.
+     */
+    private fun pythonLoader(path: String): String = """
+import importlib.util as _ctk_ilu
+_ctk_spec = _ctk_ilu.spec_from_file_location("ctk_user", "${literalPath(path)}")
+_ctk_mod = _ctk_ilu.module_from_spec(_ctk_spec)
+_ctk_spec.loader.exec_module(_ctk_mod)
+globals().update({_k: _v for _k, _v in vars(_ctk_mod).items() if not _k.startswith("__")})
+""".trim()
+
+    /**
+     * require는 모듈 스코프라 리트코드식 `var twoSum = function(){}`이 밖으로 나오지 않는다.
+     * vm.runInThisContext에 filename을 주면 전역 스코프에 실행되면서도 그 파일 이름으로
+     * 컴파일돼 브레이크포인트가 바인딩된다.
+     */
+    private fun jsLoader(path: String): String = """
+const _ctkVm = require('vm');
+const _ctkFs = require('fs');
+_ctkVm.runInThisContext(
+  _ctkFs.readFileSync("${literalPath(path)}", 'utf8'),
+  { filename: "${literalPath(path)}" }
+);
+""".trim()
+
+    /** load는 파일을 그 경로 그대로 평가하므로 정의가 전역에 남고 브레이크포인트도 붙는다 */
+    private fun rubyLoader(path: String): String = """
+load "${literalPath(path)}"
+""".trim()
+
+    /** 같은 번역 단위로 들어가므로 디버그 정보가 사용자 파일 경로를 가리킨다 */
+    private fun cppLoader(path: String): String = """
+#include "${literalPath(path)}"
+""".trim()
+
+    /** include!는 사용자 파일 내용을 크레이트에 넣으면서 원본 경로의 디버그 정보를 유지한다 */
+    private fun rustLoader(path: String): String = """
+include!("${literalPath(path)}");
+""".trim()
+
+    private fun wrapPython(
+        code: String,
+        inputValues: List<String>,
+        @Suppress("UNUSED_PARAMETER") paramNames: List<String>,
+        /**
+         * 결과물에 실제로 박아 넣을 "사용자 코드 자리".
+         * 기본은 코드 자체(실행용)지만, 디버그 하네스는 여기에 사용자 파일을
+         * 불러오는 로더를 넣는다 — 그래야 브레이크포인트가 사용자 파일에 붙는다.
+         * 메서드명 탐지 등 분석은 항상 code(원본)로 한다.
+         */
+        codeSlot: String = code,
+    ): String {
         val args = inputValues.joinToString(", ")
         val hasClass = code.contains("class Solution")
 
@@ -641,7 +757,7 @@ class Main {
         // 사용자 코드가 1번 줄부터 원형 그대로 시작해야 브레이크포인트·진단 줄번호가
         // 1:1로 맞는다 (이슈 #36 디버깅 / #32 소스 이동). import는 하단 하네스로.
         return """
-$code
+$codeSlot
 
 # 사용자 print()를 stderr로 리다이렉트
 import sys as _sys
@@ -660,8 +776,22 @@ else:
 """.trimIndent()
     }
 
-    private fun wrapCpp(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
-        val args = inputValues.joinToString(", ") { toCppLiteral(it) }
+    private fun wrapCpp(
+        code: String,
+        inputValues: List<String>,
+        @Suppress("UNUSED_PARAMETER") paramNames: List<String>,
+        /**
+         * 결과물에 실제로 박아 넣을 "사용자 코드 자리".
+         * 기본은 코드 자체(실행용)지만, 디버그 하네스는 여기에 사용자 파일을
+         * 불러오는 로더를 넣는다 — 그래야 브레이크포인트가 사용자 파일에 붙는다.
+         * 메서드명 탐지 등 분석은 항상 code(원본)로 한다.
+         */
+        codeSlot: String = code,
+    ): String {
+        // 인자를 이름 붙은 변수에 먼저 담는다 — 임시값은 `vector<int>&`에 못 붙는다
+        val argDecls = inputValues.mapIndexed { i, v -> "    auto _a$i = ${toCppLiteral(v)};" }
+            .joinToString("\n")
+        val args = inputValues.indices.joinToString(", ") { "_a$it" }
         val hasClass = code.contains("class Solution")
 
         // C++: 함수/메서드명 추출 (solution 이름 우선, 없으면 마지막 매칭)
@@ -670,25 +800,26 @@ else:
             .map { it.groupValues[1] }
             .filter { it !in excluded && !it.startsWith("~") }.toList()
         val methodName = cppMethods.find { it == "solution" } ?: cppMethods.lastOrNull() ?: "solution"
-        // 사용자 코드가 1번 줄부터 원형 유지되도록, include가 이미 있으면(일반적)
-        // 아무것도 프리펜드하지 않는다. include가 없을 때만 보충 (줄이 밀리지만 드묾)
-        val hasInclude = code.contains("#include")
-        val prefix = if (hasInclude) "" else """
+        val callExpr = if (hasClass) {
+            "$argDecls\n    Solution sol;\n    auto _result = sol.$methodName($args);"
+        } else {
+            "$argDecls\n    auto _result = $methodName($args);"
+        }
+
+        // 하네스가 쓰는 헤더는 사용자 코드 '아래'에 넣는다. 위에 프리펜드하면 사용자
+        // 코드 줄이 밀려 브레이크포인트와 컴파일 진단이 어긋나고(이슈 #36/#32),
+        // 반대로 넣지 않으면 사용자가 <iostream>을 포함하지 않았을 때 하네스가
+        // 컴파일되지 않는다. C++는 중간 #include가 합법이라 아래로 내리면 둘 다 해결된다.
+        return """
+$codeSlot
+
 #include <iostream>
 #include <vector>
 #include <string>
 using namespace std;
 
-""".trimStart('\n')
-
-        val callExpr = if (hasClass) {
-            "    Solution sol;\n    auto _result = sol.$methodName($args);"
-        } else {
-            "    auto _result = $methodName($args);"
-        }
-
-        return prefix + """
-$code
+// initializer_list → vector. 이름 붙은 변수에 담아야 참조 파라미터에 바인딩된다.
+template<typename T> vector<T> _vec(initializer_list<T> l) { return vector<T>(l); }
 
 template<typename T> void _print(T r) { cout << r; }
 void _print(string r) { cout << "\"" << r << "\""; }
@@ -753,7 +884,18 @@ $callExpr
 """.trimIndent()
     }
 
-    private fun wrapJavaScript(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+    private fun wrapJavaScript(
+        code: String,
+        inputValues: List<String>,
+        @Suppress("UNUSED_PARAMETER") paramNames: List<String>,
+        /**
+         * 결과물에 실제로 박아 넣을 "사용자 코드 자리".
+         * 기본은 코드 자체(실행용)지만, 디버그 하네스는 여기에 사용자 파일을
+         * 불러오는 로더를 넣는다 — 그래야 브레이크포인트가 사용자 파일에 붙는다.
+         * 메서드명 탐지 등 분석은 항상 code(원본)로 한다.
+         */
+        codeSlot: String = code,
+    ): String {
         val args = inputValues.joinToString(", ")
         // JS: var/function/arrow 메서드명 또는 prototype.메서드명 추출 (solution 우선)
         val jsFuncs = Regex("""(?:var|const|let)\s+(\w+)\s*=\s*(?:function|\([^)]*\)\s*=>|\w+\s*=>)|\.prototype\.(\w+)\s*=|function\s+(\w+)""").findAll(code)
@@ -761,7 +903,7 @@ $callExpr
             .filter { it != "main" }.toList()
         val methodName = jsFuncs.find { it == "solution" } ?: jsFuncs.lastOrNull() ?: "solution"
         return """
-$code
+$codeSlot
 
 // 사용자 console.log를 stderr로 리다이렉트
 const _origLog = console.log;
@@ -844,7 +986,18 @@ else console.log(_result);
         }
     }
 
-    private fun wrapRust(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+    private fun wrapRust(
+        code: String,
+        inputValues: List<String>,
+        @Suppress("UNUSED_PARAMETER") paramNames: List<String>,
+        /**
+         * 결과물에 실제로 박아 넣을 "사용자 코드 자리".
+         * 기본은 코드 자체(실행용)지만, 디버그 하네스는 여기에 사용자 파일을
+         * 불러오는 로더를 넣는다 — 그래야 브레이크포인트가 사용자 파일에 붙는다.
+         * 메서드명 탐지 등 분석은 항상 code(원본)로 한다.
+         */
+        codeSlot: String = code,
+    ): String {
         val args = inputValues.joinToString(", ") { toRustLiteral(it) }
 
         // fn 메서드명 추출 (solution 우선, 없으면 마지막)
@@ -861,7 +1014,7 @@ else console.log(_result);
         val callExpr = if (hasImpl) "Solution::$methodName($args)" else "$methodName($args)"
 
         return """
-$code
+$codeSlot
 $structDecl
 fn main() {
     let _result = $callExpr;
@@ -902,7 +1055,18 @@ func main() {
 """.trimIndent()
     }
 
-    private fun wrapRuby(code: String, inputValues: List<String>, @Suppress("UNUSED_PARAMETER") paramNames: List<String>): String {
+    private fun wrapRuby(
+        code: String,
+        inputValues: List<String>,
+        @Suppress("UNUSED_PARAMETER") paramNames: List<String>,
+        /**
+         * 결과물에 실제로 박아 넣을 "사용자 코드 자리".
+         * 기본은 코드 자체(실행용)지만, 디버그 하네스는 여기에 사용자 파일을
+         * 불러오는 로더를 넣는다 — 그래야 브레이크포인트가 사용자 파일에 붙는다.
+         * 메서드명 탐지 등 분석은 항상 code(원본)로 한다.
+         */
+        codeSlot: String = code,
+    ): String {
         val args = inputValues.joinToString(", ")
 
         val rbMethods = Regex("""def\s+(\w+)""").findAll(code)
@@ -912,7 +1076,7 @@ func main() {
 
         // require는 하단 하네스로 — 사용자 코드 줄번호 원형 보존 (이슈 #36/#32)
         return """
-$code
+$codeSlot
 
 # 사용자 puts를 stderr로 리다이렉트
 require 'json'

@@ -75,10 +75,12 @@ object BuildOutputPublisher {
             .removePrefix("컴파일 에러:\n").removePrefix("Compile error:\n")
 
         // 래퍼가 사용자 코드 줄번호를 보존하는 언어 (하네스가 코드 아래에만 붙음)
-        // — 래퍼형 실행이어도 클릭 이동이 정확함. C++는 include 미보유 시 프리펜드가
-        // 있어 제외, Java는 별도 파일 이름 일치 규칙으로 커버, Go는 package 프리펜드로 제외.
+        // — 래퍼형 실행이어도 클릭 이동이 정확하다. C++도 하네스 헤더를 사용자 코드
+        // 아래로 내리면서 프리펜드가 사라져 합류했다. Java는 별도 파일 이름 일치
+        // 규칙으로 커버하고, Go만 package 프리펜드 때문에 남아 있다.
         val linePreservedWrapper = language in setOf(
-            Language.PYTHON, Language.KOTLIN, Language.JAVASCRIPT, Language.RUST, Language.RUBY
+            Language.PYTHON, Language.KOTLIN, Language.JAVASCRIPT,
+            Language.RUST, Language.RUBY, Language.CPP
         )
 
         val diags = parse(language, compilerOutput)

@@ -557,6 +557,21 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
      * 언어에 맞는 TestDebugAdapter(EP)를 찾아 디버그 서버에 attach한다.
      * 어댑터가 없으면(그 언어의 디버거가 이 IDE에 없음) 맞는 IDE를 안내한다.
      */
+    /**
+     * 디버그 하네스를 사용자 파일 옆에 쓴다 (이슈 #36).
+     *
+     * 임시 디렉터리가 아니라 문제 폴더에 두는 이유: CLion·RustRover 같은 IDE는
+     * 프로젝트 밖 파일에 실행 구성을 만들어 주지 않는 경우가 있고, 하네스가
+     * 사용자 파일을 상대 경로 없이 절대 경로로 참조하므로 위치 자체는 자유롭다.
+     * 이름을 ctk_debug_* 로 고정해 매번 덮어쓰고, JVM 종료 시 지운다.
+     */
+    private fun writeDebugHarness(source: String, language: Language, userFile: java.io.File): java.io.File {
+        val file = java.io.File(userFile.parentFile, "ctk_debug_${userFile.nameWithoutExtension}.${language.extension}")
+        file.writeText(source, Charsets.UTF_8)
+        file.deleteOnExit()
+        return file
+    }
+
     /** 리트코드/프로그래머스처럼 플러그인이 실행 래퍼를 씌우는 플랫폼인가 */
     private fun wrapperStyleProblem(): Boolean =
         problemSource == ProblemSource.PROGRAMMERS || problemSource == ProblemSource.LEETCODE
@@ -597,27 +612,6 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
         // 실행-소유(Python/Rust/C++): IDE가 프로그램을 처음부터 디버거 아래에서 실행.
         // 케이스 입력은 실행 구성의 입력 리다이렉션으로 전달돼 attach 레이스가 없다.
         if (adapter.ownsLaunch()) {
-            // 실행-소유 어댑터는 사용자 파일을 '그대로' 실행한다. 래퍼형 플랫폼
-            // (리트코드/프로그래머스)의 파일에는 main이 없고 함수·클래스 정의만
-            // 있으므로, 그대로 디버그하면 브레이크포인트에 닿지 않고 즉시 끝난다.
-            // 예전에는 그래도 "디버그 세션 시작됨"이라고 보고해서 조용히 실패했다.
-            // JVM(Java/Kotlin)만 래퍼를 줄 보존으로 만들어 디버깅이 성립한다 (이슈 #36).
-            if (wrapperStyleProblem()) {
-                Messages.showInfoMessage(project, I18n.t(
-                    "${language.displayName}은(는) 이 플랫폼에서 케이스 디버깅을 지원하지 않습니다.\n" +
-                        "리트코드·프로그래머스 문제는 플러그인이 실행용 래퍼를 씌우는데, " +
-                        "${language.displayName} 디버깅은 파일을 그대로 실행하므로 " +
-                        "브레이크포인트에 닿지 않습니다.\n\n" +
-                        "현재 이 플랫폼에서 디버깅 가능한 언어: Java, Kotlin.\n" +
-                        "코드포스·SWEA 등 stdin 방식 문제에서는 ${language.displayName}도 디버깅됩니다.",
-                    "${language.displayName} case debugging is not supported on this platform.\n" +
-                        "LeetCode/Programmers problems are run through a generated wrapper, but " +
-                        "${language.displayName} debugging runs your file as-is, so breakpoints are never hit.\n\n" +
-                        "Debuggable on this platform: Java, Kotlin.\n" +
-                        "On stdin-style problems (Codeforces, SWEA) ${language.displayName} debugging works."
-                ), "CodingTestKit")
-                return
-            }
             if (userFile == null || !userFile.exists()) {
                 Messages.showWarningDialog(project, I18n.t(
                     "디버깅하려면 소스 파일을 먼저 저장하세요.", "Please save the source file before debugging."), "CodingTestKit")
@@ -631,7 +625,17 @@ class TestPanel(private val project: Project) : JPanel(BorderLayout()) {
                 // launchDebug는 Cargo 프로젝트 attach 등 blocking 작업을 포함할 수 있어 백그라운드에서 호출.
                 // 내부에서 실제 실행(executeConfiguration)만 EDT로 넘긴다.
                 // C++/Python/Rust 모두 IDE가 컴파일·실행을 담당하므로 우리는 소스 파일 경로만 넘긴다.
-                val ok = adapter.launchDebug(project, sessionName, userFile, tc.input, userFile.parentFile, null)
+                // 래퍼형 플랫폼(리트코드/프로그래머스)의 파일에는 main이 없다. 그대로
+                // 실행하면 브레이크포인트에 닿지 않고 끝나므로, 사용자 파일을 '불러오는'
+                // 하네스를 만들어 그쪽을 실행한다 — 사용자 코드는 자기 경로로 로드되니
+                // 에디터에 찍은 브레이크포인트가 그대로 바인딩된다 (이슈 #36).
+                val harness = if (wrapperStyleProblem())
+                    com.codingtestkit.service.CodeRunner.buildDebugHarness(
+                        code, language, tc, parameterNames, userFile
+                    ) else null
+                val entryFile = harness?.let { writeDebugHarness(it, language, userFile) } ?: userFile
+                val stdin = if (harness != null) "" else tc.input   // 하네스는 인자를 코드에 담고 있다
+                val ok = adapter.launchDebug(project, sessionName, entryFile, stdin, userFile.parentFile, null)
                 SwingUtilities.invokeLater {
                     running = false; runButton.isEnabled = true
                     if (!ok) {

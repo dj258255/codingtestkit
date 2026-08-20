@@ -175,12 +175,16 @@ class CodeRunnerTest {
     // ── toCppLiteral ──
 
     @Test
-    fun `toCppLiteral converts brackets to braces`() {
+    fun `toCppLiteral builds real vectors, not brace lists`() {
         val method = CodeRunner::class.java.getDeclaredMethod("toCppLiteral", String::class.java)
         method.isAccessible = true
 
-        assertEquals("{1, 2, 3}", method.invoke(CodeRunner, "[1, 2, 3]"))
-        assertEquals("{{1,2},{3,4}}", method.invoke(CodeRunner, "[[1,2],[3,4]]"))
+        // 중괄호 리터럴은 리트코드 표준 시그니처 vector<int>&(비-const 참조)에
+        // 바인딩되지 않아 컴파일이 깨진다 — 실제 vector 값을 만들어야 한다
+        assertEquals("_vec({1, 2, 3})", method.invoke(CodeRunner, "[1, 2, 3]"))
+        assertEquals("_vec({_vec({1,2}), _vec({3,4})})", method.invoke(CodeRunner, "[[1,2],[3,4]]"))
+        assertEquals("_vec({})", method.invoke(CodeRunner, "[]"))
+        assertEquals("string(\"abc\")", method.invoke(CodeRunner, "\"abc\""))
     }
 
     @Test
