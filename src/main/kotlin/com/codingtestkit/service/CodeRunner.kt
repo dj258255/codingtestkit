@@ -674,6 +674,24 @@ class Main {
         }
     }
 
+    /**
+     * 언어별 '사용자 파일 불러오기' 스니펫만 반환 (테스트·진단용).
+     *
+     * 브레이크포인트가 붙는 근거는 "런타임이 그 함수의 소스 위치를 사용자 파일로
+     * 해석하는가"다. 로더만 떼어 놓으면 그 사실을 언어별로 직접 측정할 수 있다.
+     */
+    internal fun debugLoaderFor(language: Language, userFile: File): String? {
+        val path = userFile.absolutePath
+        return when (language) {
+            Language.PYTHON -> pythonLoader(path)
+            Language.JAVASCRIPT -> jsLoader(path)
+            Language.RUBY -> rubyLoader(path)
+            Language.CPP -> cppLoader(path)
+            Language.RUST -> rustLoader(path)
+            Language.JAVA, Language.KOTLIN, Language.GO -> null
+        }
+    }
+
     /** 하네스 소스에 파일 경로를 문자열 리터럴로 박을 때의 이스케이프 (윈도우 역슬래시) */
     private fun literalPath(path: String): String = path.replace("\\", "\\\\").replace("\"", "\\\"")
 

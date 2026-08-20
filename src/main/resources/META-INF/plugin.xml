@@ -157,6 +157,21 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>v1.8.1</h3>
+        <p><b>LeetCode/Programmers case debugging</b> for Python, C++, Rust, JavaScript and Ruby — and a C++ run fix.</p>
+
+        <b>English</b>
+        <ul>
+            <li><b>[New] Debugging a test case on LeetCode/Programmers now works in Python, C++, Rust, JavaScript and Ruby</b> – Previously only Java and Kotlin could do this; the other languages ran your file as-is, and since a wrapper-platform file has no <code>main</code>, the session started and ended without ever reaching a breakpoint. The plugin now runs a small harness that <i>loads</i> your file instead of replacing it, so your code keeps its own path and line numbers and your breakpoints bind normally. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[Fix] C++ on LeetCode/Programmers failed to compile</b> – Arguments were passed as brace lists, which cannot bind to LeetCode's standard <code>vector&lt;int&gt;&amp;</code> parameter, and the harness headers were prepended above your code so a file without <code>&lt;iostream&gt;</code> broke the build. Both are fixed, and because the headers no longer shift your lines, C++ compiler diagnostics on those platforms are now clickable in the Build window too. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>, <a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
+        </ul>
+
+        <b>한국어</b>
+        <ul>
+            <li><b>[신규] 리트코드·프로그래머스 케이스 디버깅이 Python·C++·Rust·JavaScript·Ruby에서도 됩니다</b> – 전에는 Java·Kotlin만 가능했고, 나머지 언어는 파일을 그대로 실행했습니다. 래퍼 플랫폼의 파일에는 <code>main</code>이 없어서 세션이 시작됐다가 브레이크포인트에 닿지 못하고 끝났습니다. 이제 사용자 파일을 <i>불러오는</i> 작은 하네스를 실행하므로, 코드가 자기 경로와 줄 번호를 그대로 유지하고 브레이크포인트가 정상적으로 바인딩됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
+            <li><b>[수정] 리트코드·프로그래머스에서 C++이 컴파일되지 않던 문제</b> – 인자를 중괄호 리스트로 넘겨 리트코드 표준 파라미터 <code>vector&lt;int&gt;&amp;</code>에 바인딩되지 않았고, 하네스 헤더를 코드 위에 붙여서 <code>&lt;iostream&gt;</code>이 없는 파일은 빌드가 깨졌습니다. 둘 다 고쳤고, 헤더가 더 이상 줄을 밀지 않게 되면서 이 플랫폼의 C++ 컴파일 진단도 Build 창에서 클릭 이동이 됩니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>, <a href="https://github.com/dj258255/codingtestkit/issues/32">#32</a>)</li>
+        </ul>
+
         <h3>v1.8.0</h3>
         <p><b>Generator format</b> for describing complex test inputs, plus fixes to Build Output diagnostics, embedded dark mode, and the template panel.</p>
 
@@ -184,19 +199,6 @@
             <li><b>[수정] 템플릿 불러오기가 리트코드 제출을 깨뜨리던 문제</b> – '전체 교체'가 템플릿 원본을 그대로 써서, 패널이 안내한 <code>{{SOLUTION}}</code>을 쓴 템플릿이 오히려 필수 <code>Solution</code> 클래스를 잃고 자리표시자만 남겼습니다. 이제 새 문제 파일을 만들 때와 같은 방식으로 조합하고, 스텁을 저장해 언제든 되살릴 수 있습니다. 한 템플릿을 여러 플랫폼의 기본으로 지정하는 것도 가능해졌습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/35">#35</a>)</li>
             <li><b>[수정] 커스텀 체커가 생성 케이스를 전부 실패로 표시하던 문제</b> – 체커가 중립 판정보다 먼저 실행되면서 통과/불통과만 답할 수 있었고, 기본 템플릿은 생성 케이스에 없는 기대 출력과 비교했습니다. 이제 체커가 <code>CHECK</code>로 판정을 보류할 수 있고, 체커 자체가 실패해도 풀이를 불통과로 만들지 않습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
             <li><b>[수정] 리트코드 케이스를 Python/C++/Rust/JS/Ruby로 디버그하면 아무 데도 멈추지 않고 성공했다고 표시되던 문제</b> – 이 언어들은 파일을 그대로 실행하는데 래퍼 플랫폼의 파일에는 <code>main</code>이 없습니다. 이제 그 사실과 디버깅이 되는 곳을 안내합니다. 생성 다이얼로그 고급 탭에 라이브 미리보기도 추가했습니다. (<a href="https://github.com/dj258255/codingtestkit/issues/36">#36</a>)</li>
-        </ul>
-
-        <h3>v1.7.1</h3>
-        <p><b>Fix:</b> maximizing the problem statement no longer deletes tabs.</p>
-
-        <b>English</b>
-        <ul>
-            <li><b>[Fix] Maximize/restore deleting tabs</b> – After maximizing the problem statement (⤢), restoring removed the "Problems" tab and left the statement stuck under the "Tests" tab; repeating the toggle dropped one more tab each cycle. Restore now re-inserts the "Problems" tab correctly. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
-        </ul>
-
-        <b>한국어</b>
-        <ul>
-            <li><b>[수정] 최대화/복원 시 탭이 사라지던 문제</b> – 지문 최대화(⤢) 후 복원하면 "문제" 탭이 사라지고 지문이 "테스트" 탭에 눌어붙었으며, 토글을 반복할 때마다 탭이 하나씩 더 사라졌습니다. 이제 복원 시 "문제" 탭이 올바르게 되살아납니다. (<a href="https://github.com/dj258255/codingtestkit/issues/33">#33</a>)</li>
         </ul>
 
     ]]></change-notes>
