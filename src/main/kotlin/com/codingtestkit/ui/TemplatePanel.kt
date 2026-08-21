@@ -155,7 +155,14 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         if (!bounds.contains(e.point)) return
         templateList.selectedIndex = index
         val template = getSelectedTemplate() ?: return
+        buildTemplateContextMenu(template).show(templateList, e.x, e.y)
+    }
 
+    /**
+     * 우클릭 메뉴 구성 (이슈 #35).
+     * 마우스 이벤트 처리와 분리해 둔다 — 메뉴에 무엇이 올라가는지는 이벤트 없이도 검증돼야 한다.
+     */
+    internal fun buildTemplateContextMenu(template: CodeTemplate): JPopupMenu {
         val menu = JPopupMenu()
         menu.add(JMenuItem(I18n.t("에디터에 불러오기", "Load into Editor"), AllIcons.Actions.Upload).apply {
             addActionListener { loadTemplate() }
@@ -181,7 +188,7 @@ class TemplatePanel(private val project: Project) : JPanel(BorderLayout()), Disp
         menu.add(JMenuItem(I18n.t("삭제", "Delete"), AllIcons.General.Remove).apply {
             addActionListener { deleteTemplate() }
         })
-        menu.show(templateList, e.x, e.y)
+        return menu
     }
 
     /** 템플릿의 플랫폼 기본 지정을 토글 (이슈 #35) */

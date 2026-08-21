@@ -21,8 +21,19 @@ dependencies {
         // 일반 Python 실행 구성(PythonConfigurationType)은 PythonCore에 있음 —
         // Community에도 있어 무료 PyCharm까지 커버된다.
         bundledPlugin("PythonCore")
+        // 실제 PyCharm 플랫폼에서 어댑터 배선을 검증하기 위한 헤드리스 테스트 (이슈 #36).
+        // 이 어댑터는 PyCharm API에 이름으로 접근하는 부분이 있어, 컴파일만으로는
+        // 런타임에 그 이름이 실제로 존재하는지 알 수 없다.
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
     compileOnly(project(":core"))
+    testImplementation(project(":core"))
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.test {
+    // 플랫폼 테스트는 JUnit3/4 계열
+    jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
 }
 
 java {

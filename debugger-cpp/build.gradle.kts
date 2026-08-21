@@ -20,8 +20,17 @@ dependencies {
         // 어댑터는 구성 타입을 ID로 찾고 리플렉션으로 설정하므로 CLion 클래스 직접 참조가 없다.
         // (CppFileRunConfiguration은 V2 콘텐츠 모듈이라 컴파일해도 런타임 클래스로더가 격리됨)
         clion("2026.1.4")
+        // 실제 IDE 플랫폼에서 어댑터 배선 검증 (이슈 #36) — 컴파일만으로는
+        // 런타임에 그 API가 실제로 존재하는지 알 수 없다.
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
     compileOnly(project(":core"))
+    testImplementation(project(":core"))
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.test {
+    jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
 }
 
 java {

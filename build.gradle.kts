@@ -30,8 +30,12 @@ dependencies {
     implementation(project(":debugger-cpp"))
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testRuntimeOnly("junit:junit:4.13.2")
+    // 컴파일 시점에도 필요하다 — BasePlatformTestCase의 상위 타입이 junit.framework.TestCase다
+    testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
+    // IntelliJ 플랫폼 테스트(BasePlatformTestCase)는 JUnit3/4 계열이라, JUnit Platform
+    // 러너가 수집하려면 vintage 엔진이 필요하다. 없으면 조용히 실행되지 않는다.
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
 
     intellijPlatform {
         intellijIdeaCommunity("2024.3")

@@ -20,9 +20,17 @@ dependencies {
         goland("2024.3")
         // Go Remote 디버그 설정 타입은 GoLand에 번들된 Go 플러그인에 있음
         bundledPlugin("org.jetbrains.plugins.go")
+        // 실제 GoLand 플랫폼에서 어댑터 배선 검증 (이슈 #36)
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
     // 코어(어댑터 인터페이스)는 메인 플러그인이 이미 배포에 포함하므로 컴파일 전용
     compileOnly(project(":core"))
+    testImplementation(project(":core"))
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.test {
+    jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
 }
 
 java {
