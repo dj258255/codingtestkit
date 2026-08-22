@@ -92,6 +92,60 @@ class BreakpointHitTest {
     }
 
     @Test
+    fun `cpp breakpoint on the user file is hit with the case arguments`(@TempDir dir: Path) {
+        assumeTrue(toolExists("g++", "--version"))
+        assumeTrue(toolExists("lldb", "--version"))
+
+        val user = dir.resolve("Solution.cpp").toFile()
+        user.writeText(
+            """
+            #include <vector>
+            #include <unordered_map>
+            using namespace std;
+            class Solution {
+            public:
+                vector<int> twoSum(vector<int>& nums, int target) {
+                    unordered_map<int,int> seen;
+                    for (int i = 0; i < (int)nums.size(); i++) {
+                        int need = target - nums[i];
+                        if (seen.count(need)) return {seen[need], i};
+                        seen[nums[i]] = i;
+                    }
+                    return {};
+                }
+            };
+            """.trimIndent()
+        )
+        val breakLine = 9   // int need = target - nums[i];
+
+        val harness = CodeRunner.buildDebugHarness(
+            user.readText(), Language.CPP, twoSum, listOf("nums", "target"), user
+        ) ?: fail("하네스가 생성돼야 한다")
+        val harnessFile = dir.resolve("ctk_debug_Solution.cpp").toFile().apply { writeText(harness) }
+
+        val bin = dir.resolve("ctk_debug_bin").toFile()
+        val (cExit, cOut) = exec(dir.toFile(), "g++", "-std=c++17", "-g", "-O0",
+            "-o", bin.absolutePath, harnessFile.absolutePath)
+        assertEquals(0, cExit, cOut)
+
+        // CLion이 macOS에서 구동하는 디버거가 바로 lldb다 — 같은 방식으로 중단점을 건다
+        val (_, out) = exec(
+            dir.toFile(), "lldb", "-b",
+            "-o", "breakpoint set --file Solution.cpp --line $breakLine",
+            "-o", "run",
+            "-o", "frame variable target",
+            bin.absolutePath
+        )
+        assertTrue(out.contains("stop reason = breakpoint"),
+            "사용자 파일 $breakLine 번 줄에서 멈추지 않았다 — 디버거가 잡지 못한다:\n$out")
+        assertTrue(out.contains("Solution.cpp:$breakLine"),
+            "멈춘 위치가 사용자 파일이어야 한다 (하네스가 아니라):\n$out")
+        assertTrue(out.contains("target = 9"), "멈춘 지점에서 케이스 인자가 보여야 한다:\n$out")
+        assertTrue(out.contains("nums=size=4") || out.contains("nums = size=4"),
+            "멈춘 지점에서 nums가 보여야 한다:\n$out")
+    }
+
+    @Test
     fun `ruby breakpoint on the user file is hit with the case arguments`(@TempDir dir: Path) {
         assumeTrue(toolExists("ruby", "--version"))
 
